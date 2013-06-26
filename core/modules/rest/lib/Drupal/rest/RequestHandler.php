@@ -85,7 +85,7 @@ class RequestHandler extends ContainerAware {
     // format requirement. If there is no format associated, just pick HAL.
     $format = $request->attributes->get(RouteObjectInterface::ROUTE_OBJECT)->getRequirement('_format') ?: 'hal_json';
     try {
-      $response = call_user_method_array($method, $resource, array_merge($parameters, array($unserialized, $request)));
+      $response = call_user_func_array(array($resource, $method), array_merge($parameters, array($unserialized, $request)));
     }
     catch (HttpException $e) {
       $error['error'] = $e->getMessage();

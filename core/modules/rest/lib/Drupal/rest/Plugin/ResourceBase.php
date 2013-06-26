@@ -42,8 +42,8 @@ abstract class ResourceBase extends PluginBase implements ResourceInterface {
     $collection = new RouteCollection();
 
     $definition = $this->getPluginDefinition();
-    $canonical_path = isset($definition['links']['canonical']) ? $definition['links']['canonical'] : strtr($this->pluginId, ':', '/') . '/{id}';
-    $create_path = isset($definition['links']['drupal:create']) ? $definition['links']['drupal:create'] : strtr($this->pluginId, ':', '/');
+    $canonical_path = isset($definition['links']['canonical']) ? $definition['links']['canonical'] : '/' . strtr($this->pluginId, ':', '/') . '/{id}';
+    $create_path = isset($definition['links']['drupal:create']) ? $definition['links']['drupal:create'] : '/' . strtr($this->pluginId, ':', '/');
 
     $route_name = strtr($this->pluginId, ':', '.');
 

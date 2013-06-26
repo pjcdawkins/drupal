@@ -46,6 +46,13 @@ class EntityDerivative implements DerivativeInterface {
           'serialization_class' => $entity_info['class'],
           'label' => $entity_info['label'],
         );
+        // Use the entity links as REST URL patterns if available.
+        if (isset($entity_info['links']['canonical'])) {
+          $this->derivatives[$entity_type]['links']['canonical'] = $entity_info['links']['canonical'];
+        }
+        if (isset($entity_info['links']['drupal:create'])) {
+          $this->derivatives[$entity_type]['links']['drupal:create'] = $entity_info['links']['drupal:create'];
+        }
         $this->derivatives[$entity_type] += $base_plugin_definition;
       }
     }

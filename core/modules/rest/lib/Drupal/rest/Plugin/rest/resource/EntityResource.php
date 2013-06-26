@@ -25,7 +25,11 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *   id = "entity",
  *   label = @Translation("Entity"),
  *   serialization_class = "Drupal\Core\Entity\Entity",
- *   derivative = "Drupal\rest\Plugin\Derivative\EntityDerivative"
+ *   derivative = "Drupal\rest\Plugin\Derivative\EntityDerivative",
+ *   links = {
+ *     "canonical" = "/entity/{entity_type}/{entity}",
+ *     "drupal:create" = "/entity/{entity_type}"
+ *   }
  * )
  */
 class EntityResource extends ResourceBase {
@@ -33,17 +37,19 @@ class EntityResource extends ResourceBase {
   /**
    * Responds to entity GET requests.
    *
-   * @param mixed $id
-   *   The entity ID.
+   * @param mixed $entity
+   *   The entity ID or the already upcasted entity object.
    *
    * @return \Drupal\rest\ResourceResponse
    *   The response containing the loaded entity.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\HttpException
    */
-  public function get($id) {
-    $definition = $this->getPluginDefinition();
-    $entity = entity_load($definition['entity_type'], $id);
+  public function get($entity) {
+    if (is_scalar($entity)) {
+      $definition = $this->getPluginDefinition();
+      $entity = entity_load($definition['entity_type'], $entity);
+    }
     if ($entity) {
       if (!$entity->access('view')) {
         throw new AccessDeniedHttpException();

@@ -40,13 +40,17 @@ abstract class ResourceBase extends PluginBase implements ResourceInterface {
    */
   public function routes() {
     $collection = new RouteCollection();
-    $path_prefix = strtr($this->pluginId, ':', '/');
+
+    $definition = $this->getPluginDefinition();
+    $canonical_path = isset($definition['links']['canonical']) ? $definition['links']['canonical'] : strtr($this->pluginId, ':', '/') . '/{id}';
+    $create_path = isset($definition['links']['drupal:create']) ? $definition['links']['drupal:create'] : strtr($this->pluginId, ':', '/');
+
     $route_name = strtr($this->pluginId, ':', '.');
 
     $methods = $this->availableMethods();
     foreach ($methods as $method) {
       $lower_method = strtolower($method);
-      $route = new Route("/$path_prefix/{id}", array(
+      $route = new Route($canonical_path, array(
         '_controller' => 'Drupal\rest\RequestHandler::handle',
         // Pass the resource plugin ID along as default property.
         '_plugin' => $this->pluginId,
@@ -59,7 +63,7 @@ abstract class ResourceBase extends PluginBase implements ResourceInterface {
       switch ($method) {
         case 'POST':
           // POST routes do not require an ID in the URL path.
-          $route->setPattern("/$path_prefix");
+          $route->setPattern($create_path);
           $route->addDefaults(array('id' => NULL));
           $collection->add("$route_name.$method", $route);
           break;

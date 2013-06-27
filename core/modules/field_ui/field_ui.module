@@ -56,10 +56,8 @@ function field_ui_menu() {
   $items['admin/reports/fields'] = array(
     'title' => 'Field list',
     'description' => 'Overview of fields on all entity types.',
-    'page callback' => 'field_ui_fields_list',
-    'access arguments' => array('administer content types'),
+    'route_name' => 'field_list',
     'type' => MENU_NORMAL_ITEM,
-    'file' => 'field_ui.admin.inc',
   );
   $items['admin/reports/fields/list'] = array(
     'title' => 'Entities',
@@ -238,6 +236,7 @@ function field_ui_element_info() {
  */
 function field_ui_entity_info(&$entity_info) {
   $entity_info['field_instance']['controllers']['form']['delete'] = 'Drupal\field_ui\Form\FieldDeleteForm';
+  $entity_info['field_entity']['controllers']['list'] = 'Drupal\field_ui\FieldListController';
 }
 
 /**
@@ -268,13 +267,11 @@ function field_ui_entity_bundle_rename($entity_type, $bundle_old, $bundle_new) {
  */
 function field_ui_form_node_type_form_alter(&$form, $form_state) {
   // We want to display the button only on add page.
-  if (empty($form['#node_type']->type)) {
-    $form['actions']['save_continue'] = array(
-      '#type' => 'submit',
-      '#value' => t('Save and manage fields'),
-      '#weight' => 45,
-    );
-    $form['#submit'][] = 'field_ui_form_node_type_form_submit';
+  if ($form_state['controller']->getEntity()->isNew()) {
+    $form['actions']['save_continue'] = $form['actions']['submit'];
+    $form['actions']['save_continue']['#value'] = t('Save and manage fields');
+    $form['actions']['save_continue']['#weight'] = $form['actions']['save_continue']['#weight'] + 5;
+    $form['actions']['save_continue']['#submit'][] = 'field_ui_form_node_type_form_submit';
   }
 }
 

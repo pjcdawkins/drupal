@@ -29,10 +29,11 @@ use Drupal\Core\Language\Language;
  *   },
  *   base_table = "entity_test",
  *   fieldable = TRUE,
+ *   field_cache = FALSE,
  *   entity_keys = {
  *     "id" = "id",
  *     "uuid" = "uuid",
- *     "bundle" = "type"
+ *     "bundle" = "type",
  *   },
  *   menu_base_path = "entity-test/manage/%entity_test"
  * )

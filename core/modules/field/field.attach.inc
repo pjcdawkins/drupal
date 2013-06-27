@@ -507,6 +507,8 @@ function _field_invoke_widget_target($form_display) {
  *   An associative array of additional options. See field_invoke_method() for
  *   details.
  *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
+ *
  * @see field_form_get_state()
  * @see field_form_set_state()
  */
@@ -562,6 +564,8 @@ function field_attach_form(EntityInterface $entity, &$form, &$form_state, $langc
  *   - instance: A field instance entity, If provided, only values for the
  *     corresponding field will be loaded, and no cache is written. This
  *     option is only supported when all $entities are within the same bundle.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_load($entity_type, $entities, $age = FIELD_LOAD_CURRENT, $options = array()) {
   $load_current = $age == FIELD_LOAD_CURRENT;
@@ -733,6 +737,8 @@ function field_attach_load($entity_type, $entities, $age = FIELD_LOAD_CURRENT, $
  * @param $options
  *   An associative array of additional options. See field_attach_load() for
  *   details.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_load_revision($entity_type, $entities, $options = array()) {
   return field_attach_load($entity_type, $entities, FIELD_LOAD_REVISION, $options);
@@ -766,6 +772,8 @@ function field_attach_load_revision($entity_type, $entities, $options = array())
  * @param array $options
  *   An associative array of additional options. See field_invoke_method() for
  *   details.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_form_validate(EntityInterface $entity, $form, &$form_state, array $options = array()) {
   // Only support NG entities.
@@ -813,6 +821,8 @@ function field_attach_form_validate(EntityInterface $entity, $form, &$form_state
  * @param array $options
  *   An associative array of additional options. See field_invoke_method() for
  *   details.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_extract_form_values(EntityInterface $entity, $form, &$form_state, array $options = array()) {
   // Ensure we are working with a BC mode entity.
@@ -843,6 +853,8 @@ function field_attach_extract_form_values(EntityInterface $entity, $form, &$form
  * @return
  *   Default values (if any) will be added to the $entity parameter for fields
  *   it leaves unspecified.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_insert(EntityInterface $entity) {
   // Ensure we are working with a BC mode entity.
@@ -882,6 +894,8 @@ function field_attach_insert(EntityInterface $entity) {
  *
  * @param \Drupal\Core\Entity\EntityInterface $entity
  *   The entity with fields to save.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_update(EntityInterface $entity) {
   // Ensure we are working with a BC mode entity.
@@ -900,16 +914,9 @@ function field_attach_update(EntityInterface $entity) {
   foreach (field_info_instances($entity->entityType(), $entity->bundle()) as $instance) {
     $field = field_info_field_by_id($instance['field_id']);
     $field_id = $field['uuid'];
-    $field_name = $field['field_name'];
-    // Leave the field untouched if $entity comes with no $field_name property,
-    // but empty the field if it comes as a NULL value or an empty array.
-    // Function property_exists() is slower, so we catch the more frequent
-    // cases where it's an empty array with the faster isset().
-    if (isset($entity->$field_name) || property_exists($entity, $field_name)) {
-      // Collect the storage backend if the field has not been written yet.
-      if (!isset($skip_fields[$field_id])) {
-        $storages[$field['storage']['type']][$field_id] = $field_id;
-      }
+    // Collect the storage backend if the field has not been written yet.
+    if (!isset($skip_fields[$field_id])) {
+      $storages[$field['storage']['type']][$field_id] = $field_id;
     }
   }
 
@@ -931,6 +938,8 @@ function field_attach_update(EntityInterface $entity) {
  *
  * @param \Drupal\Core\Entity\EntityInterface $entity
  *   The entity whose field data to delete.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_delete(EntityInterface $entity) {
   // Ensure we are working with a BC mode entity.
@@ -962,6 +971,8 @@ function field_attach_delete(EntityInterface $entity) {
  *
  * @param \Drupal\Core\Entity\EntityInterface $entity
  *   The entity with fields to save.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_delete_revision(EntityInterface $entity) {
   // Ensure we are working with a BC mode entity.
@@ -1005,6 +1016,8 @@ function field_attach_delete_revision(EntityInterface $entity) {
  * @param $langcode
  *   (Optional) The language the field values are to be shown in. If no language
  *   is provided the current language is used.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_prepare_view($entity_type, array $entities, array $displays, $langcode = NULL) {
   $options['langcode'] = array();
@@ -1067,6 +1080,8 @@ function field_attach_prepare_view($entity_type, array $entities, array $display
  *
  * @return array
  *   A renderable array for the field values.
+ *
+ * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_view(EntityInterface $entity, EntityDisplay $display, $langcode = NULL, array $options = array()) {
   // Ensure we are working with a BC mode entity.
@@ -1161,7 +1176,7 @@ function field_entity_bundle_rename($entity_type, $bundle_old, $bundle_new) {
     }
   }
 
-  // Clear the cache.
+  // Clear the field cache.
   field_cache_clear();
 
   // Update bundle settings.

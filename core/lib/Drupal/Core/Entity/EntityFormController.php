@@ -59,7 +59,15 @@ class EntityFormController implements EntityFormControllerInterface {
    * {@inheritdoc}
    */
   public function getBaseFormID() {
-    return $this->entity->entityType() . '_form';
+    // Assign ENTITYTYPE_form as base form ID to invoke corresponding
+    // hook_form_alter(), #validate, #submit, and #theme callbacks, but only if
+    // it is different from the actual form ID, since callbacks would be invoked
+    // twice otherwise.
+    $base_form_id = $this->entity->entityType() . '_form';
+    if ($base_form_id == $this->getFormID()) {
+      $base_form_id = '';
+    }
+    return $base_form_id;
   }
 
   /**
@@ -426,6 +434,10 @@ class EntityFormController implements EntityFormControllerInterface {
    */
   public function buildEntity(array $form, array &$form_state) {
     $entity = clone $this->entity;
+    // If you submit a form, the form state comes from caching, which forces
+    // the controller to be the one before caching. Ensure to have the
+    // controller of the current request.
+    $form_state['controller'] = $this;
     // @todo Move entity_form_submit_build_entity() here.
     // @todo Exploit the Field API to process the submitted entity field.
     entity_form_submit_build_entity($entity->entityType(), $entity, $form, $form_state);

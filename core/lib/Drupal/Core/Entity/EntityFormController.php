@@ -325,6 +325,17 @@ class EntityFormController implements EntityFormControllerInterface {
           $violations[$field->getName()] = $field_violations;
         }
       }
+      // Now trigger the validation for entity base fields that are not
+      // configurable.
+      foreach ($definitions as $field_name => $definition) {
+        if (empty($definition['configurable'])) {
+          $field_violations = $entity->getNGEntity()->get($field_name)->validate();
+          foreach ($field_violations as $violation) {
+            // @todo: Map the error to the correct form element.
+            form_set_error('', $violation->getMessage());
+          }
+        }
+      }
     }
 
     // Map errors back to form elements.

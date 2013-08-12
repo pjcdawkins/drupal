@@ -29,7 +29,8 @@ class PrimitiveTypeConstraintValidator extends ConstraintValidator {
    */
   public function validate($value, Constraint $constraint) {
 
-    if (!isset($value)) {
+    // NULL values or the empty string are considered to be valid primitives.
+    if (!isset($value) || $value === '') {
       return;
     }
 

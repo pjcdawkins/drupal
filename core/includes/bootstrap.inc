@@ -951,6 +951,23 @@ function variable_del($name) {
 }
 
 /**
+ * Gets the page cache cid for this request.
+ *
+ * @param \Symfony\Component\HttpFoundation\Request $request
+ *   The request for this page.
+ *
+ * @return string
+ *   The cid for this request.
+ */
+function drupal_page_cache_get_cid(Request $request) {
+  $cid_parts = array(
+    $request->getUri(),
+    Drupal::service('content_negotiation')->getContentType($request),
+  );
+  return sha1(implode(':', $cid_parts));
+}
+
+/**
  * Retrieves the current page from the cache.
  *
  * Note: we do not serve cached pages to authenticated users, or to anonymous
@@ -958,27 +975,15 @@ function variable_del($name) {
  * from a form submission, the contents of a shopping cart, or other user-
  * specific content that should not be cached and displayed to other users.
  *
- * @param $check_only
- *   (optional) Set to TRUE to only return whether a previous call found a
- *   cache entry.
+ * @param \Symfony\Component\HttpFoundation\Request $request
+ *   The request for this page.
  *
  * @return
  *   The cache object, if the page was found in the cache, NULL otherwise.
  */
-function drupal_page_get_cache($check_only = FALSE) {
-  global $base_root;
-  static $cache_hit = FALSE;
-
-  if ($check_only) {
-    return $cache_hit;
-  }
-
+function drupal_page_get_cache(Request $request) {
   if (drupal_page_is_cacheable()) {
-    $cache = cache('page')->get($base_root . request_uri());
-    if ($cache !== FALSE) {
-      $cache_hit = TRUE;
-    }
-    return $cache;
+    return Drupal::cache('page')->get(drupal_page_cache_get_cid($request));
   }
 }
 
@@ -999,22 +1004,6 @@ function drupal_page_is_cacheable($allow_caching = NULL) {
 
   return $allow_caching_static && ($_SERVER['REQUEST_METHOD'] == 'GET' || $_SERVER['REQUEST_METHOD'] == 'HEAD')
     && !drupal_is_cli();
-}
-
-/**
- * Invokes a bootstrap hook in all bootstrap modules that implement it.
- *
- * @param $hook
- *   The name of the bootstrap hook to invoke.
- *
- * @see bootstrap_hooks()
- */
-function bootstrap_invoke_all($hook) {
-  $module_handler = Drupal::moduleHandler();
-  foreach ($module_handler->getBootstrapModules() as $module) {
-    $module_handler->load($module);
-    module_invoke($module, $hook);
-  }
 }
 
 /**
@@ -1317,13 +1306,6 @@ function drupal_serve_page_from_cache(stdClass $cache, Response $response, Reque
   }
 
   $response->setContent($cache->data['body']);
-}
-
-/**
- * Defines the critical hooks that force modules to always be loaded.
- */
-function bootstrap_hooks() {
-  return array('watchdog');
 }
 
 /**
@@ -2035,7 +2017,6 @@ function _drupal_bootstrap_page_cache() {
     $cache_enabled = $config->get('cache.page.use_internal');
   }
 
-  // @todo this is *criminal*. but, necessary, until we fix bootstrap ordering.
   $request = Request::createFromGlobals();
   // If there is no session cookie and cache is enabled (or forced), try
   // to serve a cached page.
@@ -2043,7 +2024,7 @@ function _drupal_bootstrap_page_cache() {
     // Make sure there is a user object because its timestamp will be checked.
     $user = drupal_anonymous_user();
     // Get the page from the cache.
-    $cache = drupal_page_get_cache();
+    $cache = drupal_page_get_cache($request);
     // If there is a cached page, display it.
     if (is_object($cache)) {
       $response = new Response();
@@ -2116,9 +2097,6 @@ function _drupal_bootstrap_variables() {
 
   // Load variables from the database, but do not overwrite variables set in settings.php.
   $conf = variable_initialize(isset($conf) ? $conf : array());
-  // Load bootstrap modules.
-  require_once __DIR__ . '/module.inc';
-  Drupal::moduleHandler()->loadBootstrapModules();
 }
 
 /**

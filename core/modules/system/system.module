@@ -964,81 +964,7 @@ function system_menu() {
     );
   }
 
-  foreach (drupal_container()->get('plugin.manager.system.plugin_ui')->getDefinitions() as $plugin_id => $plugin) {
-    if ($plugin['menu'] === TRUE) {
-      $items[$plugin['path'] . '/' . $plugin_id . '/' . $plugin['suffix']] = array(
-        'title' => $plugin['title'],
-        'page callback' => 'drupal_get_form',
-        'page arguments' => array($plugin['id'], $plugin_id),
-        'access callback' => 'system_plugin_ui_access',
-        'access arguments' => array($plugin_id),
-        'type' => $plugin['type'],
-      );
-      if (!empty($plugin['default_task'])) {
-        $items[$plugin['path'] . '/' . $plugin_id . '/' . $plugin['suffix'] . '/' . $plugin['task_suffix']] = array(
-          'title' => $plugin['task_title'],
-          'type' => MENU_DEFAULT_LOCAL_TASK,
-          'weight' => -10,
-        );
-      }
-      $items[$plugin['path'] . '/' . $plugin_id . '/%'] = array(
-        'title' => $plugin['title'],
-        'page callback' => 'drupal_get_form',
-        'page arguments' => array($plugin['id'], $plugin_id, (count(explode('/', $plugin['path'])) + 1)),
-        'access callback' => 'system_plugin_ui_access',
-        'access arguments' => array($plugin_id, (count(explode('/', $plugin['path'])) + 1)),
-        'type' => MENU_CALLBACK,
-      );
-      if (!empty($plugin['file'])) {
-        $items[$plugin['path'] . '/' . $plugin_id . '/' . $plugin['suffix']]['file'] = $plugin['file'];
-        $items[$plugin['path'] . '/' . $plugin_id . '/%']['file'] = $plugin['file'];
-        if (!empty($plugin['file_path'])) {
-          $items[$plugin['path'] . '/' . $plugin_id . '/' . $plugin['suffix']]['file path'] = $plugin['file_path'];
-          $items[$plugin['path'] . '/' . $plugin_id . '/%']['file path'] = $plugin['file_path'];
-        }
-      }
-    }
-  }
-
   return $items;
-}
-
-/**
- * Proxies to the plugin class' form method.
- *
- * @todo This needs more explanation, an @see or two, and parameter
- *   documentation. Also "proxies" is a weird word to use.
- */
-function system_plugin_ui_form($form, &$form_state, $plugin, $facet = NULL) {
-  $plugin_ui = drupal_container()->get('plugin.manager.system.plugin_ui')->createInstance($plugin);
-  $form = $plugin_ui->form($form, $form_state, $facet);
-  $form['#validate'][] = array($plugin_ui, 'formValidate');
-  $form['#submit'][] = array($plugin_ui, 'formSubmit');
-  return $form;
-}
-
-/**
- * Checks access for a given plugin using the plugin's access() method.
- *
- * @todo This needs more explanation, some @see, and parameter documentation.
- * @todo What the heck kind of parameter name is "facet"?
- */
-function system_plugin_ui_access($plugin, $facet = NULL) {
-  $plugin_ui = drupal_container()->get('plugin.manager.system.plugin_ui')->createInstance($plugin);
-  return $plugin_ui->access($facet);
-}
-
-/**
- * Implements hook_forms().
- */
-function system_forms() {
-  $forms = array();
-  foreach (drupal_container()->get('plugin.manager.system.plugin_ui')->getDefinitions() as $plugin_id => $plugin) {
-    if (empty($forms[$plugin['id']])) {
-      $forms[$plugin['id']]['callback'] = 'system_plugin_ui_form';
-    }
-  }
-  return $forms;
 }
 
 /**
@@ -1327,7 +1253,7 @@ function system_library_info() {
   $libraries['jquery'] = array(
     'title' => 'jQuery',
     'website' => 'http://jquery.com',
-    'version' => '2.0',
+    'version' => '2.0.3',
     'js' => array(
       'core/assets/vendor/jquery/jquery.js' => array('group' => JS_LIBRARY, 'weight' => -20),
     ),
@@ -1350,7 +1276,7 @@ function system_library_info() {
   $libraries['jquery.form'] = array(
     'title' => 'jQuery Form Plugin',
     'website' => 'http://malsup.com/jquery/form/',
-    'version' => '3.27',
+    'version' => '3.39',
     'js' => array(
       'core/assets/vendor/jquery-form/jquery.form.js' => array(),
     ),
@@ -2049,19 +1975,6 @@ function system_library_info() {
       array('system', 'jquery.once'),
     ),
   );
-  $libraries['drupal.system.cron'] = array(
-    'title' => 'System cron',
-    'version' => VERSION,
-    'js' => array(
-      drupal_get_path('module', 'system') . '/system.cron.js' => array(),
-    ),
-    'dependencies' => array(
-      array('system', 'jquery'),
-      array('system', 'drupal'),
-      array('system', 'drupalSettings'),
-      array('system', 'jquery.once'),
-    ),
-  );
   $libraries['drupal.system.modules'] = array(
     'title' => 'System modules',
     'version' => VERSION,
@@ -2618,7 +2531,6 @@ function _system_rebuild_module_data() {
     'version' => NULL,
     'php' => DRUPAL_MINIMUM_PHP,
     'files' => array(),
-    'bootstrap' => 0,
   );
 
   // Read info files for each module.
@@ -2702,23 +2614,6 @@ function system_rebuild_module_data() {
     Drupal::state()->set('system.module.files', $files);
   }
   return $modules_cache;
-}
-
-/**
- * Refreshes the list of bootstrap modules.
- *
- * This is called internally by module_enable/disable() to flag modules that
- * implement hooks used during bootstrap, such as hook_watchdog(). These modules
- * are loaded earlier to invoke the hooks.
- */
-function _system_update_bootstrap_status() {
-  $bootstrap_modules = array();
-  foreach (bootstrap_hooks() as $hook) {
-    foreach (Drupal::moduleHandler()->getImplementations($hook) as $module) {
-      $bootstrap_modules[$module] = drupal_get_filename('module', $module);
-    }
-  }
-  Drupal::state()->set('system.module.bootstrap', $bootstrap_modules);
 }
 
 /**

@@ -14,7 +14,7 @@ use Drupal\Core\Database\Database;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\views\Plugin\views\query\Sql;
-use Drupal\views\Plugin\Core\Entity\View;
+use Drupal\views\Entity\View;
 use Drupal\views\ViewStorageInterface;
 
 /**
@@ -100,7 +100,7 @@ class ViewUI implements ViewStorageInterface {
   /**
    * The View storage object.
    *
-   * @var \Drupal\views\Plugin\Core\Entity\View
+   * @var \Drupal\views\Entity\View
    */
   protected $storage;
 
@@ -519,7 +519,7 @@ class ViewUI implements ViewStorageInterface {
     $old_q = current_path();
 
     // Determine where the query and performance statistics should be output.
-    $config = config('views.settings');
+    $config = \Drupal::config('views.settings');
     $show_query = $config->get('ui.show.sql_query.enabled');
     $show_info = $config->get('ui.show.preview_information');
     $show_location = $config->get('ui.show.sql_query.where');
@@ -1078,13 +1078,6 @@ class ViewUI implements ViewStorageInterface {
    */
   public function initTranslation($langcode) {
     $this->storage->initTranslation($langcode);
-  }
-
-  /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getType().
-   */
-  public function getType() {
-    return $this->storage->getType();
   }
 
   /**

@@ -171,7 +171,7 @@ services:
     arguments: ['@container.namespaces']
   plugin.manager.menu.local_action:
     class: Drupal\Core\Menu\LocalActionManager
-    arguments: ['@container.namespaces', '@controller_resolver', '@request', '@module_handler']
+    arguments: ['@container.namespaces', '@controller_resolver', '@request', '@module_handler', '@cache.cache', '@language_manager']
   plugin.manager.menu.local_task:
     class: Drupal\Core\Menu\LocalTaskManager
     arguments: ['@container.namespaces', '@controller_resolver', '@request', '@router.route_provider', '@module_handler']
@@ -237,6 +237,7 @@ services:
     arguments: ['@router.route_provider', '@path_processor_manager', '@config.factory', '@settings']
     calls:
       - [setRequest, ['@?request']]
+      - [setContext, ['@?router.request_context']]
     tags:
       - { name: persist }
   router.dynamic:
@@ -349,7 +350,7 @@ services:
       - { name: event_subscriber }
   controller.page:
     class: Drupal\Core\Controller\HtmlPageController
-    arguments: ['@http_kernel']
+    arguments: ['@http_kernel', '@controller_resolver']
   controller.dialog:
     class: Drupal\Core\Controller\DialogController
     arguments: ['@http_kernel']
@@ -369,10 +370,20 @@ services:
     class: Drupal\Core\EventSubscriber\LegacyAccessSubscriber
     tags:
       - { name: event_subscriber }
+  private_key:
+    class: Drupal\Core\PrivateKey
+    arguments: ['@state']
+  csrf_token:
+    class: Drupal\Core\Access\CsrfTokenGenerator
+    arguments: ['@private_key']
+    calls:
+      - [setRequest, ['@?request']]
   access_manager:
     class: Drupal\Core\Access\AccessManager
+    arguments: ['@router.route_provider', '@url_generator', '@paramconverter_manager']
     calls:
       - [setContainer, ['@service_container']]
+      - [setRequest, ['@?request']]
   access_subscriber:
     class: Drupal\Core\EventSubscriber\AccessSubscriber
     tags:

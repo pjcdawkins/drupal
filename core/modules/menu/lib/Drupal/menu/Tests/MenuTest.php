@@ -161,7 +161,7 @@ class MenuTest extends MenuWebTestBase {
     // Enable the custom menu block.
     $menu_name = 'menu-' . $menu_name; // Drupal prepends the name with 'menu-'.
     // Confirm that the custom menu block is available.
-    $this->drupalGet('admin/structure/block/list/' . config('system.theme')->get('default') . '/add');
+    $this->drupalGet('admin/structure/block/list/' . \Drupal::config('system.theme')->get('default'));
     $this->assertText($label);
 
     // Enable the block.
@@ -379,7 +379,7 @@ class MenuTest extends MenuWebTestBase {
 
     // Make sure menu shows up with new name in block addition.
     $default_theme = variable_get('theme_default', 'stark');
-    $this->drupalget('admin/structure/block/list/' . $default_theme . '/add');
+    $this->drupalget('admin/structure/block/list/' . $default_theme);
     $this->assertText($edit['label']);
   }
 
@@ -452,7 +452,7 @@ class MenuTest extends MenuWebTestBase {
    * @param string $menu_name Menu name.
    * @param string $weight Menu weight
    *
-   * @return \Drupal\menu_link\Plugin\Core\Entity\MenuLink $menu_link
+   * @return \Drupal\menu_link\Entity\MenuLink $menu_link
    *   A menu link entity.
    */
   function addMenuLink($plid = 0, $link = '<front>', $menu_name = 'tools', $expanded = TRUE, $weight = '0') {

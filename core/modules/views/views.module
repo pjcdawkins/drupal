@@ -14,7 +14,7 @@ use Drupal\Core\Database\Query\AlterableInterface;
 use Drupal\Core\Language\Language;
 use Drupal\views\ViewExecutable;
 use Drupal\Component\Plugin\Exception\PluginException;
-use Drupal\views\Plugin\Core\Entity\View;
+use Drupal\views\Entity\View;
 use Drupal\views\Views;
 use Drupal\field\FieldInstanceInterface;
 
@@ -78,7 +78,10 @@ function views_pre_render_view_element($element) {
 }
 
 /**
- * Implement hook_theme(). Register views theming functions.
+ * Implements hook_theme().
+ *
+ * Register views theming functions and those that are defined via views plugin
+ * definitions.
  */
 function views_theme($existing, $type, $theme, $path) {
   Drupal::moduleHandler()->loadInclude('views', 'inc', 'views.theme');
@@ -117,13 +120,24 @@ function views_theme($existing, $type, $theme, $path) {
   );
 
   $plugins = views_get_plugin_definitions();
+  $module_handler = Drupal::moduleHandler();
 
-  // Register theme functions for all style plugins
+  // Register theme functions for all style plugins. It provides a basic auto
+  // implementation of theme functions or template files by using the plugin
+  // definitions (theme, theme_file, module, register_theme). Template files are
+  // assumed to be located in the templates folder.
   foreach ($plugins as $type => $info) {
-    foreach ($info as $plugin => $def) {
+    foreach ($info as $def) {
       // Not all plugins have theme functions, and they can also explicitly
       // prevent a theme function from being registered automatically.
       if (!isset($def['theme']) || empty($def['register_theme'])) {
+        continue;
+      }
+      // For each theme registration we a base directory to look for the
+      // templates folder. This will be in any case the root of the given module
+      // so we always need a module definition.
+      // @todo: watchdog or exception?
+      if (!isset($def['provider']) || !$module_handler->moduleExists($def['provider'])) {
         continue;
       }
 
@@ -131,27 +145,35 @@ function views_theme($existing, $type, $theme, $path) {
         'variables' => $variables[$type],
       );
 
-      if ($def['module'] == 'views') {
+      // For the views module we ensure views.theme.inc is included.
+      if ($def['provider'] == 'views') {
         $def['theme_file'] = 'views.theme.inc';
       }
-      elseif (isset($def['theme_file'])) {
-        $def['theme_path'] = drupal_get_path('module', $def['module']);
-      }
+      // We always use the module directory as base dir.
+      $module_dir = drupal_get_path('module', $def['provider']);
 
-      if (isset($def['theme_path'])) {
-        $hooks[$def['theme']]['path'] = $def['theme_path'];
-      }
+      // The theme_file definition is always relative to the modules directory.
       if (isset($def['theme_file'])) {
+        $hooks[$def['theme']]['path'] = $module_dir;
         $hooks[$def['theme']]['file'] = $def['theme_file'];
       }
-      if (isset($def['theme_path']) && isset($def['theme_file'])) {
-        $include = DRUPAL_ROOT . '/' . $def['theme_path'] . '/' . $def['theme_file'];
+      // Whenever we got a theme file, we include it directly so we can
+      // auto-detect the theme function.
+      if (isset($def['theme_file'])) {
+        $include = DRUPAL_ROOT . '/' . $module_dir. '/' . $def['theme_file'];
         if (is_file($include)) {
           require_once $include;
         }
       }
+     // If there is no theme function for the given theme definition, we assume
+     // a template file shall be used. By default this file is located in the
+     // /templates directory of the module's folder.
+     // If a module wants to define its own location it has to set
+     // register_theme of the plugin to FALSE and implement hook_theme() by
+     // itself.
       if (!function_exists('theme_' . $def['theme'])) {
-        $hooks[$def['theme']]['template'] = drupal_clean_css_identifier($def['theme']);
+        $hooks[$def['theme']]['path'] = $module_dir;
+        $hooks[$def['theme']]['template'] = 'templates/' . drupal_clean_css_identifier($def['theme']);
       }
     }
   }
@@ -189,7 +211,7 @@ function views_plugin_list() {
   $plugin_data = views_get_plugin_definitions();
   $plugins = array();
   foreach (views_get_enabled_views() as $view) {
-    foreach ($view->get('display') as $display_id => $display) {
+    foreach ($view->get('display') as $display) {
       foreach ($plugin_data as $type => $info) {
         if ($type == 'display' && isset($display['display_plugin'])) {
           $name = $display['display_plugin'];
@@ -890,7 +912,7 @@ function views_get_plugin_definitions() {
  * Get enabled display extenders.
  */
 function views_get_enabled_display_extenders() {
-  $enabled = array_filter((array) config('views.settings')->get('display_extenders'));
+  $enabled = array_filter((array) Drupal::config('views.settings')->get('display_extenders'));
 
   return drupal_map_assoc($enabled);
 }
@@ -1054,7 +1076,7 @@ function views_get_views_as_options($views_only = FALSE, $filter = 'all', $exclu
 /**
  * Returns whether the view is enabled.
  *
- * @param Drupal\views\Plugin\Core\Entity\View $view
+ * @param Drupal\views\Entity\View $view
  *   The view object to check.
  *
  * @return bool
@@ -1067,7 +1089,7 @@ function views_view_is_enabled(View $view) {
 /**
  * Returns whether the view is disabled.
  *
- * @param Drupal\views\Plugin\Core\Entity\View $view
+ * @param Drupal\views\Entity\View $view
  *   The view object to check.
  *
  * @return bool
@@ -1080,7 +1102,7 @@ function views_view_is_disabled(View $view) {
 /**
  * Enables and saves a view.
  *
- * @param Drupal\views\Plugin\Core\Entity\View $view
+ * @param Drupal\views\Entity\View $view
  *   The View object to disable.
  */
 function views_enable_view(View $view) {
@@ -1090,7 +1112,7 @@ function views_enable_view(View $view) {
 /**
  * Disables and saves a view.
  *
- * @param Drupal\views\Plugin\Core\Entity\View $view
+ * @param Drupal\views\Entity\View $view
  *   The View object to disable.
  */
 function views_disable_view(View $view) {
@@ -1257,7 +1279,7 @@ function views_form_views_form_validate($form, &$form_state) {
   $view = $form_state['build_info']['args'][0];
 
   // Call the validation method on every field handler that has it.
-  foreach ($view->field as $field_name => $field) {
+  foreach ($view->field as $field) {
     if (method_exists($field, 'views_form_validate')) {
       $field->views_form_validate($form, $form_state);
     }
@@ -1265,7 +1287,7 @@ function views_form_views_form_validate($form, &$form_state) {
 
   // Call the validate method on every area handler that has it.
   foreach (array('header', 'footer') as $area) {
-    foreach ($view->{$area} as $area_name => $area_handler) {
+    foreach ($view->{$area} as $area_handler) {
       if (method_exists($area_handler, 'views_form_validate')) {
         $area_handler->views_form_validate($form, $form_state);
       }
@@ -1282,7 +1304,7 @@ function views_form_views_form_submit($form, &$form_state) {
   $view = $form_state['build_info']['args'][0];
 
   // Call the submit method on every field handler that has it.
-  foreach ($view->field as $field_name => $field) {
+  foreach ($view->field as $field) {
     if (method_exists($field, 'views_form_submit')) {
       $field->views_form_submit($form, $form_state);
     }
@@ -1290,7 +1312,7 @@ function views_form_views_form_submit($form, &$form_state) {
 
   // Call the submit method on every area handler that has it.
   foreach (array('header', 'footer') as $area) {
-    foreach ($view->{$area} as $area_name => $area_handler) {
+    foreach ($view->{$area} as $area_handler) {
       if (method_exists($area_handler, 'views_form_submit')) {
         $area_handler->views_form_submit($form, $form_state);
       }
@@ -1663,7 +1685,7 @@ function views_element_validate_tags($element, &$form_state) {
  *   If TRUE, the data will be cached specific to the currently active language.
  */
 function views_cache_set($cid, $data, $use_language = FALSE) {
-  if (config('views.settings')->get('skip_cache')) {
+  if (Drupal::config('views.settings')->get('skip_cache')) {
     return;
   }
   if ($use_language) {
@@ -1687,7 +1709,7 @@ function views_cache_set($cid, $data, $use_language = FALSE) {
  *   The cache or FALSE on failure.
  */
 function views_cache_get($cid, $use_language = FALSE) {
-  if (config('views.settings')->get('skip_cache')) {
+  if (Drupal::config('views.settings')->get('skip_cache')) {
     return FALSE;
   }
   if ($use_language) {

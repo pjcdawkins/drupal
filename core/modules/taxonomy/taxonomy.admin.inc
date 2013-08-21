@@ -5,7 +5,7 @@
  * Administrative page callbacks for the taxonomy module.
  */
 
-use Drupal\taxonomy\Plugin\Core\Entity\Vocabulary;
+use Drupal\taxonomy\Entity\Vocabulary;
 
 /**
  * Page callback: provides the vocabulary creation form.
@@ -25,7 +25,7 @@ function taxonomy_vocabulary_add() {
  * Display a tree of all the terms in a vocabulary, with options to edit
  * each one. The form is made drag and drop by the theme function.
  *
- * @param Drupal\taxonomy\Plugin\Core\Entity\Vocabulary $vocabulary
+ * @param Drupal\taxonomy\Entity\Vocabulary $vocabulary
  *   The taxonomy vocabulary entity to list terms for.
  *
  * @ingroup forms
@@ -39,7 +39,7 @@ function taxonomy_overview_terms($form, &$form_state, Vocabulary $vocabulary) {
   $parent_fields = FALSE;
 
   $page            = isset($_GET['page']) ? $_GET['page'] : 0;
-  $page_increment  = config('taxonomy.settings')->get('terms_per_page_admin');
+  $page_increment  = Drupal::config('taxonomy.settings')->get('terms_per_page_admin');
   $page_entries    = 0;
   $before_entries  = 0;
   $after_entries   = 0;

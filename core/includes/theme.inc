@@ -8,6 +8,7 @@
  * customized by user themes.
  */
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\Config;
 use Drupal\Core\Language\Language;
@@ -96,7 +97,7 @@ function drupal_theme_initialize() {
 
   // Only select the user selected theme if it is available in the
   // list of themes that can be accessed.
-  $theme = !empty($user->theme) && drupal_theme_access($user->theme) ? $user->theme : config('system.theme')->get('default');
+  $theme = !empty($user->theme) && drupal_theme_access($user->theme) ? $user->theme : Drupal::config('system.theme')->get('default');
 
   // Allow modules to override the theme. Validation has already been performed
   // inside menu_get_custom_theme(), so we do not need to check it again here.
@@ -1463,8 +1464,8 @@ function theme_settings_convert_to_config(array $theme_settings, Config $config)
  */
 function theme_enable($theme_list) {
   drupal_clear_css_cache();
-  $theme_config = config('system.theme');
-  $disabled_themes = config('system.theme.disabled');
+  $theme_config = Drupal::config('system.theme');
+  $disabled_themes = Drupal::config('system.theme.disabled');
   foreach ($theme_list as $key) {
     // Throw an exception if the theme name is too long.
     if (strlen($key) > DRUPAL_EXTENSION_NAME_MAX_LENGTH) {
@@ -1500,7 +1501,7 @@ function theme_enable($theme_list) {
  */
 function theme_disable($theme_list) {
   // Don't disable the default theme.
-  if ($pos = array_search(config('system.theme')->get('default'), $theme_list) !== FALSE) {
+  if ($pos = array_search(Drupal::config('system.theme')->get('default'), $theme_list) !== FALSE) {
     unset($theme_list[$pos]);
     if (empty($theme_list)) {
       return;
@@ -1509,8 +1510,8 @@ function theme_disable($theme_list) {
 
   drupal_clear_css_cache();
 
-  $theme_config = config('system.theme');
-  $disabled_themes = config('system.theme.disabled');
+  $theme_config = Drupal::config('system.theme');
+  $disabled_themes = Drupal::config('system.theme.disabled');
   foreach ($theme_list as $key) {
     // The value is not used; the weight is ignored for themes currently.
     $theme_config->clear("enabled.$key");
@@ -2534,7 +2535,7 @@ function template_preprocess_html(&$variables) {
 
   // If on an individual node page, add the node type to body classes.
   if ($node = menu_get_object()) {
-    $variables['attributes']['class'][] = drupal_html_class('node-type-' . $node->type);
+    $variables['attributes']['class'][] = drupal_html_class('node-type-' . $node->getType());
   }
 
   // Initializes attributes which are specific to the html and body elements.
@@ -2551,7 +2552,7 @@ function template_preprocess_html(&$variables) {
     drupal_add_html_head_link(array('rel' => 'shortcut icon', 'href' => drupal_strip_dangerous_protocols($favicon), 'type' => $type));
   }
 
-  $site_config = config('system.site');
+  $site_config = Drupal::config('system.site');
   // Construct page title.
   if (drupal_get_title()) {
     $head_title = array(
@@ -2565,6 +2566,7 @@ function template_preprocess_html(&$variables) {
       $head_title['slogan'] = strip_tags(filter_xss_admin($site_config->get('slogan')));
     }
   }
+
   $variables['head_title_array'] = $head_title;
   $variables['head_title'] = implode(' | ', $head_title);
 
@@ -2643,7 +2645,7 @@ function template_preprocess_html(&$variables) {
  */
 function template_preprocess_page(&$variables) {
   $language_interface = language(Language::TYPE_INTERFACE);
-  $site_config = config('system.site');
+  $site_config = Drupal::config('system.site');
 
   // Move some variables to the top level for themer convenience and template cleanliness.
   $variables['show_messages'] = $variables['page']['#show_messages'];
@@ -2675,7 +2677,13 @@ function template_preprocess_page(&$variables) {
   $variables['site_name']         = (theme_get_setting('features.name') ? check_plain($site_config->get('name')) : '');
   $variables['site_slogan']       = (theme_get_setting('features.slogan') ? filter_xss_admin($site_config->get('slogan')) : '');
   $variables['tabs']              = menu_local_tabs();
-  $variables['title']             = new RenderWrapper('drupal_get_title');
+
+  if (isset($variables['page']['#title'])) {
+    $variables['title'] = $variables['page']['#title'];
+  }
+  else {
+    $variables['title'] = new RenderWrapper('drupal_get_title');
+  }
 
   // Pass the main menu and secondary menu to the template as render arrays.
   if (!empty($variables['main_menu'])) {
@@ -2840,15 +2848,21 @@ function template_preprocess_maintenance_page(&$variables) {
     $variables['layout'] = ($variables['layout'] == 'first') ? 'both' : 'second';
   }
 
-  $site_config = config('system.site');
+  $site_config = Drupal::config('system.site');
   $site_name = $site_config->get('name');
   $site_slogan = $site_config->get('slogan');
 
-  // Construct page title
-  if (drupal_get_title()) {
+   // Construct the page title.
+  if (isset($variables['page']['#title'])) {
+    $head_title = array(
+      'title' => strip_tags($variables['page']['#title']),
+      'name' => String::checkPlain($site_config->get('name')),
+    );
+  }
+  elseif (drupal_get_title()) {
     $head_title = array(
       'title' => strip_tags(drupal_get_title()),
-      'name' => check_plain($site_name),
+      'name' => String::checkPlain($site_config->get('name')),
     );
   }
   else {
@@ -2889,7 +2903,6 @@ function template_preprocess_maintenance_page(&$variables) {
   $variables['site_name']         = (theme_get_setting('features.name') ? check_plain($site_name) : '');
   $variables['site_slogan']       = (theme_get_setting('features.slogan') ? filter_xss_admin($site_slogan) : '');
   $variables['tabs']              = '';
-  $variables['title']             = drupal_get_title();
 
   // Compile a list of classes that are going to be applied to the body element.
   $variables['attributes']['class'][] = 'maintenance-page';
@@ -2925,6 +2938,14 @@ function template_preprocess_maintenance_page(&$variables) {
   // be called when printed.
   $variables['styles'] = new RenderWrapper('drupal_get_css', array($css));
   $variables['scripts'] = new RenderWrapper('drupal_get_js');
+
+  // Allow the page to define a title.
+  if (isset($variables['page']['#title'])) {
+    $variables['title'] = $variables['page']['#title'];
+  }
+  if (!isset($variables['title'])) {
+    $variables['title'] = drupal_get_title();
+  }
 }
 
 /**

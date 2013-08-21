@@ -35,7 +35,7 @@ class PageCacheTest extends WebTestBase {
   function setUp() {
     parent::setUp();
 
-    config('system.site')
+    \Drupal::config('system.site')
       ->set('name', 'Drupal')
       ->set('page.front', 'test-page')
       ->save();
@@ -45,7 +45,7 @@ class PageCacheTest extends WebTestBase {
    * Tests support for different cache items with different Accept headers.
    */
   function testAcceptHeaderRequests() {
-    $config = config('system.performance');
+    $config = \Drupal::config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
@@ -72,7 +72,7 @@ class PageCacheTest extends WebTestBase {
    * Tests support of requests with If-Modified-Since and If-None-Match headers.
    */
   function testConditionalRequests() {
-    $config = config('system.performance');
+    $config = \Drupal::config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
@@ -117,7 +117,7 @@ class PageCacheTest extends WebTestBase {
    * Tests cache headers.
    */
   function testPageCache() {
-    $config = config('system.performance');
+    $config = \Drupal::config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->set('response.gzip', 1);
@@ -177,7 +177,7 @@ class PageCacheTest extends WebTestBase {
    * mod_deflate Apache module.
    */
   function testPageCompression() {
-    $config = config('system.performance');
+    $config = \Drupal::config('system.performance');
     $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->set('response.gzip', 1);
@@ -200,7 +200,20 @@ class PageCacheTest extends WebTestBase {
     $this->drupalGet('');
     $this->assertEqual($this->drupalGetHeader('X-Drupal-Cache'), 'HIT', 'Page was cached.');
     $this->assertFalse($this->drupalGetHeader('Content-Encoding'), 'A Content-Encoding header was not sent.');
-    $this->assertTitle(t('Test page | @site-name', array('@site-name' => config('system.site')->get('name'))), 'Site title matches.');
+    $this->assertTitle(t('Test page | @site-name', array('@site-name' => \Drupal::config('system.site')->get('name'))), 'Site title matches.');
     $this->assertRaw('</html>', 'Page was not compressed.');
+
+    // Disable compression mode.
+    $config->set('response.gzip', 0);
+    $config->save();
+
+    // Verify if cached page is still available for a client with compression support.
+    $this->drupalGet('', array(), array('Accept-Encoding: gzip,deflate'));
+    $this->drupalSetContent(gzinflate(substr($this->drupalGetContent(), 10, -8)));
+    $this->assertRaw('</html>', 'Page was delivered after compression mode is changed (compression support enabled).');
+
+    // Verify if cached page is still available for a client without compression support.
+    $this->drupalGet('');
+    $this->assertRaw('</html>', 'Page was delivered after compression mode is changed (compression support disabled).');
   }
 }

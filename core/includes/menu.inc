@@ -9,7 +9,7 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Template\Attribute;
-use Drupal\menu_link\Plugin\Core\Entity\MenuLink;
+use Drupal\menu_link\Entity\MenuLink;
 use Drupal\menu_link\MenuLinkStorageController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -1008,7 +1008,7 @@ function menu_item_route_access(Route $route, $href, &$map) {
  * "story" content type:
  * @code
  * $node = menu_get_object();
- * $story = $node->type == 'story';
+ * $story = $node->getType() == 'story';
  * @endcode
  *
  * @param $type
@@ -1821,7 +1821,7 @@ function menu_list_system_menus() {
  * Returns an array of links to be rendered as the Main menu.
  */
 function menu_main_menu() {
-  $config = config('menu.settings');
+  $config = Drupal::config('menu.settings');
   $menu_enabled = module_exists('menu');
   // When menu module is not enabled, we need a hardcoded default value.
   $main_links_source = $menu_enabled ? $config->get('main_links') : 'main';
@@ -1832,7 +1832,7 @@ function menu_main_menu() {
  * Returns an array of links to be rendered as the Secondary links.
  */
 function menu_secondary_menu() {
-  $config = config('menu.settings');
+  $config = Drupal::config('menu.settings');
   $menu_enabled = module_exists('menu');
   // When menu module is not enabled, we need a hardcoded default value.
   $main_links_source = $menu_enabled ? $config->get('main_links') : 'main';
@@ -2376,7 +2376,7 @@ function menu_set_active_menu_names($menu_names = NULL) {
     $active = $menu_names;
   }
   elseif (!isset($active)) {
-    $config = config('system.menu');
+    $config = Drupal::config('system.menu');
     $active = $config->get('active_menus_default') ?: array_keys(menu_list_system_menus());
   }
   return $active;
@@ -3398,7 +3398,7 @@ function _menu_router_save($menu, $masks) {
  */
 function _menu_site_is_offline($check_only = FALSE) {
   // Check if site is in maintenance mode.
-  if (config('system.maintenance')->get('enabled')) {
+  if (Drupal::config('system.maintenance')->get('enabled')) {
     if (user_access('access site in maintenance mode')) {
       // Ensure that the maintenance mode message is displayed only once
       // (allowing for page redirects) and specifically suppress its display on

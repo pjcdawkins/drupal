@@ -10,6 +10,7 @@ use Drupal\Component\Utility\Url;
 use Drupal\Core\DrupalKernel;
 use Drupal\Core\Database\Database;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
+use Drupal\Core\Utility\Title;
 use Symfony\Component\ClassLoader\ClassLoader;
 use Symfony\Component\ClassLoader\ApcClassLoader;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -202,12 +203,9 @@ const DRUPAL_EXTENSION_NAME_MAX_LENGTH = 50;
 define('REQUEST_TIME', (int) $_SERVER['REQUEST_TIME']);
 
 /**
- * Flag for drupal_set_title(); text is not sanitized, so run check_plain().
- */
-const CHECK_PLAIN = 0;
-
-/**
  * Flag for drupal_set_title(); text has already been sanitized.
+ *
+ * @todo Move to the Title class.
  */
 const PASS_THROUGH = -1;
 
@@ -891,8 +889,10 @@ function variable_initialize($conf = array()) {
  * @return
  *   The value of the variable. Unserialization is taken care of as necessary.
  *
- * @see variable_del()
- * @see variable_set()
+ * @deprecated This will be removed in Drupal 8.0. Instead, use the
+ *   configuration API.
+ *
+ * @see \Drupal\Core\Config::get()
  */
 function variable_get($name, $default = NULL) {
   global $conf;
@@ -913,8 +913,10 @@ function variable_get($name, $default = NULL) {
  *   The value to set. This can be any PHP data type; these functions take care
  *   of serialization as necessary.
  *
- * @see variable_del()
- * @see variable_get()
+ * @deprecated This will be removed in Drupal 8.0. Instead, use the
+ *   configuration API.
+ *
+ * @see \Drupal\Core\Config::set()
  */
 function variable_set($name, $value) {
   global $conf;
@@ -936,8 +938,10 @@ function variable_set($name, $value) {
  * @param $name
  *   The name of the variable to undefine.
  *
- * @see variable_get()
- * @see variable_set()
+ * @deprecated This will be removed in Drupal 8.0. Instead, use the
+ *   configuration API.
+ *
+ * @see \Drupal\Core\Config::clear()
  */
 function variable_del($name) {
   global $conf;
@@ -1220,12 +1224,12 @@ function drupal_page_header() {
  * response is sent.
  */
 function drupal_serve_page_from_cache(stdClass $cache, Response $response, Request $request) {
-  $config = config('system.performance');
+  $config = Drupal::config('system.performance');
 
   // First half: we must determine if we should be returning a 304.
 
   // Negotiate whether to use compression.
-  $page_compression = $config->get('response.gzip') && extension_loaded('zlib');
+  $page_compression = !empty($cache->data['page_compressed']) && extension_loaded('zlib');
   $return_compressed = $page_compression && $request->server->has('HTTP_ACCEPT_ENCODING') && strpos($request->server->get('HTTP_ACCEPT_ENCODING'), 'gzip') !== FALSE;
 
   // Get headers. Keys are lower-case.
@@ -1696,7 +1700,7 @@ function drupal_get_title() {
  *   Optional string value to assign to the page title; or if set to NULL
  *   (default), leaves the current title unchanged.
  * @param $output
- *   Optional flag - normally should be left as CHECK_PLAIN. Only set to
+ *   Optional flag - normally should be left as Title::CHECK_PLAIN. Only set to
  *   PASS_THROUGH if you have already removed any possibly dangerous code
  *   from $title using a function like check_plain() or filter_xss(). With this
  *   flag the string will be passed through unchanged.
@@ -1704,7 +1708,7 @@ function drupal_get_title() {
  * @return
  *   The updated title of the current page.
  */
-function drupal_set_title($title = NULL, $output = CHECK_PLAIN) {
+function drupal_set_title($title = NULL, $output = Title::CHECK_PLAIN) {
   $stored_title = &drupal_static(__FUNCTION__);
 
   if (isset($title)) {
@@ -1878,7 +1882,7 @@ function drupal_handle_request($test_only = FALSE) {
  */
 function drupal_get_user_timezone() {
   global $user;
-  $config = config('system.date');
+  $config = Drupal::config('system.date');
 
   if ($user && $config->get('timezone.user.configurable') && $user->isAuthenticated() && $user->getTimezone()) {
     return $user->getTimezone();
@@ -1975,7 +1979,7 @@ function _drupal_bootstrap_configuration() {
   // Load the procedural configuration system helper functions.
   require_once __DIR__ . '/config.inc';
 
-  // Set the Drupal custom error handler. (requires config())
+  // Set the Drupal custom error handler. (requires Drupal::config())
   set_error_handler('_drupal_error_handler');
   set_exception_handler('_drupal_exception_handler');
 
@@ -2013,7 +2017,7 @@ function _drupal_bootstrap_page_cache() {
   }
   else {
     drupal_bootstrap(DRUPAL_BOOTSTRAP_VARIABLES, FALSE);
-    $config = config('system.performance');
+    $config = Drupal::config('system.performance');
     $cache_enabled = $config->get('cache.page.use_internal');
   }
 
@@ -2382,7 +2386,7 @@ function language($type) {
  *   name and its value is its configurability (TRUE/FALSE).
  */
 function language_types_get_all() {
-  $types = \Drupal::config('system.language.types')->get('all');
+  $types = Drupal::config('system.language.types')->get('all');
   return $types ? $types : array_keys(language_types_get_default());
 }
 
@@ -2442,7 +2446,7 @@ function language_list($flags = Language::STATE_CONFIGURABLE) {
       // save the same object without data loss.
       foreach ($language_entities as $langcode_config_name) {
         $langcode = substr($langcode_config_name, strlen('language.entity.'));
-        $info = config($langcode_config_name)->get();
+        $info = Drupal::config($langcode_config_name)->get();
         $languages[$langcode] = new Language(array(
           'default' => ($info['id'] == $default->id),
           'name' => $info['label'],

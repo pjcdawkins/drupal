@@ -279,7 +279,7 @@ abstract class FieldPluginBase extends HandlerBase {
         '' => t(' - Use default -'),
         '0' => t('- None -')
       );
-      $elements += config('views.settings')->get('field_rewrite_elements');
+      $elements += \Drupal::config('views.settings')->get('field_rewrite_elements');
     }
 
     return $elements;
@@ -1483,7 +1483,7 @@ abstract class FieldPluginBase extends HandlerBase {
     }
 
     // Get flattened set of tokens for any array depth in $_GET parameters.
-    $tokens += $this->getTokenValuesRecursive(drupal_container()->get('request')->query->all());
+    $tokens += $this->getTokenValuesRecursive(\Drupal::request()->query->all());
 
     // Now add replacements for our fields.
     foreach ($this->view->display_handler->getHandlers('field') as $field => $handler) {

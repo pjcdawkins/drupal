@@ -5,13 +5,13 @@
  * User page callbacks for the Aggregator module.
  */
 
-use Drupal\aggregator\Plugin\Core\Entity\Feed;
+use Drupal\aggregator\Entity\Feed;
 use Drupal\Core\Entity\EntityInterface;
 
 /**
  * Page callback: Displays all the items captured from the particular feed.
  *
- * @param \Drupal\aggregator\Plugin\Core\Entity\Feed $feed
+ * @param \Drupal\aggregator\Entity\Feed $feed
  *   The feed for which to display all items.
  *
  * @return string
@@ -59,7 +59,7 @@ function aggregator_page_source_form($form, $form_state, $feed) {
  * @ingroup forms
  */
 function aggregator_page_category($category) {
-  drupal_add_feed('aggregator/rss/' . $category->cid, config('system.site')->get('name') . ' ' . t('aggregator - @title', array('@title' => $category->title)));
+  drupal_add_feed('aggregator/rss/' . $category->cid, Drupal::config('system.site')->get('name') . ' ' . t('aggregator - @title', array('@title' => $category->title)));
 
   // It is safe to include the cid in the query because it's loaded from the
   // database by aggregator_category_load().
@@ -206,7 +206,7 @@ function aggregator_categorize_items($items, $feed_source = '') {
       $done = TRUE;
       $form['items'][$iid]['item'] = $form_items[$iid];
       $form['items'][$iid]['categories'] = array(
-        '#type' => config('aggregator.settings')->get('source.category_selector'),
+        '#type' => Drupal::config('aggregator.settings')->get('source.category_selector'),
         '#default_value' => $selected,
         '#options' => $categories,
         '#size' => 10,
@@ -349,7 +349,7 @@ function theme_aggregator_page_opml($variables) {
   $output  = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
   $output .= "<opml version=\"1.1\">\n";
   $output .= "<head>\n";
-  $output .= '<title>' . check_plain(config('system.site')->get('name')) . "</title>\n";
+  $output .= '<title>' . check_plain(Drupal::config('system.site')->get('name')) . "</title>\n";
   $output .= '<dateModified>' . gmdate(DATE_RFC2822, REQUEST_TIME) . "</dateModified>\n";
   $output .= "</head>\n";
   $output .= "<body>\n";
@@ -369,7 +369,7 @@ function theme_aggregator_page_opml($variables) {
  *
  * @param array $variables
  *   An associative array containing:
- *   - source: A Drupal\aggregator\Plugin\Core\Entity\Feed instance representing
+ *   - source: A Drupal\aggregator\Entity\Feed instance representing
  *     the feed source.
  *   - summary_items: An array of feed items.
  */
@@ -423,7 +423,7 @@ function template_preprocess_aggregator_summary_item(&$variables) {
  *
  * @param array $variables
  *   An associative array containing:
- *   - aggregator_feed: A Drupal\aggregator\Plugin\Core\Entity\Feed instance
+ *   - aggregator_feed: A Drupal\aggregator\Entity\Feed instance
  *     representing the feed source.
  */
 function template_preprocess_aggregator_feed_source(&$variables) {

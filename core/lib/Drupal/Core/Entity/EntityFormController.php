@@ -329,7 +329,7 @@ class EntityFormController implements EntityFormControllerInterface {
       // configurable.
       foreach ($definitions as $field_name => $definition) {
         if (empty($definition['configurable'])) {
-          $field_violations = $entity->getNGEntity()->get($field_name)->validate();
+          $field_violations = $entity->get($field_name)->validate();
           foreach ($field_violations as $violation) {
             // @todo: Map the error to the correct form element.
             form_set_error('', $violation->getMessage());

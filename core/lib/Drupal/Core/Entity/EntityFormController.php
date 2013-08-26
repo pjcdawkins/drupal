@@ -271,14 +271,26 @@ class EntityFormController extends FormBase implements EntityFormControllerInter
     $entity = $this->buildEntity($form, $form_state);
     $entity_langcode = $entity->language()->id;
 
-    $violations = array();
+    $violations = $entity->validate();
+    $field_violations = array();
 
     // @todo Simplify when all entity types are converted to EntityNG.
     if ($entity instanceof EntityNG) {
-      foreach ($entity as $field_name => $field) {
-        $field_violations = $field->validate();
-        if (count($field_violations)) {
-          $violations[$field_name] = $field_violations;
+      foreach ($violations as $violation) {
+        $property_path = $violation->getPropertyPath();
+        // If there is a property path this means we are dealing with a field
+        // violation.
+        if ($property_path) {
+          // The part before the first dot is our field name.
+          $path_parts = explode('.', $property_path);
+          $field_name = $path_parts[0];
+          // Collect all violations per field.
+          $field_violations[$field_name][] = $violation;
+        }
+        else {
+          // Violation is not specific to a field, so we print it as general
+          // form error.
+          form_set_error('', $violation->getMessage());
         }
       }
     }
@@ -294,30 +306,19 @@ class EntityFormController extends FormBase implements EntityFormControllerInter
         // @todo Exception : calls setValue(), tries to set the 'formatted'
         // property.
         $field = \Drupal::typedData()->create($definitions[$field_name], $items, $field_name, $entity);
-        $field_violations = $field->validate();
-        if (count($field_violations)) {
-          $violations[$field->getName()] = $field_violations;
-        }
-      }
-      // Now trigger the validation for entity base fields that are not
-      // configurable.
-      foreach ($definitions as $field_name => $definition) {
-        if (empty($definition['configurable'])) {
-          $field_violations = $entity->get($field_name)->validate();
-          foreach ($field_violations as $violation) {
-            // @todo: Map the error to the correct form element.
-            form_set_error('', $violation->getMessage());
-          }
+        $violations = $field->validate();
+        if (count($violations)) {
+          $field_violations[$field->getName()] = $violations;
         }
       }
     }
 
-    // Map errors back to form elements.
-    if ($violations) {
-      foreach ($violations as $field_name => $field_violations) {
+    // Map errors back to field form elements.
+    if ($field_violations) {
+      foreach ($field_violations as $field_name => $violations) {
         $langcode = field_is_translatable($entity->entityType(), field_info_field($field_name)) ? $entity_langcode : Language::LANGCODE_NOT_SPECIFIED;
         $field_state = field_form_get_state($form['#parents'], $field_name, $langcode, $form_state);
-        $field_state['constraint_violations'] = $field_violations;
+        $field_state['constraint_violations'] = $violations;
         field_form_set_state($form['#parents'], $field_name, $langcode, $form_state, $field_state);
       }
 

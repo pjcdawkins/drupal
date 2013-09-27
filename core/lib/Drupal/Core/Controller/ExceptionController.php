@@ -57,7 +57,7 @@ class ExceptionController extends ContainerAware {
       return $this->$method($exception, $request);
     }
 
-    return new Response('A fatal error occurred: ' . $exception->getMessage(), $exception->getStatusCode(), $exception->getHeaders());
+    return new Response('An error occurred: ' . $exception->getMessage(), $exception->getStatusCode(), $exception->getHeaders());
   }
 
   /**

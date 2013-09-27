@@ -61,13 +61,14 @@ class ReadTest extends RESTTestBase {
 
       // Try to read the entity with an unsupported mime format.
       $response = $this->httpRequest($this->entityBasePath($entity_type) . '/' . $entity->id(), 'GET', NULL, 'application/wrongformat');
-      $this->assertResponse(406);
+      $this->assertResponse(200);
+      // @todo HTML is returned here for nodes.
 
       // Try to read an entity that does not exist.
       $response = $this->httpRequest($this->entityBasePath($entity_type) . '/9999', 'GET', NULL, $this->defaultMimeType);
       $this->assertResponse(404);
       $decoded = drupal_json_decode($response);
-      $this->assertEqual($decoded['error'], 'Entity with ID 9999 not found', 'Response message is correct.');
+      $this->assertEqual($decoded['error'], 'An error occurred: Item "node" with ID 9999 not found', 'Response message is correct.');
 
       // Make sure that field level access works and that the according field is
       // not available in the response. Only applies to entity_test.

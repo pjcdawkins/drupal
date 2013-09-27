@@ -179,7 +179,10 @@ class ParamConverterManager extends ContainerAware implements RouteEnhancerInter
       // converted in which case we throw a 404.
       $defaults[$name] = $this->getConverter($definition['converter'])->convert($defaults[$name], $definition, $name, $defaults, $request);
       if (!isset($defaults[$name])) {
-        throw new NotFoundHttpException();
+        throw new NotFoundHttpException(format_string('Item "@name" with ID @id not found', array(
+          '@name' => $name,
+          '@id' => $defaults['_raw_variables']->get($name),
+        )));
       }
     }
 

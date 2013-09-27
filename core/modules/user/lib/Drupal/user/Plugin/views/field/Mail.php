@@ -8,10 +8,10 @@
 namespace Drupal\user\Plugin\views\field;
 
 use Drupal\Component\Annotation\PluginID;
+use Drupal\views\ResultRow;
 
 /**
-/**
- * Field handler to provide acess control for the email field.
+ * Field handler to provide access control for the email field.
  *
  * @ingroup views_field_handlers
  *
@@ -39,8 +39,8 @@ class Mail extends User {
     );
   }
 
-  function render_link($data, $values) {
-    parent::render_link($data, $values);
+  protected function renderLink($data, ResultRow $values) {
+    parent::renderLink($data, $values);
 
     if ($this->options['link_to_user'] == 'mailto') {
       $this->options['alter']['make_link'] = TRUE;

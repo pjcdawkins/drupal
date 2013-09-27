@@ -8,7 +8,6 @@
 namespace Drupal\custom_block\Tests;
 
 use Drupal\Core\Database\Database;
-use Drupal\Core\Language\Language;
 
 /**
  * Tests creating and saving a block.
@@ -49,10 +48,9 @@ class CustomBlockCreationTest extends CustomBlockTestBase {
   public function testCustomBlockCreation() {
     // Create a block.
     $edit = array();
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     $edit['info'] = $this->randomName(8);
-    $edit["block_body[$langcode][0][value]"] = $this->randomName(16);
-    $this->drupalPost('block/add/basic', $edit, t('Save'));
+    $edit['block_body[0][value]'] = $this->randomName(16);
+    $this->drupalPostForm('block/add/basic', $edit, t('Save'));
 
     // Check that the Basic block has been created.
     $this->assertRaw(format_string('!block %name has been created.', array(
@@ -64,6 +62,41 @@ class CustomBlockCreationTest extends CustomBlockTestBase {
     $blocks = entity_load_multiple_by_properties('custom_block', array('info' => $edit['info']));
     $block = reset($blocks);
     $this->assertTrue($block, 'Custom Block found in database.');
+
+    // Check that attempting to create another block with the same value for
+    // 'info' returns an error.
+    $this->drupalPostForm('block/add/basic', $edit, t('Save'));
+
+    // Check that the Basic block has been created.
+    $this->assertRaw(format_string('A block with description %name already exists.', array(
+      '%name' => $edit["info"]
+    )));
+    $this->assertResponse(200);
+  }
+
+  /**
+   * Create a default custom block.
+   *
+   * Creates a custom block from defaults and ensures that the 'basic block'
+   * type is being used.
+   */
+  public function testDefaultCustomBlockCreation() {
+    $edit = array();
+    $edit['info'] = $this->randomName(8);
+    $edit['block_body[0][value]'] = $this->randomName(16);
+    // Don't pass the custom block type in the url so the default is forced.
+    $this->drupalPostForm('block/add', $edit, t('Save'));
+
+    // Check that the block has been created and that it is a basic block.
+    $this->assertRaw(format_string('!block %name has been created.', array(
+      '!block' => 'Basic block',
+      '%name' => $edit["info"],
+    )), 'Basic block created.');
+
+    // Check that the block exists in the database.
+    $blocks = entity_load_multiple_by_properties('custom_block', array('info' => $edit['info']));
+    $block = reset($blocks);
+    $this->assertTrue($block, 'Default Custom Block found in database.');
   }
 
   /**
@@ -109,11 +142,10 @@ class CustomBlockCreationTest extends CustomBlockTestBase {
   public function testBlockDelete() {
     // Create a block.
     $edit = array();
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     $edit['info'] = $this->randomName(8);
     $body = $this->randomName(16);
-    $edit["block_body[$langcode][0][value]"] = $body;
-    $this->drupalPost('block/add/basic', $edit, t('Save'));
+    $edit['block_body[0][value]'] = $body;
+    $this->drupalPostForm('block/add/basic', $edit, t('Save'));
 
     // Place the block.
     $instance = array(
@@ -121,7 +153,9 @@ class CustomBlockCreationTest extends CustomBlockTestBase {
       'settings[label]' => $edit['info'],
       'region' => 'sidebar_first',
     );
-    $this->drupalPost(NULL, $instance, t('Save block'));
+    $block = entity_load('custom_block', 1);
+    $url = 'admin/structure/block/add/custom_block:' . $block->uuid() . '/' . \Drupal::config('system.theme')->get('default');
+    $this->drupalPostForm($url, $instance, t('Save block'));
 
     $block = custom_block_load(1);
 
@@ -136,16 +170,15 @@ class CustomBlockCreationTest extends CustomBlockTestBase {
     $this->drupalGet('block/1/delete');
     $this->assertText(format_plural(1, 'This will also remove 1 placed block instance.', 'This will also remove @count placed block instance.'));
 
-    $this->drupalPost(NULL, array(), 'Delete');
+    $this->drupalPostForm(NULL, array(), 'Delete');
     $this->assertRaw(t('Custom block %name has been deleted.', array('%name' => $edit['info'])));
 
     // Create another block and force the plugin cache to flush.
     $edit2 = array();
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     $edit2['info'] = $this->randomName(8);
     $body2 = $this->randomName(16);
-    $edit2["block_body[$langcode][0][value]"] = $body2;
-    $this->drupalPost('block/add/basic', $edit2, t('Save'));
+    $edit2['block_body[0][value]'] = $body2;
+    $this->drupalPostForm('block/add/basic', $edit2, t('Save'));
 
     $this->assertNoRaw('Error message');
 
@@ -154,8 +187,8 @@ class CustomBlockCreationTest extends CustomBlockTestBase {
     $edit3 = array();
     $edit3['info'] = $this->randomName(8);
     $body = $this->randomName(16);
-    $edit3["block_body[$langcode][0][value]"] = $body;
-    $this->drupalPost('block/add/basic', $edit3, t('Save'));
+    $edit3['block_body[0][value]'] = $body;
+    $this->drupalPostForm('block/add/basic', $edit3, t('Save'));
 
     // Show the delete confirm form.
     $this->drupalGet('block/3/delete');

@@ -66,18 +66,17 @@ class EntityReferenceAdminTest extends WebTestBase {
     $bundle_path = 'admin/structure/types/manage/' . $this->type;
 
     // First step: 'Add new field' on the 'Manage fields' page.
-    $this->drupalPost($bundle_path . '/fields', array(
+    $this->drupalPostForm($bundle_path . '/fields', array(
       'fields[_add_new_field][label]' => 'Test label',
       'fields[_add_new_field][field_name]' => 'test',
       'fields[_add_new_field][type]' => 'entity_reference',
-      'fields[_add_new_field][widget_type]' => 'entity_reference_autocomplete',
     ), t('Save'));
 
     // Node should be selected by default.
     $this->assertFieldByName('field[settings][target_type]', 'node');
 
     // Second step: 'Instance settings' form.
-    $this->drupalPost(NULL, array(), t('Save field settings'));
+    $this->drupalPostForm(NULL, array(), t('Save field settings'));
 
     // The base handler should be selected by default.
     $this->assertFieldByName('instance[settings][handler]', 'default');
@@ -89,22 +88,24 @@ class EntityReferenceAdminTest extends WebTestBase {
       $this->assertFieldByName('instance[settings][handler_settings][target_bundles][' . $bundle_name . ']');
     }
 
+    reset($bundles);
+
     // Test the sort settings.
     // Option 0: no sort.
     $this->assertFieldByName('instance[settings][handler_settings][sort][field]', '_none');
     $this->assertNoFieldByName('instance[settings][handler_settings][sort][direction]');
     // Option 1: sort by field.
-    $this->drupalPostAJAX(NULL, array('instance[settings][handler_settings][sort][field]' => 'nid'), 'instance[settings][handler_settings][sort][field]');
+    $this->drupalPostAjaxForm(NULL, array('instance[settings][handler_settings][sort][field]' => 'nid'), 'instance[settings][handler_settings][sort][field]');
     $this->assertFieldByName('instance[settings][handler_settings][sort][direction]', 'ASC');
     // Set back to no sort.
-    $this->drupalPostAJAX(NULL, array('instance[settings][handler_settings][sort][field]' => '_none'), 'instance[settings][handler_settings][sort][field]');
+    $this->drupalPostAjaxForm(NULL, array('instance[settings][handler_settings][sort][field]' => '_none'), 'instance[settings][handler_settings][sort][field]');
 
     // Third step: confirm.
-    $this->drupalPost(NULL, array(
+    $this->drupalPostForm(NULL, array(
       'instance[settings][handler_settings][target_bundles][' . key($bundles) . ']' => key($bundles),
     ), t('Save settings'));
 
     // Check that the field appears in the overview form.
-    $this->assertFieldByXPath('//table[@id="field-overview"]//td[1]', 'Test label', t('Field was created and appears in the overview page.'));
+    $this->assertFieldByXPath('//table[@id="field-overview"]//td[1]', 'Test label', 'Field was created and appears in the overview page.');
   }
 }

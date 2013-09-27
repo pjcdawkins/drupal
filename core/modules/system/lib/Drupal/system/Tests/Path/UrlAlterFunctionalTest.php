@@ -36,8 +36,8 @@ class UrlAlterFunctionalTest extends WebTestBase {
     $account = $this->drupalCreateUser(array('administer url aliases'));
     $this->drupalLogin($account);
 
-    $uid = $account->uid;
-    $name = $account->name;
+    $uid = $account->id();
+    $name = $account->getUsername();
 
     // Test a single altered path.
     $this->drupalGet("user/$name");
@@ -53,7 +53,7 @@ class UrlAlterFunctionalTest extends WebTestBase {
 
     // Test adding an alias via the UI.
     $edit = array('source' => "user/$uid/edit", 'alias' => 'alias/test2');
-    $this->drupalPost('admin/config/search/path/add', $edit, t('Save'));
+    $this->drupalPostForm('admin/config/search/path/add', $edit, t('Save'));
     $this->assertText(t('The alias has been saved.'));
     $this->drupalGet('alias/test2');
     $this->assertResponse('200', 'The path alias gets resolved correctly');
@@ -68,7 +68,7 @@ class UrlAlterFunctionalTest extends WebTestBase {
     $this->drupalGet('community');
     $this->assertText('General discussion', 'The community path gets resolved correctly');
     $this->assertUrlOutboundAlter('forum', 'community');
-    $forum_vid = config('forum.settings')->get('vocabulary');
+    $forum_vid = \Drupal::config('forum.settings')->get('vocabulary');
     $term_name = $this->randomName();
     $term = entity_create('taxonomy_term', array(
       'name' => $term_name,

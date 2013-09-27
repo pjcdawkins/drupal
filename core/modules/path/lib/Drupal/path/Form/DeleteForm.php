@@ -7,16 +7,15 @@
 
 namespace Drupal\path\Form;
 
-use Drupal\Core\Controller\ControllerInterface;
+use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Form\ConfirmFormBase;
 use Drupal\Core\Path\Path;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Builds the form to delete a path alias.
  */
-class DeleteForm extends ConfirmFormBase implements ControllerInterface {
+class DeleteForm extends ConfirmFormBase implements ContainerInjectionInterface {
 
   /**
    * The path crud service.
@@ -66,19 +65,22 @@ class DeleteForm extends ConfirmFormBase implements ControllerInterface {
   }
 
   /**
-   * Implements \Drupal\Core\Form\ConfirmFormBase::getCancelPath().
+   * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/config/search/path';
+  public function getCancelRoute() {
   }
 
   /**
    * Overrides \Drupal\Core\Form\ConfirmFormBase::buildForm().
    */
-  public function buildForm(array $form, array &$form_state, $pid = NULL, Request $request = NULL) {
+  public function buildForm(array $form, array &$form_state, $pid = NULL) {
     $this->pathAlias = $this->path->load(array('pid' => $pid));
 
-    return parent::buildForm($form, $form_state, $request);
+    $form = parent::buildForm($form, $form_state);
+
+    // @todo Convert to getCancelRoute() after http://drupal.org/node/1987802.
+    $form['actions']['cancel']['#href'] = 'admin/config/search/path';
+    return $form;
   }
 
   /**

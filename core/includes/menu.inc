@@ -8,9 +8,11 @@
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Routing\RequestHelper;
 use Drupal\Core\Template\Attribute;
-use Drupal\menu_link\Plugin\Core\Entity\MenuLink;
+use Drupal\menu_link\Entity\MenuLink;
 use Drupal\menu_link\MenuLinkStorageController;
+use Symfony\Cmf\Component\Routing\RouteObjectInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Route;
@@ -144,7 +146,7 @@ const MENU_IS_LOCAL_ACTION = 0x0100;
  */
 
 /**
- * Menu type -- A "normal" menu item that's shown in menu and breadcrumbs.
+ * Menu type -- A "normal" menu item that's shown in menus.
  *
  * Normal menu items show up in the menu tree and can be moved/hidden by
  * the administrator. Use this for most menu items. It is the default value if
@@ -156,7 +158,7 @@ define('MENU_NORMAL_ITEM', MENU_VISIBLE_IN_TREE | MENU_VISIBLE_IN_BREADCRUMB);
  * Menu type -- A hidden, internal callback, typically used for API calls.
  *
  * Callbacks simply register a path so that the correct function is fired
- * when the URL is accessed. They do not appear in menus or breadcrumbs.
+ * when the URL is accessed. They do not appear in menus.
  */
 const MENU_CALLBACK = 0x0000;
 
@@ -198,7 +200,7 @@ define('MENU_LOCAL_ACTION', MENU_IS_LOCAL_TASK | MENU_IS_LOCAL_ACTION | MENU_VIS
 /**
  * Menu type -- A task specific to the parent, which is never rendered.
  *
- * Sibling local tasks are not rendered themselves, but affect the breadcrumb
+ * Sibling local tasks are not rendered themselves, but affect the active
  * trail and need their sibling tasks rendered as tabs.
  */
 define('MENU_SIBLING_LOCAL_TASK', MENU_IS_LOCAL_TASK | MENU_IS_LOCAL_ACTION | MENU_VISIBLE_IN_BREADCRUMB);
@@ -337,7 +339,7 @@ function menu_get_ancestors($parts) {
   $ancestors = array();
   $length =  $number_parts - 1;
   $end = (1 << $number_parts) - 1;
-  $masks = Drupal::state()->get('menu.masks');
+  $masks = \Drupal::state()->get('menu.masks');
   // If the optimized menu.masks array is not available use brute force to get
   // the correct $ancestors and $placeholders returned. Do not use this as the
   // default value of the menu.masks variable to avoid building such a big
@@ -435,7 +437,7 @@ function menu_unserialize($data, $map) {
  * @param $router_item
  *   The router item. Usually a router entry from menu_get_item() is either
  *   modified or set to a different path. This allows the navigation block,
- *   the page title, the breadcrumb, and the page help to be modified in one
+ *   the page title, the active trail, and the page help to be modified in one
  *   call.
  */
 function menu_set_item($path, $router_item) {
@@ -446,7 +448,7 @@ function menu_set_item($path, $router_item) {
  * Gets a router item.
  *
  * @param $path
- *   The path, for example node/5. The function will find the corresponding
+ *   The path; for example, 'node/5'. The function will find the corresponding
  *   node/% item and return that.
  * @param $router_item
  *   Internal use only.
@@ -471,8 +473,9 @@ function menu_get_item($path = NULL, $router_item = NULL) {
   if (!isset($router_items[$path])) {
     // Rebuild if we know it's needed, or if the menu masks are missing which
     // occurs rarely, likely due to a race condition of multiple rebuilds.
-    if (Drupal::state()->get('menu_rebuild_needed') || !Drupal::state()->get('menu.masks')) {
+    if (\Drupal::state()->get('menu_rebuild_needed') || !\Drupal::state()->get('menu.masks')) {
       menu_router_rebuild();
+      \Drupal::service('router.builder')->rebuild();
     }
     $original_map = arg(NULL, $path);
 
@@ -508,7 +511,7 @@ function menu_get_item($path = NULL, $router_item = NULL) {
  * @param $item
  *   A menu router or menu link item
  * @param $map
- *   An array of path arguments (ex: array('node', '5'))
+ *   An array of path arguments; for example, array('node', '5').
  *
  * @return
  *   Returns TRUE for success, FALSE if an object cannot be loaded.
@@ -559,7 +562,7 @@ function _menu_load_objects(&$item, &$map) {
           $return = $function($value);
         }
         // If callback returned an error or there is no callback, trigger 404.
-        if ($return === FALSE) {
+        if (empty($return)) {
           $item['access'] = FALSE;
           $map = FALSE;
           return FALSE;
@@ -578,7 +581,7 @@ function _menu_load_objects(&$item, &$map) {
  * @param $item
  *   A menu router or menu link item
  * @param $map
- *   An array of path arguments (ex: array('node', '5'))
+ *   An array of path arguments; for example, array('node', '5').
  *
  * @return
  *   $item['access'] becomes TRUE if the item is accessible, FALSE otherwise.
@@ -727,7 +730,7 @@ function _menu_item_localize(&$item, $map, $link_translate = FALSE) {
  * @param $router_item
  *   A menu router item
  * @param $map
- *   An array of path arguments (ex: array('node', '5'))
+ *   An array of path arguments; for example, array('node', '5').
  * @param $to_arg
  *   Execute $item['to_arg_functions'] or not. Use only if you want to render a
  *   path from the menu table, for example tabs.
@@ -781,7 +784,7 @@ function _menu_translate(&$router_item, $map, $to_arg = FALSE) {
     // with the link map.
     $map = $link_map;
 
-    $route_provider = Drupal::getContainer()->get('router.route_provider');
+    $route_provider = \Drupal::getContainer()->get('router.route_provider');
     $route = $route_provider->getRouteByName($router_item['route_name']);
     $router_item['access'] = menu_item_route_access($route, $router_item['href'], $map);
   }
@@ -802,9 +805,9 @@ function _menu_translate(&$router_item, $map, $to_arg = FALSE) {
  * Translates the path elements in the map using any to_arg helper function.
  *
  * @param $map
- *   An array of path arguments (ex: array('node', '5'))
+ *   An array of path arguments; for example, array('node', '5').
  * @param $to_arg_functions
- *   An array of helper function (ex: array(2 => 'menu_tail_to_arg'))
+ *   An array of helper functions; for example, array(2 => 'menu_tail_to_arg').
  *
  * @see hook_menu()
  */
@@ -895,7 +898,6 @@ function _menu_link_translate(&$item, $translate = FALSE) {
       // current path, and we can take over the argument map for a link like
       // 'foo/%/bar'. This inheritance is only valid for breadcrumb links.
       // @see _menu_tree_check_access()
-      // @see menu_get_active_breadcrumb()
       elseif ($translate && ($current_router_item = menu_get_item())) {
         // If $translate is TRUE, then this link is in the active trail.
         // Only translate paths within the current path.
@@ -958,19 +960,22 @@ function _menu_link_translate(&$item, $translate = FALSE) {
  * @param string $href
  *   Menu path as returned by $item['href'] of menu_get_item().
  * @param array $map
- *   An array of path arguments, for example, array('node', '5').
+ *   An array of path arguments; for example, array('node', '5').
  *
  * @return bool
  *   TRUE if the user has access or FALSE if the user should be presented
  *   with access denied.
+ *
+ * @throws \Symfony\Component\Routing\Exception\ResourceNotFoundException
+ *   If the system path in $href does not match the $route.
  */
 function menu_item_route_access(Route $route, $href, &$map) {
-  $request = Request::create('/' . $href);
-  $request->attributes->set('system_path', $href);
+  $request = RequestHelper::duplicate(\Drupal::request(), '/' . $href);
+  $request->attributes->set('_system_path', $href);
   // Attempt to match this path to provide a fully built request to the
   // access checker.
   try {
-    $request->attributes->add(Drupal::service('router.dynamic')->matchRequest($request));
+    $request->attributes->add(\Drupal::service('router.dynamic')->matchRequest($request));
   }
   catch (NotFoundHttpException $e) {
     return FALSE;
@@ -991,7 +996,7 @@ function menu_item_route_access(Route $route, $href, &$map) {
     }
   }
 
-  return Drupal::service('access_manager')->check($route, $request);
+  return \Drupal::service('access_manager')->check($route, $request);
 }
 
 /**
@@ -1005,7 +1010,7 @@ function menu_item_route_access(Route $route, $href, &$map) {
  * "story" content type:
  * @code
  * $node = menu_get_object();
- * $story = $node->type == 'story';
+ * $story = $node->getType() == 'story';
  * @endcode
  *
  * @param $type
@@ -1019,11 +1024,31 @@ function menu_item_route_access(Route $route, $href, &$map) {
  *   it's 2. Defaults to 1.
  * @param $path
  *   See menu_get_item() for more on this. Defaults to the current path.
+ *
+ * @todo Remove this function in https://drupal.org/node/2091399.
  */
 function menu_get_object($type = 'node', $position = 1, $path = NULL) {
   $router_item = menu_get_item($path);
-  if (isset($router_item['load_functions'][$position]) && !empty($router_item['map'][$position]) && $router_item['load_functions'][$position] == $type . '_load') {
+  if (empty($router_item['map'][$position])) {
+    return;
+  }
+
+  if (isset($router_item['load_functions'][$position]) && $router_item['load_functions'][$position] == $type . '_load') {
     return $router_item['map'][$position];
+  }
+
+  // If the path is route-based, use the route path instead of the menu item.
+  // The most common use of this function is for the node page, which has a
+  // route path of '/node/{node}'. By splitting that path into parts, we check
+  // for the $type wrapped in curly braces at the correct $position, returning
+  // the value found there.
+  $request = \Drupal::request();
+  if ($request->attributes->has(RouteObjectInterface::ROUTE_OBJECT)) {
+    $path = $request->attributes->get(RouteObjectInterface::ROUTE_OBJECT)->getPath();
+    $parts = explode('/', ltrim($path, '/'));
+    if (isset($parts[$position]) && $parts[$position] == '{' . $type . '}') {
+      return $router_item['map'][$position];
+    }
   }
 }
 
@@ -1161,7 +1186,7 @@ function menu_tree_all_data($menu_name, $link = NULL, $max_depth = NULL) {
   // Use $mlid as a flag for whether the data being loaded is for the whole tree.
   $mlid = isset($link['mlid']) ? $link['mlid'] : 0;
   // Generate a cache ID (cid) specific for this $menu_name, $link, $language, and depth.
-  $cid = 'links:' . $menu_name . ':all:' . $mlid . ':' . $language_interface->langcode . ':' . (int) $max_depth;
+  $cid = 'links:' . $menu_name . ':all:' . $mlid . ':' . $language_interface->id . ':' . (int) $max_depth;
 
   if (!isset($tree[$cid])) {
     // If the static variable doesn't have the data, check {cache_menu}.
@@ -1255,7 +1280,7 @@ function menu_tree_get_path($menu_name) {
  * @param $only_active_trail
  *   (optional) Whether to only return the links in the active trail (TRUE)
  *   instead of all links on every level of the menu link tree (FALSE). Defaults
- *   to FALSE. Internally used for breadcrumbs only.
+ *   to FALSE.
  *
  * @return
  *   An array of menu links, in the order they should be rendered. The array
@@ -1271,20 +1296,38 @@ function menu_tree_page_data($menu_name, $max_depth = NULL, $only_active_trail =
 
   // Check if the active trail has been overridden for this menu tree.
   $active_path = menu_tree_get_path($menu_name);
-  // Load the menu item corresponding to the current page.
-  if ($item = menu_get_item($active_path)) {
+  // Load the router item corresponding to the current page.
+  $request = \Drupal::request();
+  $system_path = NULL;
+  if ($route_name = $request->attributes->get(RouteObjectInterface::ROUTE_NAME)) {
+    // @todo https://drupal.org/node/2068471 is adding support so we can tell
+    // if this is called on a 404/403 page.
+    $system_path = $request->attributes->get('_system_path');
+    $page_not_403 = 1;
+  }
+  // @todo Remove once the old router system is removed.
+  elseif ($request->attributes->has('_legacy')) {
+    // Page is a 404 if no item is loaded.
+    if ($item = menu_get_item($active_path)) {
+      $system_path = $item['href'];
+      // Variable to indicate that we are not serving an access denied response
+      // for this page. Used to limit the number of links rendered.
+      $page_not_403 = (int) $item['access'];
+    }
+  }
+  if (isset($system_path)) {
     if (isset($max_depth)) {
       $max_depth = min($max_depth, MENU_MAX_DEPTH);
     }
     // Generate a cache ID (cid) specific for this page.
-    $cid = 'links:' . $menu_name . ':page:' . $item['href'] . ':' . $language_interface->langcode . ':' . (int) $item['access'] . ':' . (int) $max_depth;
+    $cid = 'links:' . $menu_name . ':page:' . $system_path . ':' . $language_interface->id . ':' . $page_not_403 . ':' . (int) $max_depth;
     // If we are asked for the active trail only, and $menu_name has not been
     // built and cached for this page yet, then this likely means that it
     // won't be built anymore, as this function is invoked from
-    // template_process_page(). So in order to not build a giant menu tree
+    // template_preprocess_page(). So in order to not build a giant menu tree
     // that needs to be checked for access on all levels, we simply check
     // whether we have the menu already in cache, or otherwise, build a minimum
-    // tree containing the breadcrumb/active trail only.
+    // tree containing the active trail only.
     // @see menu_set_active_trail()
     if (!isset($tree[$cid]) && $only_active_trail) {
       $cid .= ':trail';
@@ -1308,9 +1351,9 @@ function menu_tree_page_data($menu_name, $max_depth = NULL, $only_active_trail =
         // We always want all the top-level links with plid == 0.
         $active_trail = array(0 => 0);
 
-        // If the item for the current page is accessible, build the tree
+        // If this page is accessible to the current user, build the tree
         // parameters accordingly.
-        if ($item['access']) {
+        if ($page_not_403) {
           // Find a menu link corresponding to the current path. If $active_path
           // is NULL, let menu_link_get_preferred() determine the path.
           if ($active_link = menu_link_get_preferred($active_path, $menu_name)) {
@@ -1335,13 +1378,13 @@ function menu_tree_page_data($menu_name, $max_depth = NULL, $only_active_trail =
           }
           $parents = $active_trail;
 
-          $expanded = Drupal::state()->get('menu_expanded');
+          $expanded = \Drupal::state()->get('menu_expanded');
           // Check whether the current menu has any links set to be expanded.
           if (!$only_active_trail && $expanded && in_array($menu_name, $expanded)) {
             // Collect all the links set to be expanded, and then add all of
             // their children to the list as well.
             do {
-              $query = Drupal::entityQuery('menu_link')
+              $query = \Drupal::entityQuery('menu_link')
                 ->condition('menu_name', $menu_name)
                 ->condition('expanded', 1)
                 ->condition('has_children', 1)
@@ -1386,8 +1429,7 @@ function menu_tree_page_data($menu_name, $max_depth = NULL, $only_active_trail =
  *   - active_trail: An array of mlids, representing the coordinates of the
  *     currently active menu link.
  *   - only_active_trail: Whether to only return links that are in the active
- *     trail. This option is ignored, if 'expanded' is non-empty. Internally
- *     used for breadcrumbs.
+ *     trail. This option is ignored, if 'expanded' is non-empty.
  *   - min_depth: The minimum depth of menu links in the resulting tree.
  *     Defaults to 1, which is the default to build a whole tree for a menu
  *     (excluding menu container itself).
@@ -1425,7 +1467,7 @@ function _menu_build_tree($menu_name, array $parameters = array()) {
   if (isset($parameters['expanded'])) {
     sort($parameters['expanded']);
   }
-  $tree_cid = 'links:' . $menu_name . ':tree-data:' . $language_interface->langcode . ':' . hash('sha256', serialize($parameters));
+  $tree_cid = 'links:' . $menu_name . ':tree-data:' . $language_interface->id . ':' . hash('sha256', serialize($parameters));
 
   // If we do not have this tree in the static cache, check {cache_menu}.
   if (!isset($trees[$tree_cid])) {
@@ -1436,7 +1478,7 @@ function _menu_build_tree($menu_name, array $parameters = array()) {
   }
 
   if (!isset($trees[$tree_cid])) {
-    $query = Drupal::entityQuery('menu_link');
+    $query = \Drupal::entityQuery('menu_link');
     for ($i = 1; $i <= MENU_MAX_DEPTH; $i++) {
       $query->sort('p' . $i, 'ASC');
     }
@@ -1597,7 +1639,7 @@ function _menu_tree_data(&$links, $parents, $depth) {
   $tree = array();
   while ($item = array_pop($links)) {
     // We need to determine if we're on the path to root so we can later build
-    // the correct active trail and breadcrumb.
+    // the correct active trail.
     $item['in_active_trail'] = in_array($item['mlid'], $parents);
     // Add the current link to the tree.
     $tree[$item['mlid']] = array(
@@ -1694,8 +1736,15 @@ function theme_menu_local_task($variables) {
     $link['localized_options']['html'] = TRUE;
     $link_text = t('!local-task-title!active', array('!local-task-title' => $link['title'], '!active' => $active));
   }
+  if (!empty($link['href'])) {
+    // @todo - remove this once all pages are converted to routes.
+    $a_tag = l($link_text, $link['href'], $link['localized_options']);
+  }
+  else {
+    $a_tag = \Drupal::l($link_text, $link['route_name'], $link['route_parameters'], $link['localized_options']);
+  }
 
-  return '<li' . (!empty($variables['element']['#active']) ? ' class="active"' : '') . '>' . l($link_text, $link['href'], $link['localized_options']) . '</li>';
+  return '<li' . (!empty($variables['element']['#active']) ? ' class="active"' : '') . '>' . $a_tag . '</li>';
 }
 
 /**
@@ -1734,29 +1783,6 @@ function drupal_help_arg($arg = array()) {
 }
 
 /**
- * Returns the help associated with the active menu item.
- */
-function menu_get_active_help() {
-  $output = '';
-  $router_path = menu_tab_root_path();
-  // We will always have a path unless we are on a 403 or 404.
-  if (!$router_path) {
-    return '';
-  }
-
-  $arg = drupal_help_arg(arg(NULL));
-
-  foreach (module_implements('help') as $module) {
-    $function = $module . '_help';
-    // Lookup help for this path.
-    if ($help = $function($router_path, $arg)) {
-      $output .= $help . "\n";
-    }
-  }
-  return $output;
-}
-
-/**
  * Gets the custom theme for the current page, if there is one.
  *
  * @param $initialize
@@ -1776,7 +1802,7 @@ function menu_get_custom_theme($initialize = FALSE) {
     // First allow modules to dynamically set a custom theme for the current
     // page. Since we can only have one, the last module to return a valid
     // theme takes precedence.
-    $custom_themes = array_filter(module_invoke_all('custom_theme'), 'drupal_theme_access');
+    $custom_themes = array_filter(\Drupal::moduleHandler()->invokeAll('custom_theme'), 'drupal_theme_access');
     if (!empty($custom_themes)) {
       $custom_theme = array_pop($custom_themes);
     }
@@ -1818,7 +1844,7 @@ function menu_list_system_menus() {
  * Returns an array of links to be rendered as the Main menu.
  */
 function menu_main_menu() {
-  $config = config('menu.settings');
+  $config = \Drupal::config('menu.settings');
   $menu_enabled = module_exists('menu');
   // When menu module is not enabled, we need a hardcoded default value.
   $main_links_source = $menu_enabled ? $config->get('main_links') : 'main';
@@ -1829,7 +1855,7 @@ function menu_main_menu() {
  * Returns an array of links to be rendered as the Secondary links.
  */
 function menu_secondary_menu() {
-  $config = config('menu.settings');
+  $config = \Drupal::config('menu.settings');
   $menu_enabled = module_exists('menu');
   // When menu module is not enabled, we need a hardcoded default value.
   $main_links_source = $menu_enabled ? $config->get('main_links') : 'main';
@@ -1935,6 +1961,20 @@ function menu_local_tasks($level = 0) {
     $actions = $empty['actions'];
     $tabs = array();
 
+    // Look for route-based tabs.
+    $data['tabs'] = array();
+    $data['actions'] = array();
+
+    $route_name = \Drupal::request()->attributes->get(RouteObjectInterface::ROUTE_NAME);
+    if (!empty($route_name)) {
+      $manager = \Drupal::service('plugin.manager.menu.local_task');
+      $local_tasks = $manager->getTasksBuild($route_name);
+      foreach ($local_tasks as $level => $items) {
+        $data['tabs'][$level] = empty($data['tabs'][$level]) ? $items : array_merge($data['tabs'][$level], $items);
+      }
+    }
+
+    // @todo Remove the code below once the old menu router system got removed.
     $router_item = menu_get_item();
 
     // If this router item points to its parent, start from the parents to
@@ -1948,6 +1988,10 @@ function menu_local_tasks($level = 0) {
     if (!$router_item || !$router_item['access']) {
       return $empty;
     }
+    // @todo remove all code using {menu_router} and anything using MENU_*
+    // constants when all local actions and local tasks are converted to
+    // plugins. The remaining code should just invoke those managers plus do the
+    // invocations of hook_menu_local_tasks() and hook_menu_local_tasks_alter().
 
     // Get all tabs (also known as local tasks) and the root page.
     $result = db_select('menu_router', NULL, array('fetch' => PDO::FETCH_ASSOC))
@@ -2116,10 +2160,10 @@ function menu_local_tasks($level = 0) {
     ksort($tabs);
     // Remove the depth, we are interested only in their relative placement.
     $tabs = array_values($tabs);
-    $data['tabs'] = $tabs;
+    $data['tabs'] += $tabs;
 
     // Allow modules to dynamically add further tasks.
-    $module_handler = Drupal::moduleHandler();
+    $module_handler = \Drupal::moduleHandler();
     foreach ($module_handler->getImplementations('menu_local_tasks') as $module) {
       $function = $module . '_menu_local_tasks';
       $function($data, $router_item, $root_path);
@@ -2168,7 +2212,7 @@ function menu_local_tasks($level = 0) {
  *   example 'node' or 'admin/structure/block/manage'.
  * @param $args
  *   A list of dynamic path arguments to append to $parent_path to form the
- *   fully-qualified menu router path, for example array(123) for a certain
+ *   fully-qualified menu router path; for example, array(123) for a certain
  *   node or array('system', 'tools') for a certain block.
  *
  * @return
@@ -2273,20 +2317,19 @@ function menu_secondary_local_tasks() {
 function menu_get_local_actions() {
   $links = menu_local_tasks();
   $router_item = menu_get_item();
-  // @todo Consider storing the results of hook_local_actions() in a static.
-  foreach (Drupal::moduleHandler()->invokeAll('local_actions') as $route_info) {
-    if (in_array($router_item['route_name'], $route_info['appears_on'])) {
-      $route_path = _menu_router_translate_route($route_info['route_name']);
-      $action_router_item = menu_get_item($route_path);
-      $links['actions'][$route_path] = array(
-        '#theme' => 'menu_local_action',
-        '#link' => array(
-          'title' => $route_info['title'],
-          'href' => $route_path,
-        ),
-        '#access' => $action_router_item['access'],
-      );
-    }
+  $manager = \Drupal::service('plugin.manager.menu.local_action');
+  $local_actions = $manager->getActionsForRoute($router_item['route_name']);
+  foreach ($local_actions as $plugin) {
+    $route_path = $manager->getPath($plugin);
+    $action_router_item = menu_get_item($route_path);
+    $links['actions'][$route_path] = array(
+      '#theme' => 'menu_local_action',
+      '#link' => array(
+        'title' => $manager->getTitle($plugin),
+        'href' => $route_path,
+      ),
+      '#access' => $action_router_item['access'],
+    );
   }
   return $links['actions'];
 }
@@ -2361,7 +2404,7 @@ function menu_set_active_menu_names($menu_names = NULL) {
     $active = $menu_names;
   }
   elseif (!isset($active)) {
-    $config = config('system.menu');
+    $config = \Drupal::config('system.menu');
     $active = $config->get('active_menus_default') ?: array_keys(menu_list_system_menus());
   }
   return $active;
@@ -2396,9 +2439,7 @@ function menu_set_active_item($path) {
  *
  * Any trail set by this function will only be used for functionality that calls
  * menu_get_active_trail(). Drupal core only uses trails set here for
- * breadcrumbs and the page title and not for menu trees or page content.
- * Additionally, breadcrumbs set by drupal_set_breadcrumb() will override any
- * trail set here.
+ * the page title and not for menu trees or page content.
  *
  * To affect the trail used by menu trees, use menu_tree_set_path(). To affect
  * the page content, use menu_set_active_item() instead.
@@ -2485,7 +2526,7 @@ function menu_set_active_trail($new_trail = NULL) {
  * Looks up the preferred menu link for a given system path.
  *
  * @param $path
- *   The path, for example 'node/5'. The function will find the corresponding
+ *   The path; for example, 'node/5'. The function will find the corresponding
  *   menu link ('node/5' if it exists, or fallback to 'node/%').
  * @param $selected_menu
  *   The name of a menu used to restrict the search for a preferred menu link.
@@ -2595,57 +2636,6 @@ function menu_get_active_trail() {
 }
 
 /**
- * Gets the breadcrumb for the current page, as determined by the active trail.
- *
- * @see menu_set_active_trail()
- */
-function menu_get_active_breadcrumb() {
-  $breadcrumb = array();
-
-  // No breadcrumb for the front page.
-  if (drupal_is_front_page()) {
-    return $breadcrumb;
-  }
-
-  $item = menu_get_item();
-  if (!empty($item['access'])) {
-    $active_trail = menu_get_active_trail();
-
-    // Allow modules to alter the breadcrumb, if possible, as that is much
-    // faster than rebuilding an entirely new active trail.
-    drupal_alter('menu_breadcrumb', $active_trail, $item);
-
-    // Don't show a link to the current page in the breadcrumb trail.
-    $end = end($active_trail);
-    if ($item['href'] == $end['href']) {
-      array_pop($active_trail);
-    }
-
-    // Remove the tab root (parent) if the current path links to its parent.
-    // Normally, the tab root link is included in the breadcrumb, as soon as we
-    // are on a local task or any other child link. However, if we are on a
-    // default local task (e.g., node/%/view), then we do not want the tab root
-    // link (e.g., node/%) to appear, as it would be identical to the current
-    // page. Since this behavior also needs to work recursively (i.e., on
-    // default local tasks of default local tasks), and since the last non-task
-    // link in the trail is used as page title (see menu_get_active_title()),
-    // this condition cannot be cleanly integrated into menu_get_active_trail().
-    // menu_get_active_trail() already skips all links that link to their parent
-    // (commonly MENU_DEFAULT_LOCAL_TASK). In order to also hide the parent link
-    // itself, we always remove the last link in the trail, if the current
-    // router item links to its parent.
-    if (($item['type'] & MENU_LINKS_TO_PARENT) == MENU_LINKS_TO_PARENT) {
-      array_pop($active_trail);
-    }
-
-    foreach ($active_trail as $parent) {
-      $breadcrumb[] = l($parent['title'], $parent['href'], $parent['localized_options']);
-    }
-  }
-  return $breadcrumb;
-}
-
-/**
  * Gets the title of the current page, as determined by the active trail.
  */
 function menu_get_active_title() {
@@ -2682,7 +2672,7 @@ function menu_cache_clear_all() {
  * Resets the menu system static cache.
  */
 function menu_reset_static_cache() {
-  Drupal::entityManager()
+  \Drupal::entityManager()
     ->getStorageController('menu_link')->resetCache();
   drupal_static_reset('_menu_build_tree');
   drupal_static_reset('menu_tree');
@@ -2720,7 +2710,7 @@ function menu_router_rebuild() {
     menu_cache_clear_all();
     _menu_clear_page_cache();
     // Indicate that the menu has been successfully rebuilt.
-    Drupal::state()->delete('menu_rebuild_needed');
+    \Drupal::state()->delete('menu_rebuild_needed');
   }
   catch (Exception $e) {
     $transaction->rollback();
@@ -2741,7 +2731,7 @@ function menu_router_build($save = FALSE) {
   // We need to manually call each module so that we can know which module
   // a given item came from.
   $callbacks = array();
-  foreach (module_implements('menu') as $module) {
+  foreach (\Drupal::moduleHandler()->getImplementations('menu') as $module) {
     $router_items = call_user_func($module . '_menu');
     if (isset($router_items) && is_array($router_items)) {
       foreach (array_keys($router_items) as $path) {
@@ -2788,11 +2778,11 @@ function menu_router_build($save = FALSE) {
  *   The translated path pattern from the route.
  */
 function _menu_router_translate_route($route_name) {
-  $route = Drupal::service('router.route_provider')->getRouteByName($route_name);
-  $path = trim($route->getPattern(), '/');
-
-  // Translate placeholders, e.g. {foo} -> %.
-  return preg_replace('/{' . DRUPAL_PHP_FUNCTION_PATTERN . '}/', '%', $path);
+  $outline = \Drupal::service('router.route_provider')
+    ->getRouteByName($route_name)
+    ->compile()
+    ->getPatternOutline();
+  return trim($outline, '/');
 }
 
 /**
@@ -2825,15 +2815,13 @@ function menu_get_router() {
  * @todo This function should be removed/refactored.
  */
 function _menu_navigation_links_rebuild($menu) {
-  if (module_exists('menu_link')) {
-    $menu_link_controller = Drupal::entityManager()
-      ->getStorageController('menu_link');
+  if (!module_exists('menu_link')) {
+    // The Menu link module may not be available during install, so rebuild
+    // when possible.
+    return;
   }
-  else {
-    // The Menu link module is not available at install time, so we need to
-    // hardcode the default storage controller.
-    $menu_link_controller = new MenuLinkStorageController('menu_link', Drupal::service('database'), Drupal::service('router.route_provider'));
-  }
+  $menu_link_controller = \Drupal::entityManager()
+    ->getStorageController('menu_link');
 
   // Add normal and suggested items as links.
   $router_items = array();
@@ -2918,7 +2906,7 @@ function _menu_navigation_links_rebuild($menu) {
   }
 
   // Find any item whose router path does not exist any more.
-  $query = Drupal::entityQuery('menu_link')
+  $query = \Drupal::entityQuery('menu_link')
     ->condition('router_path', $paths, 'NOT IN')
     ->condition('external', 0)
     ->condition('updated', 0)
@@ -2945,7 +2933,7 @@ function _menu_navigation_links_rebuild($menu) {
 function menu_load_links($menu_name) {
   $links = array();
 
-  $query = Drupal::entityQuery('menu_link')
+  $query = \Drupal::entityQuery('menu_link')
     ->condition('menu_name', $menu_name)
     // Order by weight so as to be helpful for menus that are only one level
     // deep.
@@ -2985,7 +2973,7 @@ function _menu_clear_page_cache() {
     $cache_cleared = 1;
   }
   elseif ($cache_cleared == 1) {
-    drupal_register_shutdown_function('cache_invalidate_tags', array('content', TRUE));
+    drupal_register_shutdown_function('cache_invalidate_tags', array('content' => TRUE));
     // Keep track of which menus have expanded items.
     drupal_register_shutdown_function('_menu_set_expanded_menus');
     $cache_cleared = 2;
@@ -2997,7 +2985,7 @@ function _menu_clear_page_cache() {
  */
 function _menu_set_expanded_menus() {
   $names = db_query("SELECT menu_name FROM {menu_links} WHERE expanded <> 0 GROUP BY menu_name")->fetchCol();
-  Drupal::state()->set('menu_expanded', $names);
+  \Drupal::state()->set('menu_expanded', $names);
 }
 
 /**
@@ -3272,8 +3260,8 @@ function _menu_router_build($callbacks, $save = FALSE) {
     $path_roots = array_values($path_roots);
     // Update the path roots variable and reset the path alias whitelist cache
     // if the list has changed.
-    if ($path_roots != Drupal::state()->get('menu_path_roots')) {
-      Drupal::state()->set('menu_path_roots', array_values($path_roots));
+    if ($path_roots != \Drupal::state()->get('menu_path_roots')) {
+      \Drupal::state()->set('menu_path_roots', array_values($path_roots));
       drupal_container()->get('path.alias_manager')->cacheClear();
     }
     _menu_router_save($menu, $masks);
@@ -3361,7 +3349,7 @@ function _menu_router_save($menu, $masks) {
   // Insert any remaining records.
   $insert->execute();
   // Store the masks.
-  Drupal::state()->set('menu.masks', $masks);
+  \Drupal::state()->set('menu.masks', $masks);
 
   return $menu;
 }
@@ -3385,7 +3373,7 @@ function _menu_router_save($menu, $masks) {
  */
 function _menu_site_is_offline($check_only = FALSE) {
   // Check if site is in maintenance mode.
-  if (config('system.maintenance')->get('enabled')) {
+  if (\Drupal::state()->get('system.maintenance_mode')) {
     if (user_access('access site in maintenance mode')) {
       // Ensure that the maintenance mode message is displayed only once
       // (allowing for page redirects) and specifically suppress its display on

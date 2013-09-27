@@ -8,7 +8,7 @@
 namespace Drupal\views\Plugin\views\wizard;
 
 use Drupal\Component\Utility\NestedArray;
-use Drupal\views\Plugin\Core\Entity\View;
+use Drupal\views\Entity\View;
 use Drupal\views\Views;
 use Drupal\views_ui\ViewUI;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
@@ -211,6 +211,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
     $form['displays']['page'] = array(
       '#type' => 'fieldset',
+      '#title' => t('Page settings'),
       '#attributes' => array('class' => array('views-attachment', 'fieldset-no-legend')),
       '#tree' => TRUE,
     );
@@ -248,6 +249,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     );
     $form['displays']['page']['options']['style'] = array(
       '#type' => 'fieldset',
+      '#title' => t('Page display settings'),
       '#attributes' => array('class' => array('container-inline', 'fieldset-no-legend')),
     );
 
@@ -354,6 +356,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
     $form['displays']['block'] = array(
       '#type' => 'fieldset',
+      '#title' => t('Block settings'),
       '#attributes' => array('class' => array('views-attachment', 'fieldset-no-legend')),
       '#tree' => TRUE,
     );
@@ -385,6 +388,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     );
     $form['displays']['block']['options']['style'] = array(
       '#type' => 'fieldset',
+      '#title' => t('Block display settings'),
       '#attributes' => array('class' => array('container-inline', 'fieldset-no-legend')),
     );
 
@@ -402,7 +406,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
     $this->buildFormStyle($form, $form_state, 'block');
     $form['displays']['block']['options']['items_per_page'] = array(
-      '#title' => t('Items per page'),
+      '#title' => t('Items per block'),
       '#type' => 'number',
       '#default_value' => 5,
       '#min' => 0,
@@ -624,7 +628,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
       'label' => $form_state['values']['label'],
       'description' => $form_state['values']['description'],
       'base_table' => $this->base_table,
-      'langcode' => language_default()->langcode,
+      'langcode' => language_default()->id,
     );
 
     $view = entity_create('view', $values);
@@ -694,17 +698,17 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
   protected function addDisplays(View $view, $display_options, $form, $form_state) {
     // Initialize and store the view executable to get the display plugin
     // instances.
-    $executable = $view->get('executable');
+    $executable = $view->getExecutable();
 
     // Display: Master
-    $default_display = $view->newDisplay('default', 'Master', 'default');
+    $default_display = $executable->newDisplay('default', 'Master', 'default');
     foreach ($display_options['default'] as $option => $value) {
       $default_display->setOption($option, $value);
     }
 
     // Display: Page
     if (isset($display_options['page'])) {
-      $display = $view->newDisplay('page', 'Page', 'page_1');
+      $display = $executable->newDisplay('page', 'Page', 'page_1');
       // The page display is usually the main one (from the user's point of
       // view). Its options should therefore become the overall view defaults,
       // so that new displays which are added later automatically inherit them.
@@ -712,14 +716,14 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
 
       // Display: Feed (attached to the page).
       if (isset($display_options['feed'])) {
-        $display = $view->newDisplay('feed', 'Feed', 'feed_1');
+        $display = $executable->newDisplay('feed', 'Feed', 'feed_1');
         $this->setOverrideOptions($display_options['feed'], $display, $default_display);
       }
     }
 
     // Display: Block.
     if (isset($display_options['block'])) {
-      $display = $view->newDisplay('block', 'Block', 'block_1');
+      $display = $executable->newDisplay('block', 'Block', 'block_1');
       // When there is no page, the block display options should become the
       // overall view defaults.
       if (!isset($display_options['page'])) {
@@ -763,20 +767,27 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
     // choose the first field with a field handler.
     $data = Views::viewsData()->get($this->base_table);
     if (isset($data['table']['base']['defaults']['field'])) {
-      $field = $data['table']['base']['defaults']['field'];
+      $default_field = $data['table']['base']['defaults']['field'];
     }
     else {
-      foreach ($data as $field => $field_data) {
+      foreach ($data as $default_field => $field_data) {
         if (isset($field_data['field']['id'])) {
           break;
         }
       }
     }
-    $display_options['fields'][$field] = array(
+    $display_options['fields'][$default_field] = array(
       'table' => $this->base_table,
-      'field' => $field,
-      'id' => $field,
+      'field' => $default_field,
+      'id' => $default_field,
     );
+
+    // Load the plugin ID and module.
+    $base_field = $data['table']['base']['field'];
+    $display_options['fields'][$base_field]['plugin_id'] = $data[$base_field]['field']['id'];
+    if ($definition = Views::pluginManager('field')->getDefinition($display_options['fields'][$base_field]['plugin_id'])) {
+      $display_options['fields'][$base_field]['provider'] = isset($definition['provider']) ? $definition['provider'] : 'views';
+    }
 
     return $display_options;
   }
@@ -1151,7 +1162,7 @@ abstract class WizardPluginBase extends PluginBase implements WizardInterface {
    */
   public function validateView(array $form, array &$form_state) {
     $view = $this->instantiateView($form, $form_state);
-    $errors = $view->get('executable')->validate();
+    $errors = $view->getExecutable()->validate();
 
     if (empty($errors)) {
       $this->setValidatedView($form, $form_state, $view);

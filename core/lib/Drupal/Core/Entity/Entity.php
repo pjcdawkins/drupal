@@ -7,11 +7,10 @@
 
 namespace Drupal\Core\Entity;
 
-use Drupal\Component\Uuid\Uuid;
+use Drupal\Core\Entity\Plugin\DataType\EntityReferenceItem;
 use Drupal\Core\Language\Language;
+use Drupal\Core\TypedData\TranslatableInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
-use Drupal\user\UserInterface;
-use IteratorAggregate;
 use Drupal\Core\Session\AccountInterface;
 
 /**
@@ -22,7 +21,7 @@ use Drupal\Core\Session\AccountInterface;
  * This class can be used as-is by simple entity types. Entity types requiring
  * special handling can extend the class.
  */
-class Entity implements IteratorAggregate, EntityInterface {
+class Entity implements \IteratorAggregate, EntityInterface {
 
   /**
    * The language code of the entity's default language.
@@ -149,36 +148,109 @@ class Entity implements IteratorAggregate, EntityInterface {
   }
 
   /**
-   * Implements \Drupal\Core\Entity\EntityInterface::uri().
+   * Returns the URI elements of the entity.
+   *
+   * URI templates might be set in the links array in an annotation, for
+   * example:
+   * @code
+   * links = {
+   *   "canonical" = "/node/{node}",
+   *   "edit-form" = "/node/{node}/edit",
+   *   "version-history" = "/node/{node}/revisions"
+   * }
+   * @endcode
+   * or specified in a callback function set like:
+   * @code
+   * uri_callback = "contact_category_uri",
+   * @endcode
+   * If looking for the canonical URI, and it was not set in the links array
+   * or in a uri_callback function, the path is set using the default template:
+   * entity/entityType/id.
+   *
+   * @param string $rel
+   *   The link relationship type, for example: canonical or edit-form.
+   *
+   * @return array
+   *   An array containing the 'path' and 'options' keys used to build the URI
+   *   of the entity, and matching the signature of url().
    */
-  public function uri() {
-    $bundle = $this->bundle();
-    // A bundle-specific callback takes precedence over the generic one for the
-    // entity type.
+  public function uri($rel = 'canonical') {
     $entity_info = $this->entityInfo();
-    $bundles = entity_get_bundles($this->entityType);
-    if (isset($bundles[$bundle]['uri_callback'])) {
-      $uri_callback = $bundles[$bundle]['uri_callback'];
-    }
-    elseif (isset($entity_info['uri_callback'])) {
-      $uri_callback = $entity_info['uri_callback'];
+
+    // The links array might contain URI templates set in annotations.
+    $link_templates = isset($entity_info['links']) ? $entity_info['links'] : array();
+
+    if (isset($link_templates[$rel])) {
+      // If there is a template for the given relationship type, do the
+      // placeholder replacement and use that as the path.
+      $template = $link_templates[$rel];
+      $replacements = $this->uriPlaceholderReplacements();
+      $uri['path'] = str_replace(array_keys($replacements), array_values($replacements), $template);
+
+      // @todo Remove this once http://drupal.org/node/1888424 is in and we can
+      //   move the BC handling of / vs. no-/ to the generator.
+      $uri['path'] = trim($uri['path'], '/');
+
+      // Pass the entity data to url() so that alter functions do not need to
+      // look up this entity again.
+      $uri['options']['entity_type'] = $this->entityType;
+      $uri['options']['entity'] = $this;
+      return $uri;
     }
 
-    // Invoke the callback to get the URI. If there is no callback, use the
-    // default URI format.
-    if (isset($uri_callback) && function_exists($uri_callback)) {
-      $uri = $uri_callback($this);
+    // Only use these defaults for a canonical link (that is, a link to self).
+    // Other relationship types are not supported by this logic.
+    if ($rel == 'canonical') {
+      $bundle = $this->bundle();
+      // A bundle-specific callback takes precedence over the generic one for
+      // the entity type.
+      $bundles = entity_get_bundles($this->entityType);
+      if (isset($bundles[$bundle]['uri_callback'])) {
+        $uri_callback = $bundles[$bundle]['uri_callback'];
+      }
+      elseif (isset($entity_info['uri_callback'])) {
+        $uri_callback = $entity_info['uri_callback'];
+      }
+
+      // Invoke the callback to get the URI. If there is no callback, use the
+      // default URI format.
+      if (isset($uri_callback) && function_exists($uri_callback)) {
+        $uri = $uri_callback($this);
+      }
+      else {
+        $uri = array(
+          'path' => 'entity/' . $this->entityType . '/' . $this->id(),
+        );
+      }
+      // Pass the entity data to url() so that alter functions do not need to
+      // look up this entity again.
+      $uri['options']['entity_type'] = $this->entityType;
+      $uri['options']['entity'] = $this;
+      return $uri;
     }
-    else {
-      $uri = array(
-        'path' => 'entity/' . $this->entityType . '/' . $this->id(),
+  }
+
+  /**
+   * Returns an array of placeholders for this entity.
+   *
+   * Individual entity classes may override this method to add additional
+   * placeholders if desired. If so, they should be sure to replicate the
+   * property caching logic.
+   *
+   * @return array
+   *   An array of URI placeholders.
+   */
+  protected function uriPlaceholderReplacements() {
+    if (empty($this->uriPlaceholderReplacements)) {
+      $this->uriPlaceholderReplacements = array(
+        '{entityType}' => $this->entityType(),
+        '{bundle}' => $this->bundle(),
+        '{id}' => $this->id(),
+        '{uuid}' => $this->uuid(),
+        '{' . $this->entityType() . '}' => $this->id(),
       );
     }
-    // Pass the entity data to url() so that alter functions do not need to
-    // look up this entity again.
-    $uri['options']['entity_type'] = $this->entityType;
-    $uri['options']['entity'] = $this;
-    return $uri;
+    return $this->uriPlaceholderReplacements;
   }
 
   /**
@@ -273,6 +345,11 @@ class Entity implements IteratorAggregate, EntityInterface {
    * Implements \Drupal\Core\TypedData\AccessibleInterface::access().
    */
   public function access($operation = 'view', AccountInterface $account = NULL) {
+    if ($operation == 'create') {
+      return \Drupal::entityManager()
+        ->getAccessController($this->entityType)
+        ->createAccess($this->bundle(), $account);
+    }
     return \Drupal::entityManager()
       ->getAccessController($this->entityType)
       ->access($this, $operation, Language::LANGCODE_DEFAULT, $account);
@@ -287,17 +364,20 @@ class Entity implements IteratorAggregate, EntityInterface {
     $language = language_load($this->langcode);
     if (!$language) {
       // Make sure we return a proper language object.
-      $language = new Language(array('langcode' => Language::LANGCODE_NOT_SPECIFIED));
+      $language = new Language(array('id' => Language::LANGCODE_NOT_SPECIFIED));
     }
     return $language;
   }
 
   /**
    * Implements \Drupal\Core\TypedData\TranslatableInterface::getTranslation().
+   *
+   * @return \Drupal\Core\Entity\EntityInterface
    */
-  public function getTranslation($langcode, $strict = TRUE) {
+  public function getTranslation($langcode) {
     // @todo: Replace by EntityNG implementation once all entity types have been
     // converted to use the entity field API.
+    return $this;
   }
 
   /**
@@ -318,15 +398,14 @@ class Entity implements IteratorAggregate, EntityInterface {
     // @todo: Replace by EntityNG implementation once all entity types have been
     // converted to use the entity field API.
     $default_language = $this->language();
-    $languages = array($default_language->langcode => $default_language);
+    $languages = array($default_language->id => $default_language);
     $entity_info = $this->entityInfo();
 
     if ($entity_info['fieldable']) {
       // Go through translatable properties and determine all languages for
       // which translated values are available.
       foreach (field_info_instances($this->entityType, $this->bundle()) as $field_name => $instance) {
-        $field = field_info_field($field_name);
-        if (field_is_translatable($this->entityType, $field) && isset($this->$field_name)) {
+        if (field_is_translatable($this->entityType, $instance->getField()) && isset($this->$field_name)) {
           foreach (array_filter($this->$field_name) as $langcode => $value)  {
             $languages[$langcode] = TRUE;
           }
@@ -336,7 +415,7 @@ class Entity implements IteratorAggregate, EntityInterface {
     }
 
     if (empty($include_default)) {
-      unset($languages[$default_language->langcode]);
+      unset($languages[$default_language->id]);
     }
 
     return $languages;
@@ -368,8 +447,8 @@ class Entity implements IteratorAggregate, EntityInterface {
 
     // Check if the entity type supports UUIDs and generate a new one if so.
     if (!empty($entity_info['entity_keys']['uuid'])) {
-      $uuid = new Uuid();
-      $duplicate->{$entity_info['entity_keys']['uuid']} = $uuid->generate();
+      // @todo Inject the UUID service into the Entity class once possible.
+      $duplicate->{$entity_info['entity_keys']['uuid']} = \Drupal::service('uuid')->generate();
     }
     return $duplicate;
   }
@@ -407,76 +486,58 @@ class Entity implements IteratorAggregate, EntityInterface {
   }
 
   /**
-   * Implements \Drupal\Core\Entity\EntityInterface::getBCEntity().
-   */
-  public function getBCEntity() {
-    return $this;
-  }
-
-  /**
-   * Implements \Drupal\Core\Entity\EntityInterface::getNGEntity().
-   */
-  public function getNGEntity() {
-    return $this;
-  }
-
-  /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getType().
-   */
-  public function getType() {
-    // @todo: Incorporate the entity type here by making entities proper
-    // typed data. See http://drupal.org/node/1868004.
-    return 'entity';
-  }
-
-  /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getDefinition().
+   * {@inheritdoc}
    */
   public function getDefinition() {
-    return array(
-      'type' => $this->getType()
-    );
+    // @todo: This does not make much sense, so remove once TypedDataInterface
+    // is removed. See https://drupal.org/node/2002138.
+    if ($this->bundle() != $this->entityType()) {
+      $type = 'entity:' . $this->entityType() . ':' . $this->bundle();
+    }
+    else {
+      $type = 'entity:' . $this->entityType();
+    }
+    return array('type' => $type);
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getValue().
+   * {@inheritdoc}
    */
   public function getValue() {
-    // @todo: Implement by making entities proper typed data. See
-    // http://drupal.org/node/1868004.
+    // @todo: This does not make much sense, so remove once TypedDataInterface
+    // is removed. See https://drupal.org/node/2002138.
+    return $this->getPropertyValues();
   }
 
   /**
    * Implements \Drupal\Core\TypedData\TypedDataInterface::setValue().
    */
   public function setValue($value, $notify = TRUE) {
-    // @todo: Implement by making entities proper typed data. See
-    // http://drupal.org/node/1868004.
+    // @todo: This does not make much sense, so remove once TypedDataInterface
+    // is removed. See https://drupal.org/node/2002138.
+    $this->setPropertyValues($value);
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getString().
+   * {@inheritdoc}
    */
   public function getString() {
-    // @todo: Implement by making entities proper typed data. See
-    // http://drupal.org/node/1868004.
+    return $this->label();
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getConstraints().
+   * {@inheritdoc}
    */
   public function getConstraints() {
-    // @todo: Implement by making entities proper typed data. See
-    // http://drupal.org/node/1868004.
     return array();
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::validate().
+   * {@inheritdoc}
    */
   public function validate() {
-    // @todo: Implement by making entities proper typed data. See
-    // http://drupal.org/node/1868004.
+    // @todo: Add the typed data manager as proper dependency.
+    return \Drupal::typedData()->getValidator()->validate($this);
   }
 
   /**
@@ -550,6 +611,7 @@ class Entity implements IteratorAggregate, EntityInterface {
    * {@inheritdoc}
    */
   public function postSave(EntityStorageControllerInterface $storage_controller, $update = TRUE) {
+    $this->changed();
   }
 
   /**
@@ -574,6 +636,9 @@ class Entity implements IteratorAggregate, EntityInterface {
    * {@inheritdoc}
    */
   public static function postDelete(EntityStorageControllerInterface $storage_controller, array $entities) {
+    foreach ($entities as $entity) {
+      $entity->changed();
+    }
   }
 
   /**
@@ -586,6 +651,98 @@ class Entity implements IteratorAggregate, EntityInterface {
    * {@inheritdoc}
    */
   public function preSaveRevision(EntityStorageControllerInterface $storage_controller, \stdClass $record) {
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getUntranslated() {
+    return $this->getTranslation(Language::LANGCODE_DEFAULT);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasTranslation($langcode) {
+    $translations = $this->getTranslationLanguages();
+    return isset($translations[$langcode]);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function addTranslation($langcode, array $values = array()) {
+    // @todo Config entities do not support entity translation hence we need to
+    //   move the TranslatableInterface implementation to EntityNG. See
+    //   http://drupal.org/node/2004244
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function removeTranslation($langcode) {
+    // @todo Config entities do not support entity translation hence we need to
+    //   move the TranslatableInterface implementation to EntityNG. See
+    //   http://drupal.org/node/2004244
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function initTranslation($langcode) {
+    // @todo Config entities do not support entity translation hence we need to
+    //   move the TranslatableInterface implementation to EntityNG. See
+    //   http://drupal.org/node/2004244
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function baseFieldDefinitions($entity_type) {
+    return array();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function referencedEntities() {
+    $referenced_entities = array();
+
+    // @todo Remove when all entities are converted to EntityNG.
+    if (!$this->getPropertyDefinitions()) {
+      return $referenced_entities;
+    }
+
+    // Gather a list of referenced entities.
+    foreach ($this->getProperties() as $name => $definition) {
+      $field_items = $this->get($name);
+      foreach ($field_items as $offset => $field_item) {
+        if ($field_item instanceof EntityReferenceItem && $entity = $field_item->entity) {
+          $referenced_entities[] = $entity;
+        }
+      }
+    }
+
+    return $referenced_entities;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function changed() {
+    $referenced_entity_ids = array(
+      $this->entityType() => array($this->id() => TRUE),
+    );
+
+    foreach ($this->referencedEntities() as $referenced_entity) {
+      $referenced_entity_ids[$referenced_entity->entityType()][$referenced_entity->id()] = TRUE;
+    }
+
+    foreach ($referenced_entity_ids as $entity_type => $entity_ids) {
+      if (\Drupal::entityManager()->hasController($entity_type, 'render')) {
+        \Drupal::entityManager()->getRenderController($entity_type)->resetCache(array_keys($entity_ids));
+      }
+    }
   }
 
 }

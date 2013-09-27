@@ -2,7 +2,7 @@
  * @file
  * Handles AJAX fetching of views, including filter submission and response.
  */
-(function ($) {
+(function ($, Drupal, drupalSettings) {
 
 "use strict";
 
@@ -11,8 +11,8 @@
  */
 Drupal.behaviors.ViewsAjaxView = {};
 Drupal.behaviors.ViewsAjaxView.attach = function() {
-  if (Drupal.settings && Drupal.settings.views && Drupal.settings.views.ajaxViews) {
-    $.each(Drupal.settings.views.ajaxViews, function(i, settings) {
+  if (drupalSettings && drupalSettings.views && drupalSettings.views.ajaxViews) {
+    $.each(drupalSettings.views.ajaxViews, function(i, settings) {
       Drupal.views.instances[i] = new Drupal.views.ajaxView(settings);
     });
   }
@@ -29,7 +29,7 @@ Drupal.views.ajaxView = function(settings) {
   this.$view = $(selector);
 
   // Retrieve the path to use for views' ajax.
-  var ajax_path = Drupal.settings.views.ajax_path;
+  var ajax_path = drupalSettings.views.ajax_path;
 
   // If there are multiple views this might've ended up showing up multiple times.
   if (ajax_path.constructor.toString().indexOf("Array") !== -1) {
@@ -68,6 +68,16 @@ Drupal.views.ajaxView = function(settings) {
     // to a given element.
     .filter(jQuery.proxy(this.filterNestedViews, this))
     .once(jQuery.proxy(this.attachPagerAjax, this));
+
+  // Add a trigger to update this view specifically. In order to trigger a
+  // refresh use the following code.
+  //
+  // @code
+  // jQuery('.view-name').trigger('RefreshView');
+  // @endcode
+  var self_settings = this.element_settings;
+  self_settings.event = 'RefreshView';
+  this.refreshViewAjax = new Drupal.ajax(this.selector, this.$view, self_settings);
 };
 
 Drupal.views.ajaxView.prototype.attachExposedFormAjax = function() {
@@ -135,4 +145,4 @@ Drupal.AjaxCommands.prototype.viewsScrollTop = function (ajax, response) {
   }
 };
 
-})(jQuery);
+})(jQuery, Drupal, drupalSettings);

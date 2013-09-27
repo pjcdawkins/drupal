@@ -35,7 +35,7 @@ class IntegrationTest extends ViewTestBase {
   /**
    * Stores the node object which is used by the test.
    *
-   * @var \Drupal\node\Plugin\Core\Entity\Node
+   * @var \Drupal\node\Entity\Node
    */
   protected $node;
 
@@ -57,7 +57,7 @@ class IntegrationTest extends ViewTestBase {
   protected function setUp() {
     parent::setUp();
 
-    ViewTestData::importTestViews(get_class($this), array('statistics_test_views'));
+    ViewTestData::createTestViews(get_class($this), array('statistics_test_views'));
 
     // Create a new user for viewing nodes.
     $this->webUser = $this->drupalCreateUser(array('access content'));
@@ -80,12 +80,11 @@ class IntegrationTest extends ViewTestBase {
     $this->drupalGet('node/' . $this->node->id());
     // Manually calling statistics.php, simulating ajax behavior.
     // @see \Drupal\statistics\Tests\StatisticsLoggingTest::testLogging().
-    $post = http_build_query(array('nid' => $this->node->id()));
     global $base_url;
     $stats_path = $base_url . '/' . drupal_get_path('module', 'statistics'). '/statistics.php';
     $client = \Drupal::httpClient();
     $client->setConfig(array('curl.options' => array(CURLOPT_TIMEOUT => 10)));
-    $client->post($stats_path, array(), $post)->send();
+    $client->post($stats_path, array(), array('nid' => $this->node->id()))->send();
     $this->drupalGet('test_statistics_integration');
 
     $expected = statistics_get($this->node->id());

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\filter\Plugin\Core\Entity\FilterFormatInterface.
+ * Contains \Drupal\filter\Entity\FilterFormatInterface.
  */
 
 namespace Drupal\filter;
@@ -29,7 +29,7 @@ interface FilterFormatInterface extends ConfigEntityInterface {
    * Sets the configuration for a filter plugin instance.
    *
    * Sets or replaces the configuration of a filter plugin in $this->filters,
-   * and if instantianted already, also ensures that the actual filter plugin on
+   * and if instantiated already, also ensures that the actual filter plugin on
    * the FilterBag contains the identical configuration.
    *
    * @param string $instance_id
@@ -48,5 +48,14 @@ interface FilterFormatInterface extends ConfigEntityInterface {
    *   TRUE if this format is the fallback format, FALSE otherwise.
    */
   public function isFallbackFormat();
+
+  /**
+   * Returns the machine-readable permission name for the text format.
+   *
+   * @return string|bool
+   *   The machine-readable permission name, or FALSE if the text format is
+   *   malformed or is the fallback format (which is available to all users).
+   */
+  public function getPermissionName();
 
 }

@@ -47,7 +47,7 @@ class UpdateUploadTest extends UpdateTestBase {
       'files[project_upload]' => $invalidArchiveFile->uri,
     );
     // This also checks that the correct archive extensions are allowed.
-    $this->drupalPost('admin/modules/install', $edit, t('Install'));
+    $this->drupalPostForm('admin/modules/install', $edit, t('Install'));
     $this->assertText(t('Only files with the following extensions are allowed: @archive_extensions.', array('@archive_extensions' => archiver_get_extensions())),'Only valid archives can be uploaded.');
 
     // Check to ensure an existing module can't be reinstalled. Also checks that
@@ -57,7 +57,7 @@ class UpdateUploadTest extends UpdateTestBase {
     $edit = array(
       'files[project_upload]' => $validArchiveFile,
     );
-    $this->drupalPost('admin/modules/install', $edit, t('Install'));
+    $this->drupalPostForm('admin/modules/install', $edit, t('Install'));
     $this->assertText(t('@module_name is already installed.', array('@module_name' => 'AAA Update test')), 'Existing module was extracted and not reinstalled.');
   }
 
@@ -81,11 +81,11 @@ class UpdateUploadTest extends UpdateTestBase {
         'version' => '7.0',
       ),
     );
-    config('update_test.settings')
+    \Drupal::config('update_test.settings')
       ->set('system_info', $setting)
       ->set('xml_map', array('drupal' => '2-sec'))
       ->save();
-    config('update.settings')->set('fetch.url', url('update-test', array('absolute' => TRUE)))->save();
+    \Drupal::config('update.settings')->set('fetch.url', url('update-test', array('absolute' => TRUE)))->save();
     // Initialize the update status.
     $this->drupalGet('admin/reports/updates');
 

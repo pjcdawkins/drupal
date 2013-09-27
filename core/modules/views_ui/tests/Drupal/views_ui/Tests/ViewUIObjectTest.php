@@ -13,10 +13,6 @@ use Drupal\views\ViewExecutable;
 use Drupal\views_ui\ViewUI;
 use Symfony\Component\DependencyInjection\Container;
 
-if (!defined('DRUPAL_CORE_COMPATIBILITY')) {
-  define('DRUPAL_CORE_COMPATIBILITY', '8.x');
-}
-
 /**
  * Tests the ViewUI class.
  *
@@ -58,7 +54,7 @@ class ViewUIObjectTest extends UnitTestCase {
       }
     }
 
-    $storage = $this->getMock('Drupal\views\Plugin\Core\Entity\View', $interface_methods, array(array(), 'view'));
+    $storage = $this->getMock('Drupal\views\Entity\View', $interface_methods, array(array(), 'view'));
     $executable = $this->getMockBuilder('Drupal\views\ViewExecutable')
       ->disableOriginalConstructor()
       ->setConstructorArgs(array($storage))

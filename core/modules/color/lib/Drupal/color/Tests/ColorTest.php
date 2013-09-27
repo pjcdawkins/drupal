@@ -78,7 +78,7 @@ class ColorTest extends WebTestBase {
    * Tests the Color module functionality using the given theme.
    */
   function _testColor($theme, $test_values) {
-    config('system.theme')
+    \Drupal::config('system.theme')
       ->set('default', $theme)
       ->save();
     $settings_path = 'admin/appearance/settings/' . $theme;
@@ -88,10 +88,10 @@ class ColorTest extends WebTestBase {
     $this->assertResponse(200);
     $edit['scheme'] = '';
     $edit[$test_values['palette_input']] = '#123456';
-    $this->drupalPost($settings_path, $edit, t('Save configuration'));
+    $this->drupalPostForm($settings_path, $edit, t('Save configuration'));
 
     $this->drupalGet('<front>');
-    $stylesheets = config('color.' . $theme)->get('stylesheets');
+    $stylesheets = \Drupal::config('color.' . $theme)->get('stylesheets');
     $this->assertPattern('|' . file_create_url($stylesheets[0]) . '|', 'Make sure the color stylesheet is included in the content. (' . $theme . ')');
 
     $stylesheet_content = join("\n", file($stylesheets[0]));
@@ -100,15 +100,15 @@ class ColorTest extends WebTestBase {
     $this->drupalGet($settings_path);
     $this->assertResponse(200);
     $edit['scheme'] = $test_values['scheme'];
-    $this->drupalPost($settings_path, $edit, t('Save configuration'));
+    $this->drupalPostForm($settings_path, $edit, t('Save configuration'));
 
     $this->drupalGet('<front>');
-    $stylesheets = config('color.' . $theme)->get('stylesheets');
+    $stylesheets = \Drupal::config('color.' . $theme)->get('stylesheets');
     $stylesheet_content = join("\n", file($stylesheets[0]));
     $this->assertTrue(strpos($stylesheet_content, 'color: ' . $test_values['scheme_color']) !== FALSE, 'Make sure the color we changed is in the color stylesheet. (' . $theme . ')');
 
     // Test with aggregated CSS turned on.
-    $config = config('system.performance');
+    $config = \Drupal::config('system.performance');
     $config->set('css.preprocess', 1);
     $config->save();
     $this->drupalGet('<front>');
@@ -126,7 +126,7 @@ class ColorTest extends WebTestBase {
    * Tests whether the provided color is valid.
    */
   function testValidColor() {
-    config('system.theme')
+    \Drupal::config('system.theme')
       ->set('default', 'bartik')
       ->save();
     $settings_path = 'admin/appearance/settings/bartik';
@@ -136,7 +136,7 @@ class ColorTest extends WebTestBase {
 
     foreach ($this->colorTests as $color => $is_valid) {
       $edit['palette[bg]'] = $color;
-      $this->drupalPost($settings_path, $edit, t('Save configuration'));
+      $this->drupalPostForm($settings_path, $edit, t('Save configuration'));
 
       if($is_valid) {
         $this->assertText('The configuration options have been saved.');

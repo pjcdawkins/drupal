@@ -60,31 +60,31 @@ class BulkFormTest extends WebTestBase {
 
     // Set all nodes to sticky and check that.
     $edit += array('action' => 'node_make_sticky_action');
-    $this->drupalPost(NULL, $edit, t('Apply'));
+    $this->drupalPostForm(NULL, $edit, t('Apply'));
 
     foreach ($nodes as $node) {
       $changed_node = node_load($node->id());
-      $this->assertTrue($changed_node->sticky, format_string('Node @nid got marked as sticky.', array('@nid' => $node->id())));
+      $this->assertTrue($changed_node->isSticky(), format_string('Node @nid got marked as sticky.', array('@nid' => $node->id())));
     }
 
     $this->assertText('Make content sticky was applied to 10 items.');
 
     // Unpublish just one node.
     $node = node_load($nodes[0]->id());
-    $this->assertTrue($node->status, 'The node is published.');
+    $this->assertTrue($node->isPublished(), 'The node is published.');
 
     $edit = array('action_bulk_form[0]' => TRUE, 'action' => 'node_unpublish_action');
-    $this->drupalPost(NULL, $edit, t('Apply'));
+    $this->drupalPostForm(NULL, $edit, t('Apply'));
 
     $this->assertText('Unpublish content was applied to 1 item.');
 
     // Load the node again.
     $node = node_load($node->id(), TRUE);
-    $this->assertFalse($node->status, 'A single node has been unpublished.');
+    $this->assertFalse($node->isPublished(), 'A single node has been unpublished.');
 
     // The second node should still be published.
     $node = node_load($nodes[1]->id(), TRUE);
-    $this->assertTrue($node->status, 'An unchecked node is still published.');
+    $this->assertTrue($node->isPublished(), 'An unchecked node is still published.');
 
     // Set up to include just the sticky actions.
     $view = views_get_view('test_bulk_form');

@@ -10,7 +10,7 @@ namespace Drupal\views\Plugin\views\display;
 use Drupal\Core\Language\Language;
 use Drupal\views\Plugin\views\area\AreaPluginBase;
 use Drupal\views\ViewExecutable;
-use \Drupal\views\Plugin\views\PluginBase;
+use Drupal\views\Plugin\views\PluginBase;
 use Drupal\views\Views;
 
 /**
@@ -32,7 +32,7 @@ abstract class DisplayPluginBase extends PluginBase {
   /**
    * The top object of a view.
    *
-   * @var Drupal\views\ViewExecutable
+   * @var \Drupal\views\ViewExecutable
    */
   var $view = NULL;
 
@@ -99,9 +99,24 @@ abstract class DisplayPluginBase extends PluginBase {
    */
   protected $usesAreas = TRUE;
 
+  /**
+   * Constructs a new DisplayPluginBase object.
+   *
+   * Because DisplayPluginBase::initDisplay() takes the display configuration by
+   * reference and handles it differently than usual plugin configuration, pass
+   * an empty array of configuration to the parent. This prevents our
+   * configuration from being duplicated.
+   *
+   * @todo Replace DisplayPluginBase::$display with
+   *   DisplayPluginBase::$configuration to standardize with other plugins.
+   */
+  public function __construct(array $configuration, $plugin_id, array $plugin_definition) {
+    parent::__construct(array(), $plugin_id, $plugin_definition);
+  }
+
   public function initDisplay(ViewExecutable $view, array &$display, array &$options = NULL) {
-    $this->setOptionDefaults($this->options, $this->defineOptions());
     $this->view = $view;
+    $this->setOptionDefaults($this->options, $this->defineOptions());
     $this->display = &$display;
 
     // Load extenders as soon as possible.
@@ -1279,7 +1294,7 @@ abstract class DisplayPluginBase extends PluginBase {
       $link_display = empty($displays[$display_id]) ? t('None') : check_plain($displays[$display_id]['display_title']);
       $link_display = $this->getOption('link_display') == 'custom_url' ? t('Custom URL') : $link_display;
       $options['link_display'] = array(
-        'category' => 'other',
+        'category' => 'pager',
         'title' => t('Link display'),
         'value' => $link_display,
         'desc' => t('Specify which display or custom url this display will link to.'),
@@ -1396,6 +1411,7 @@ abstract class DisplayPluginBase extends PluginBase {
       case 'title':
         $form['#title'] .= t('The title of this view');
         $form['title'] = array(
+          '#title' => t('Title'),
           '#type' => 'textfield',
           '#description' => t('This title will be displayed with the view, wherever titles are normally displayed; i.e, as the page title, block title, etc.'),
           '#default_value' => $this->getOption('title'),
@@ -1445,9 +1461,9 @@ abstract class DisplayPluginBase extends PluginBase {
         );
         $form['use_more_always'] = array(
           '#type' => 'checkbox',
-          '#title' => t("Display 'more' link only if there is more content"),
-          '#description' => t("Leave this unchecked to display the 'more' link even if there are no more items to display."),
-          '#default_value' => !$this->getOption('use_more_always'),
+          '#title' => t('Always display the more link'),
+          '#description' => t('Check this to display the more link even if there are no more items to display.'),
+          '#default_value' => $this->getOption('use_more_always'),
           '#states' => array(
             'visible' => array(
               ':input[name="use_more"]' => array('checked' => TRUE),
@@ -1457,7 +1473,7 @@ abstract class DisplayPluginBase extends PluginBase {
         $form['use_more_text'] = array(
           '#type' => 'textfield',
           '#title' => t('More link text'),
-          '#description' => t("The text to display for the more link."),
+          '#description' => t('The text to display for the more link.'),
           '#default_value' => $this->getOption('use_more_text'),
           '#states' => array(
             'visible' => array(
@@ -1485,6 +1501,8 @@ abstract class DisplayPluginBase extends PluginBase {
 
         $access = $this->getOption('access');
         $form['access']['type'] =  array(
+          '#title' => t('Access'),
+          '#title_display' => 'invisible',
           '#type' => 'radios',
           '#options' => views_fetch_plugin_names('access', $this->getType(), array($this->view->storage->get('base_table'))),
           '#default_value' => $access['type'],
@@ -1520,6 +1538,8 @@ abstract class DisplayPluginBase extends PluginBase {
 
         $cache = $this->getOption('cache');
         $form['cache']['type'] =  array(
+          '#title' => t('Caching'),
+          '#title_display' => 'invisible',
           '#type' => 'radios',
           '#options' => views_fetch_plugin_names('cache', $this->getType(), array($this->view->storage->get('base_table'))),
           '#default_value' => $cache['type'],
@@ -1611,6 +1631,8 @@ abstract class DisplayPluginBase extends PluginBase {
         $form['#title'] .= t('How should this view be styled');
         $style_plugin = $this->getPlugin('style');
         $form['style'] =  array(
+          '#title' => t('Style'),
+          '#title_display' => 'invisible',
           '#type' => 'radios',
           '#options' => views_fetch_plugin_names('style', $this->getType(), array($this->view->storage->get('base_table'))),
           '#default_value' => $style_plugin->definition['id'],
@@ -1653,6 +1675,8 @@ abstract class DisplayPluginBase extends PluginBase {
         $form['#title'] .= t('How should each row in this view be styled');
         $row_plugin_instance = $this->getPlugin('row');
         $form['row'] =  array(
+          '#title' => t('Row'),
+          '#title_display' => 'invisible',
           '#type' => 'radios',
           '#options' => views_fetch_plugin_names('row', $this->getType(), array($this->view->storage->get('base_table'))),
           '#default_value' => $row_plugin_instance->definition['id'],
@@ -1677,6 +1701,7 @@ abstract class DisplayPluginBase extends PluginBase {
         $options['custom_url'] = t('Custom URL');
         if (count($options)) {
           $form['link_display'] = array(
+            '#title' => t('Custom URL'),
             '#type' => 'radios',
             '#options' => $options,
             '#description' => t("Which display to use to get this display's path for things like summary links, rss feed links, more links, etc."),
@@ -1726,11 +1751,11 @@ abstract class DisplayPluginBase extends PluginBase {
         break;
       case 'analyze-theme':
         $form['#title'] .= t('Theming information');
-        if ($theme = drupal_container()->get('request')->request->get('theme')) {
+        if ($theme = \Drupal::request()->request->get('theme')) {
           $this->theme = $theme;
         }
         elseif (empty($this->theme)) {
-          $this->theme = config('system.theme')->get('default');
+          $this->theme = \Drupal::config('system.theme')->get('default');
         }
 
         if (isset($GLOBALS['theme']) && $GLOBALS['theme'] == $this->theme) {
@@ -1844,6 +1869,8 @@ abstract class DisplayPluginBase extends PluginBase {
           '#suffix' => '</div>',
         );
         $form['box']['theme'] = array(
+          '#title' => t('Theme'),
+          '#title_display' => 'invisible',
           '#type' => 'select',
           '#options' => $options,
           '#default_value' => $this->theme,
@@ -1972,6 +1999,8 @@ abstract class DisplayPluginBase extends PluginBase {
 
         $exposed_form = $this->getOption('exposed_form');
         $form['exposed_form']['type'] =  array(
+          '#title' => t('Exposed form'),
+          '#title_display' => 'invisible',
           '#type' => 'radios',
           '#options' => views_fetch_plugin_names('exposed_form', $this->getType(), array($this->view->storage->get('base_table'))),
           '#default_value' => $exposed_form['type'],
@@ -2006,6 +2035,8 @@ abstract class DisplayPluginBase extends PluginBase {
 
         $pager = $this->getOption('pager');
         $form['pager']['type'] =  array(
+          '#title' => t('Pager'),
+          '#title_display' => 'invisible',
           '#type' => 'radios',
           '#options' => views_fetch_plugin_names('pager', !$this->usesPager() ? 'basic' : NULL, array($this->view->storage->get('base_table'))),
           '#default_value' => $pager['type'],
@@ -2246,7 +2277,7 @@ abstract class DisplayPluginBase extends PluginBase {
         break;
       case 'use_more':
         $this->setOption($section, intval($form_state['values'][$section]));
-        $this->setOption('use_more_always', !intval($form_state['values']['use_more_always']));
+        $this->setOption('use_more_always', intval($form_state['values']['use_more_always']));
         $this->setOption('use_more_text', $form_state['values']['use_more_text']);
       case 'distinct':
         $this->setOption($section, $form_state['values'][$section]);
@@ -2452,7 +2483,7 @@ abstract class DisplayPluginBase extends PluginBase {
         if (!empty($this->view->exposed_raw_input)) {
           $url_options['query'] = $this->view->exposed_raw_input;
         }
-        $theme = views_theme_functions('views_more', $this->view, $this->view->display_handler->display);
+        $theme = $this->view->buildThemeFunctions('views_more');
         $path = check_url(url($path, $url_options));
 
         return theme($theme, array('more_url' => $path, 'link_text' => check_plain($this->useMoreText()), 'view' => $this->view));
@@ -2647,6 +2678,14 @@ abstract class DisplayPluginBase extends PluginBase {
   }
 
   /**
+   * Reacts on adding a display.
+   *
+   * @see \Drupal\views\Entity\View::newDisplay()
+   */
+  public function newDisplay() {
+  }
+
+  /**
    * Reacts on deleting a display.
    */
   public function remove() {
@@ -2683,6 +2722,34 @@ abstract class DisplayPluginBase extends PluginBase {
     }
     return TRUE;
   }
+
+ /**
+  * Is the output of the view empty.
+  *
+  * If a view has no result and neither the empty, nor the footer nor the header
+  * does show anything return FALSE.
+  *
+  * @return bool
+  *   Returns TRUE if the output is empty, else FALSE.
+  */
+ public function outputIsEmpty() {
+   if (!empty($this->view->result)) {
+     return FALSE;
+   }
+
+   // Check whether all of the area handlers are empty.
+   foreach (array('empty', 'footer', 'header') as $type) {
+     $handlers = $this->getHandlers($type);
+     foreach ($handlers as $handler) {
+       // If one is not empty, return FALSE now.
+       if (!$handler->isEmpty()) {
+         return FALSE;
+       }
+     }
+   }
+
+   return TRUE;
+ }
 
   /**
    * Provide the block system with any exposed widget blocks for this display.

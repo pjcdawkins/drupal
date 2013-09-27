@@ -18,6 +18,7 @@ use Drupal\Core\Plugin\Discovery\CacheDecorator;
 use Drupal\Core\Plugin\Discovery\AnnotatedClassDiscovery;
 use Drupal\Core\Plugin\Discovery\InfoHookDecorator;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\StringTranslation\TranslationInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -88,6 +89,29 @@ class EntityManager extends PluginManagerBase {
   protected $fieldDefinitions;
 
   /**
+   * The root paths.
+   *
+   * @see \Drupal\Core\Entity\EntityManager::__construct().
+   *
+   * @var \Traversable
+   */
+  protected $namespaces;
+
+  /**
+   * The string translationManager.
+   *
+   * @var \Drupal\Core\StringTranslation\TranslationInterface
+   */
+  protected $translationManager;
+
+  /*
+   * Static cache of bundle information.
+   *
+   * @var array
+   */
+  protected $bundleInfo;
+
+  /**
    * Constructs a new Entity plugin manager.
    *
    * @param \Traversable $namespaces
@@ -101,25 +125,59 @@ class EntityManager extends PluginManagerBase {
    *   The cache backend to use.
    * @param \Drupal\Core\Language\LanguageManager $language_manager
    *   The language manager.
+   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation_manager
+   *   The string translationManager.
    */
-  public function __construct(\Traversable $namespaces, ContainerInterface $container, ModuleHandlerInterface $module_handler, CacheBackendInterface $cache, LanguageManager $language_manager) {
+  public function __construct(\Traversable $namespaces, ContainerInterface $container, ModuleHandlerInterface $module_handler, CacheBackendInterface $cache, LanguageManager $language_manager, TranslationInterface $translation_manager) {
     // Allow the plugin definition to be altered by hook_entity_info_alter().
-    $annotation_namespaces = array(
-      'Drupal\Core\Entity\Annotation' => DRUPAL_ROOT . '/core/lib',
-    );
 
     $this->moduleHandler = $module_handler;
     $this->cache = $cache;
     $this->languageManager = $language_manager;
+    $this->namespaces = $namespaces;
+    $this->translationManager = $translation_manager;
 
-    $this->discovery = new AnnotatedClassDiscovery('Core/Entity', $namespaces, $annotation_namespaces, 'Drupal\Core\Entity\Annotation\EntityType');
-    $this->discovery = new InfoHookDecorator($this->discovery, 'entity_info');
-    $this->discovery = new AlterDecorator($this->discovery, 'entity_info');
-    $this->discovery = new CacheDecorator($this->discovery, 'entity_info:' . $this->languageManager->getLanguage(Language::TYPE_INTERFACE)->langcode, 'cache', CacheBackendInterface::CACHE_PERMANENT, array('entity_info' => TRUE));
-
+    $this->doDiscovery($namespaces);
     $this->factory = new DefaultFactory($this->discovery);
     $this->container = $container;
   }
+
+  protected function doDiscovery($namespaces) {
+    $this->discovery = new AnnotatedClassDiscovery('Entity', $namespaces, 'Drupal\Core\Entity\Annotation\EntityType');
+    $this->discovery = new InfoHookDecorator($this->discovery, 'entity_info');
+    $this->discovery = new AlterDecorator($this->discovery, 'entity_info');
+    $this->discovery = new CacheDecorator($this->discovery, 'entity_info:' . $this->languageManager->getLanguage(Language::TYPE_INTERFACE)->id, 'cache', CacheBackendInterface::CACHE_PERMANENT, array('entity_info' => TRUE));
+  }
+
+  /**
+   * Add more namespaces to the entity manager.
+   *
+   * This is usually only necessary for uninstall purposes.
+   *
+   * @todo Remove this method, along with doDiscovery(), when
+   * https://drupal.org/node/1199946 is fixed.
+   *
+   * @param \Traversable $namespaces
+   *
+   * @see comment_uninstall()
+   */
+  public function addNamespaces(\Traversable $namespaces) {
+    reset($this->namespaces);
+    $iterator = new \AppendIterator;
+    $iterator->append(new \IteratorIterator($this->namespaces));
+    $iterator->append($namespaces);
+    $this->doDiscovery($iterator);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function clearCachedDefinitions() {
+    parent::clearCachedDefinitions();
+
+    $this->bundleInfo = NULL;
+  }
+
 
   /**
    * Checks whether a certain entity type has a certain controller.
@@ -153,9 +211,16 @@ class EntityManager extends PluginManagerBase {
    */
   public function getControllerClass($entity_type, $controller_type, $nested = NULL) {
     $definition = $this->getDefinition($entity_type);
+    if (!$definition) {
+      throw new \InvalidArgumentException(sprintf('The %s entity type does not exist.', $entity_type));
+    }
     $definition = $definition['controllers'];
+    if (!$definition) {
+      throw new \InvalidArgumentException(sprintf('The entity type (%s) does not exist.', $entity_type));
+    }
+
     if (empty($definition[$controller_type])) {
-      throw new \InvalidArgumentException(sprintf('The entity (%s) did not specify a %s.', $entity_type, $controller_type));
+      throw new \InvalidArgumentException(sprintf('The entity type (%s) did not specify a %s controller.', $entity_type, $controller_type));
     }
 
     $class = $definition[$controller_type];
@@ -163,14 +228,14 @@ class EntityManager extends PluginManagerBase {
     // Some class definitions can be nested.
     if (isset($nested)) {
       if (empty($class[$nested])) {
-        throw new \InvalidArgumentException(sprintf("Missing '%s: %s' for entity '%s'", $controller_type, $nested, $entity_type));
+        throw new \InvalidArgumentException(sprintf("The entity type (%s) did not specify a %s controller: %s.", $entity_type, $controller_type, $nested));
       }
 
       $class = $class[$nested];
     }
 
     if (!class_exists($class)) {
-      throw new \InvalidArgumentException(sprintf('Entity (%s) %s "%s" does not exist.', $entity_type, $controller_type, $class));
+      throw new \InvalidArgumentException(sprintf('The entity type (%s) %s controller "%s" does not exist.', $entity_type, $controller_type, $class));
     }
 
     return $class;
@@ -225,13 +290,18 @@ class EntityManager extends PluginManagerBase {
   public function getFormController($entity_type, $operation) {
     if (!isset($this->controllers['form'][$operation][$entity_type])) {
       $class = $this->getControllerClass($entity_type, 'form', $operation);
-      if (in_array('Drupal\Core\Entity\EntityControllerInterface', class_implements($class))) {
-        $this->controllers['form'][$operation][$entity_type] = $class::createInstance($this->container, $entity_type, $this->getDefinition($entity_type));
-        $this->controllers['form'][$operation][$entity_type]->setOperation($operation);
+      if (in_array('Drupal\Core\DependencyInjection\ContainerInjectionInterface', class_implements($class))) {
+        $controller = $class::create($this->container);
       }
       else {
-        $this->controllers['form'][$operation][$entity_type] = new $class($operation);
+        $controller = new $class();
       }
+
+      $controller
+        ->setTranslationManager($this->translationManager)
+        ->setModuleHandler($this->moduleHandler)
+        ->setOperation($operation);
+      $this->controllers['form'][$operation][$entity_type] = $controller;
     }
     return $this->controllers['form'][$operation][$entity_type];
   }
@@ -255,11 +325,15 @@ class EntityManager extends PluginManagerBase {
    * @param string $entity_type
    *   The entity type for this access controller.
    *
-   * @return \Drupal\Core\Entity\EntityRenderControllerInterface.
+   * @return \Drupal\Core\Entity\EntityAccessControllerInterface.
    *   A access controller instance.
    */
   public function getAccessController($entity_type) {
-    return $this->getController($entity_type, 'access');
+    if (!isset($this->controllers['access'][$entity_type])) {
+      $controller = $this->getController($entity_type, 'access');
+      $controller->setModuleHandler($this->moduleHandler);
+    }
+    return $this->controllers['access'][$entity_type];
   }
 
   /**
@@ -300,7 +374,7 @@ class EntityManager extends PluginManagerBase {
    *   langcode. Defaults to an empty array.
    * @code
    *   $form_state['langcode'] = $langcode;
-   *   $manager = Drupal::entityManager();
+   *   $manager = \Drupal::entityManager();
    *   $form = $manager->getForm($entity, 'default', $form_state);
    * @endcode
    *
@@ -341,6 +415,33 @@ class EntityManager extends PluginManagerBase {
   }
 
   /**
+   * Returns the route information for an entity type's bundle.
+   *
+   * @param string $entity_type
+   *   The entity type.
+   * @param string $bundle
+   *   The name of the bundle.
+   *
+   * @return array
+   *   An associative array with the following keys:
+   *   - route_name: The name of the route.
+   *   - route_parameters: (optional) An associative array of parameter names
+   *     and values.
+   */
+  public function getAdminRouteInfo($entity_type, $bundle) {
+    $entity_info = $this->getDefinition($entity_type);
+    if (isset($entity_info['bundle_prefix'])) {
+      $bundle = str_replace($entity_info['bundle_prefix'], '', $bundle);
+    }
+    return array(
+      'route_name' => "field_ui.overview_$entity_type",
+      'route_parameters' => array(
+        'bundle' => $bundle,
+      )
+    );
+  }
+
+  /**
    * Gets an array of entity field definitions.
    *
    * If a bundle is passed, fields specific to this bundle are included. Entity
@@ -370,13 +471,14 @@ class EntityManager extends PluginManagerBase {
   public function getFieldDefinitions($entity_type, $bundle = NULL) {
     if (!isset($this->entityFieldInfo[$entity_type])) {
       // First, try to load from cache.
-      $cid = 'entity_field_definitions:' . $entity_type . ':' . $this->languageManager->getLanguage(Language::TYPE_INTERFACE)->langcode;
+      $cid = 'entity_field_definitions:' . $entity_type . ':' . $this->languageManager->getLanguage(Language::TYPE_INTERFACE)->id;
       if ($cache = $this->cache->get($cid)) {
         $this->entityFieldInfo[$entity_type] = $cache->data;
       }
       else {
+        $class = $this->factory->getPluginClass($entity_type, $this->getDefinition($entity_type));
         $this->entityFieldInfo[$entity_type] = array(
-          'definitions' => $this->getStorageController($entity_type)->baseFieldDefinitions(),
+          'definitions' => $class::baseFieldDefinitions($entity_type),
           // Contains definitions of optional (per-bundle) fields.
           'optional' => array(),
           // An array keyed by bundle name containing the optional fields added
@@ -452,6 +554,48 @@ class EntityManager extends PluginManagerBase {
     unset($this->entityFieldInfo);
     unset($this->fieldDefinitions);
     $this->cache->deleteTags(array('entity_field_info' => TRUE));
+  }
+
+  /**
+   * Get the bundle info of an entity type.
+   *
+   * @param string $entity_type
+   *   The entity type.
+   *
+   * @return array
+   *   Returns the bundle information for the specified entity type.
+   */
+  public function getBundleInfo($entity_type) {
+    $bundle_info = $this->getAllBundleInfo();
+    return isset($bundle_info[$entity_type]) ? $bundle_info[$entity_type] : array();
+  }
+
+  /**
+   * Get the bundle info of all entity types.
+   *
+   * @return array
+   *   An array of all bundle information.
+   */
+  public function getAllBundleInfo() {
+    if (!isset($this->bundleInfo)) {
+      $langcode = $this->languageManager->getLanguage(Language::TYPE_INTERFACE)->id;
+      if ($cache = $this->cache->get("entity_bundle_info:$langcode")) {
+        $this->bundleInfo = $cache->data;
+      }
+      else {
+        $this->bundleInfo = $this->moduleHandler->invokeAll('entity_bundle_info');
+        // If no bundles are provided, use the entity type name and label.
+        foreach ($this->getDefinitions() as $type => $entity_info) {
+          if (!isset($this->bundleInfo[$type])) {
+            $this->bundleInfo[$type][$type]['label'] = $entity_info['label'];
+          }
+        }
+        $this->moduleHandler->alter('entity_bundle_info', $this->bundleInfo);
+        $this->cache->set("entity_bundle_info:$langcode", $this->bundleInfo, CacheBackendInterface::CACHE_PERMANENT, array('entity_info' => TRUE));
+      }
+    }
+
+    return $this->bundleInfo;
   }
 
 }

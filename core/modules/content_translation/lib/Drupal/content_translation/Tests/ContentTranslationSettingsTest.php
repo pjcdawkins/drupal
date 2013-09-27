@@ -38,7 +38,7 @@ class ContentTranslationSettingsTest extends WebTestBase {
     $this->drupalCreateContentType(array('type' => 'article'));
     $this->drupalCreateContentType(array('type' => 'page'));
 
-    $admin_user = $this->drupalCreateUser(array('administer languages', 'administer content translation'));
+    $admin_user = $this->drupalCreateUser(array('administer languages', 'administer content translation', 'administer content types'));
     $this->drupalLogin($admin_user);
   }
 
@@ -63,7 +63,7 @@ class ContentTranslationSettingsTest extends WebTestBase {
       'settings[comment][comment_node_article][translatable]' => TRUE,
     );
     $this->assertSettings('comment', 'comment_node_article', FALSE, $edit);
-    $xpath_err = '//div[@id="messages"]//div[contains(@class, "error")]';
+    $xpath_err = '//div[contains(@class, "error")]';
     $this->assertTrue($this->xpath($xpath_err), 'Enabling translation only for entity bundles generates a form error.');
 
     // Test that the translation settings are not stored if a non-configurable
@@ -89,13 +89,30 @@ class ContentTranslationSettingsTest extends WebTestBase {
     );
     $this->assertSettings('comment', 'comment_node_article', TRUE, $edit);
     field_info_cache_clear();
-    $field = field_info_field('comment_body');
+    $field = field_info_field('comment', 'comment_body');
     $this->assertTrue($field['translatable'], 'Comment body is translatable.');
 
     // Test that language settings are correctly stored.
     $language_configuration = language_get_default_configuration('comment', 'comment_node_article');
     $this->assertEqual($language_configuration['langcode'], 'current_interface', 'The default language for article comments is set to the current interface language.');
     $this->assertTrue($language_configuration['language_show'], 'The language selector for article comments is shown.');
+
+    // Verify language widget appears on node type form.
+    $this->drupalGet('admin/structure/types/manage/article');
+    $this->assertField('content_translation');
+    $this->assertFieldChecked('edit-content-translation');
+
+    // Verify that translation may be enabled for the article content type.
+    $edit = array(
+      'language_configuration[content_translation]' => TRUE,
+    );
+    // Make sure the checkbox is available and not checked by default.
+    $this->drupalGet('admin/structure/types/manage/article');
+    $this->assertField('language_configuration[content_translation]');
+    $this->assertNoFieldChecked('edit-language-configuration-content-translation');
+    $this->drupalPostForm('admin/structure/types/manage/article', $edit, t('Save content type'));
+    $this->drupalGet('admin/structure/types/manage/article');
+    $this->assertFieldChecked('edit-language-configuration-content-translation');
   }
 
   /**
@@ -114,7 +131,7 @@ class ContentTranslationSettingsTest extends WebTestBase {
    *   TRUE if the assertion succeeded, FALSE otherwise.
    */
   protected function assertSettings($entity_type, $bundle, $enabled, $edit) {
-    $this->drupalPost('admin/config/regional/content-language', $edit, t('Save'));
+    $this->drupalPostForm('admin/config/regional/content-language', $edit, t('Save'));
     $args = array('@entity_type' => $entity_type, '@bundle' => $bundle, '@enabled' => $enabled ? 'enabled' : 'disabled');
     $message = format_string('Translation for entity @entity_type (@bundle) is @enabled.', $args);
     field_info_cache_clear();

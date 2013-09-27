@@ -48,9 +48,9 @@ function hook_block_view_alter(array &$build, \Drupal\block\BlockPluginInterface
  *
  * In this hook name, BASE_BLOCK_ID refers to the block implementation's plugin
  * id, regardless of whether the plugin supports derivatives. For example, for
- * the \Drupal\system\Plugin\block\block\SystemPoweredByBlock block, this would
- * be 'system_powered_by_block' as per that class's annotation. And for the
- * \Drupal\system\Plugin\block\block\SystemMenuBlock block, it would be
+ * the \Drupal\system\Plugin\Block\SystemPoweredByBlock block, this would be
+ * 'system_powered_by_block' as per that class's annotation. And for the
+ * \Drupal\system\Plugin\Block\SystemMenuBlock block, it would be
  * 'system_menu_block' as per that class's annotation, regardless of which menu
  * the derived block is for.
  *
@@ -74,11 +74,11 @@ function hook_block_view_BASE_BLOCK_ID_alter(array &$build, \Drupal\block\BlockP
  * Modules may implement this hook if they want to have a say in whether or not
  * a given user has access to perform a given operation on a block instance.
  *
- * @param \Drupal\block\Plugin\Core\Entity\Block $block
+ * @param \Drupal\block\Entity\Block $block
  *   The block instance.
  * @param string $operation
  *   The operation to be performed, e.g., 'view', 'create', 'delete', 'update'.
- * @param \Drupal\user\Plugin\Core\Entity\User $account
+ * @param \Drupal\user\Entity\User $account
  *   The user object to perform the access check operation on.
  * @param string $langcode
  *   The language code to perform the access check operation on.
@@ -91,7 +91,7 @@ function hook_block_view_BASE_BLOCK_ID_alter(array &$build, \Drupal\block\BlockP
  * @see \Drupal\Core\Entity\EntityAccessController::access()
  * @see \Drupal\block\BlockAccessController::checkAccess()
  */
-function hook_block_access(\Drupal\block\Plugin\Core\Entity\Block $block, $operation, \Drupal\user\Plugin\Core\Entity\User $account, $langcode) {
+function hook_block_access(\Drupal\block\Entity\Block $block, $operation, \Drupal\user\Entity\User $account, $langcode) {
   // Example code that would prevent displaying the 'Powered by Drupal' block in
   // a region different than the footer.
   if ($operation == 'view' && $block->get('plugin') == 'system_powered_by_block' && $block->get('region') != 'footer') {

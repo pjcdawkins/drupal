@@ -125,61 +125,10 @@ function hook_cron() {
     ':time' => REQUEST_TIME,
     ':never' => AGGREGATOR_CLEAR_NEVER,
   ));
-  $queue = Drupal::queue('aggregator_feeds');
+  $queue = \Drupal::queue('aggregator_feeds');
   foreach ($result as $feed) {
     $queue->createItem($feed);
   }
-}
-
-/**
- * Defines available data types for the typed data API.
- *
- * The typed data API allows modules to support any kind of data based upon
- * pre-defined primitive types and interfaces for complex data and lists.
- *
- * Defined data types may map to one of the pre-defined primitive types in
- * \Drupal\Core\TypedData\Primitive or may be complex data types, containing one
- * or more data properties. Typed data objects for complex data types have to
- * implement the \Drupal\Core\TypedData\ComplexDataInterface. Further interfaces
- * that may be implemented are:
- *  - \Drupal\Core\TypedData\AccessibleInterface
- *  - \Drupal\Core\TypedData\TranslatableInterface
- *
- * Furthermore, lists of data items are represented by objects implementing
- * the \Drupal\Core\TypedData\ListInterface. A list contains items of the same
- * data type, is ordered and may contain duplicates. The classed used for a list
- * of items of a certain type may be specified using the 'list class' key.
- *
- * @return array
- *   An associative array where the key is the data type name and the value is
- *   again an associative array. Supported keys are:
- *   - label: The human readable label of the data type.
- *   - class: The associated typed data class. Must implement the
- *     \Drupal\Core\TypedData\TypedDataInterface.
- *   - list class: (optional) A typed data class used for wrapping multiple
- *     data items of the type. Must implement the
- *     \Drupal\Core\TypedData\ListInterface. Defaults to
- *     \Drupal\Core\TypedData\ItemList;
- *   - primitive type: (optional) Maps the data type to one of the pre-defined
- *     primitive types in \Drupal\Core\TypedData\Primitive. If set, it must be
- *     a constant defined by \Drupal\Core\TypedData\Primitive such as
- *     \Drupal\Core\TypedData\Primitive::STRING.
- *   - constraints: An array of validation constraints for this type. See
- *     \Drupal\Core\TypedData\TypedDataManager::getConstraints() for details.
- *
- * @see \Drupal::typedData()
- * @see Drupal\Core\TypedData\TypedDataManager::create()
- * @see hook_data_type_info_alter()
- */
-function hook_data_type_info() {
-  return array(
-    'email' => array(
-      'label' => t('Email'),
-      'class' => '\Drupal\email\Type\Email',
-      'primitive type' => \Drupal\Core\TypedData\Primitive::STRING,
-      'constraints' => array('Email' => array()),
-    ),
-  );
 }
 
 /**
@@ -213,7 +162,7 @@ function hook_data_type_info_alter(&$data_types) {
  *   again an associative array. Possible keys are:
  *   - 'worker callback': A PHP callable to call. It will be called
  *     with one argument, the item created via
- *     Drupal\Core\Queue\QueueInterface::createItem() in hook_cron().
+ *     \Drupal\Core\Queue\QueueInterface::createItem().
  *   - 'cron': (optional) An associative array containing the optional key:
  *     - 'time': (optional) How much time Drupal cron should spend on calling
  *       this worker in seconds. Defaults to 15.
@@ -329,7 +278,7 @@ function hook_element_info_alter(&$type) {
  */
 function hook_js_alter(&$javascript) {
   // Swap out jQuery to use an updated version of the library.
-  $javascript['core/misc/jquery.js']['data'] = drupal_get_path('module', 'jquery_update') . '/jquery.js';
+  $javascript['core/assets/vendor/jquery/jquery.js']['data'] = drupal_get_path('module', 'jquery_update') . '/jquery.js';
 }
 
 /**
@@ -461,7 +410,8 @@ function hook_css_alter(&$css) {
  */
 function hook_ajax_render_alter($commands) {
   // Inject any new status messages into the content area.
-  $commands[] = ajax_command_prepend('#block-system-main .content', theme('status_messages'));
+  $status_messages = array('#theme' => 'status_messages');
+  $commands[] = ajax_command_prepend('#block-system-main .content', drupal_render($status_messages));
 }
 
 /**
@@ -663,9 +613,9 @@ function hook_menu_get_item_alter(&$router_item, $path, $original_map) {
  * This 'abc' object will then be passed into the callback functions defined
  * for the menu item, such as the page callback function mymodule_abc_edit()
  * to replace the integer 1 in the argument array. Note that a load function
- * should return FALSE when it is unable to provide a loadable object. For
+ * should return NULL when it is unable to provide a loadable object. For
  * example, the node_load() function for the 'node/%node/edit' menu item will
- * return FALSE for the path 'node/999/edit' if a node with a node ID of 999
+ * return NULL for the path 'node/999/edit' if a node with a node ID of 999
  * does not exist. The menu routing system will return a 404 error in this case.
  *
  * @subsection sub_argument_wildcards Argument Wildcards
@@ -872,31 +822,6 @@ function hook_menu() {
 }
 
 /**
- * Define route-based local actions.
- *
- * Instead of using MENU_LOCAL_ACTION in hook_menu(), implement
- * hook_local_actions().
- *
- * @return array
- *   An associative array containing the following keys:
- *   - route_name: The machine name of the local action route.
- *   - title: The title of the local action.
- *   - appears_on: An array of route names for this action to be display on.
- */
-function hook_local_actions() {
-  return array(
-    array(
-      'route_name' => 'mymodule.route.action',
-      'title' => t('Perform local action'),
-      'appears_on' => array(
-        'mymodule.other_route',
-        'mymodule.other_other_route',
-      ),
-    ),
-  );
-}
-
-/**
  * Alter the data being saved to the {menu_router} table after hook_menu is invoked.
  *
  * This hook is invoked by menu_router_build(). The menu definitions are passed
@@ -990,50 +915,29 @@ function hook_menu_local_tasks_alter(&$data, $router_item, $root_path) {
 }
 
 /**
- * Alter links in the active trail before it is rendered as the breadcrumb.
+ * Alter local actions plugins.
  *
- * This hook is invoked by menu_get_active_breadcrumb() and allows alteration
- * of the breadcrumb links for the current page, which may be preferred instead
- * of setting a custom breadcrumb via drupal_set_breadcrumb().
+ * @param array $local_actions
+ *   The array of local action plugin definitions, keyed by plugin ID.
  *
- * Implementations should take into account that menu_get_active_breadcrumb()
- * subsequently performs the following adjustments to the active trail *after*
- * this hook has been invoked:
- * - The last link in $active_trail is removed, if its 'href' is identical to
- *   the 'href' of $item. This happens, because the breadcrumb normally does
- *   not contain a link to the current page.
- * - The (second to) last link in $active_trail is removed, if the current $item
- *   is a MENU_DEFAULT_LOCAL_TASK. This happens in order to do not show a link
- *   to the current page, when being on the path for the default local task;
- *   e.g. when being on the path node/%/view, the breadcrumb should not contain
- *   a link to node/%.
- *
- * Each link in the active trail must contain:
- * - title: The localized title of the link.
- * - href: The system path to link to.
- * - localized_options: An array of options to pass to url().
- *
- * @param $active_trail
- *   An array containing breadcrumb links for the current page.
- * @param $item
- *   The menu router item of the current page.
- *
- * @see drupal_set_breadcrumb()
- * @see menu_get_active_breadcrumb()
- * @see menu_get_active_trail()
- * @see menu_set_active_trail()
+ * @see \Drupal\Core\Menu\LocalActionInterface
+ * @see \Drupal\Core\Menu\LocalActionManager
  */
-function hook_menu_breadcrumb_alter(&$active_trail, $item) {
-  // Always display a link to the current page by duplicating the last link in
-  // the active trail. This means that menu_get_active_breadcrumb() will remove
-  // the last link (for the current page), but since it is added once more here,
-  // it will appear.
-  if (!drupal_is_front_page()) {
-    $end = end($active_trail);
-    if ($item['href'] == $end['href']) {
-      $active_trail[] = $end;
-    }
-  }
+function hook_menu_local_actions_alter(&$local_actions) {
+}
+
+/**
+ * Alter local tasks plugins.
+ *
+ * @param array $local_tasks
+ *   The array of local tasks plugin definitions, keyed by plugin ID.
+ *
+ * @see \Drupal\Core\Menu\LocalTaskInterface
+ * @see \Drupal\Core\Menu\LocalTaskManager
+ */
+function hook_local_task_alter(&$local_tasks) {
+  // Remove a specified local task plugin.
+  unset($local_tasks['example_plugin_id']);
 }
 
 /**
@@ -1407,16 +1311,16 @@ function hook_mail_alter(&$message) {
       $message['send'] = FALSE;
       return;
     }
-    $message['body'][] = "--\nMail sent out from " . config('system.site')->get('name');
+    $message['body'][] = "--\nMail sent out from " . \Drupal::config('system.site')->get('name');
   }
 }
 
 /**
  * Alter the registry of modules implementing a hook.
  *
- * This hook is invoked during module_implements(). A module may implement this
- * hook in order to reorder the implementing modules, which are otherwise
- * ordered by the module's system weight.
+ * This hook is invoked during \Drupal::moduleHandler()->getImplementations().
+ * A module may implement this hook in order to reorder the implementing
+ * modules, which are otherwise ordered by the module's system weight.
  *
  * Note that hooks invoked using drupal_alter() can have multiple variations
  * (such as hook_form_alter() and hook_form_FORM_ID_alter()). drupal_alter()
@@ -1436,7 +1340,8 @@ function hook_mail_alter(&$message) {
  */
 function hook_module_implements_alter(&$implementations, $hook) {
   if ($hook == 'rdf_mapping') {
-    // Move my_module_rdf_mapping() to the end of the list. module_implements()
+    // Move my_module_rdf_mapping() to the end of the list.
+    // \Drupal::moduleHandler()->getImplementations()
     // iterates through $implementations with a foreach loop which PHP iterates
     // in the order that the items were added, so to move an item to the end of
     // the array, we remove it and then add it.
@@ -1444,6 +1349,29 @@ function hook_module_implements_alter(&$implementations, $hook) {
     unset($implementations['my_module']);
     $implementations['my_module'] = $group;
   }
+}
+
+/**
+ * Perform alterations to the breadcrumb built by the BreadcrumbManager.
+ *
+ * @param array $breadcrumb
+ *   An array of breadcrumb link a tags, returned by the breadcrumb manager
+ *   build method, for example
+ *   @code
+ *     array('<a href="/">Home</a>');
+ *   @endcode
+ * @param array $attributes
+ *   Attributes representing the current page, coming from
+ *   \Drupal::request()->attributes.
+ * @param array $context
+ *   May include the following key:
+ *   - builder: the instance of
+ *     \Drupal\Core\Breadcrumb\BreadcrumbBuilderInterface that constructed this
+ *     breadcrumb, or NULL if no builder acted based on the current attributes.
+ */
+function hook_system_breadcrumb_alter(array &$breadcrumb, array $attributes, array $context) {
+  // Add an item to the end of the breadcrumb.
+  $breadcrumb[] = Drupal::l(t('Text'), 'example_route_name');
 }
 
 /**
@@ -1766,9 +1694,7 @@ function hook_template_preprocess_default_variables_alter(&$variables) {
  */
 function hook_custom_theme() {
   // Allow the user to request a particular theme via a query parameter.
-  if (isset($_GET['theme'])) {
-    return $_GET['theme'];
-  }
+  return \Drupal::request()->query->get('theme');
 }
 
 /**
@@ -1826,7 +1752,7 @@ function hook_watchdog(array $log_entry) {
   $to = 'someone@example.com';
   $params = array();
   $params['subject'] = t('[@site_name] @severity_desc: Alert from your web site', array(
-    '@site_name' => config('system.site')->get('name'),
+    '@site_name' => \Drupal::config('system.site')->get('name'),
     '@severity_desc' => $severity_list[$log_entry['severity']],
   ));
 
@@ -1856,7 +1782,7 @@ function hook_watchdog(array $log_entry) {
     '@message'       => strip_tags($log_entry['message']),
   ));
 
-  drupal_mail('emaillog', 'entry', $to, $language_interface->langcode, $params);
+  drupal_mail('emaillog', 'entry', $to, $language_interface->id, $params);
 }
 
 /**
@@ -1892,12 +1818,12 @@ function hook_mail($key, &$message, $params) {
   $account = $params['account'];
   $context = $params['context'];
   $variables = array(
-    '%site_name' => config('system.site')->get('name'),
+    '%site_name' => \Drupal::config('system.site')->get('name'),
     '%username' => user_format_name($account),
   );
   if ($context['hook'] == 'taxonomy') {
     $entity = $params['entity'];
-    $vocabulary = taxonomy_vocabulary_load($entity->id());
+    $vocabulary = entity_load('taxonomy_vocabulary', $entity->id());
     $variables += array(
       '%term_name' => $entity->name,
       '%term_description' => $entity->description,
@@ -1912,10 +1838,10 @@ function hook_mail($key, &$message, $params) {
   if (isset($params['node'])) {
     $node = $params['node'];
     $variables += array(
-      '%uid' => $node->uid,
-      '%node_url' => url('node/' . $node->nid, array('absolute' => TRUE)),
+      '%uid' => $node->getAuthorId(),
+      '%node_url' => url('node/' . $node->id(), array('absolute' => TRUE)),
       '%node_type' => node_get_type_label($node),
-      '%title' => $node->title,
+      '%title' => $node->getTitle(),
       '%teaser' => $node->teaser,
       '%body' => $node->body,
     );
@@ -1980,26 +1906,12 @@ function hook_rebuild() {
 }
 
 /**
- * Perform necessary actions before modules are installed.
+ * Perform necessary actions before a module is installed.
  *
- * This function allows all modules to react prior to a module being installed.
- *
- * @param $modules
- *   An array of modules about to be installed.
+ * @param string $module
+ *   The name of the module about to be installed.
  */
-function hook_modules_preinstall($modules) {
-  mymodule_cache_clear();
-}
-
-/**
- * Perform necessary actions before modules are enabled.
- *
- * This function allows all modules to react prior to a module being enabled.
- *
- * @param $module
- *   An array of modules about to be enabled.
- */
-function hook_modules_preenable($modules) {
+function hook_module_preinstall($module) {
   mymodule_cache_clear();
 }
 
@@ -2009,14 +1921,13 @@ function hook_modules_preenable($modules) {
  * This function differs from hook_install() in that it gives all other modules
  * a chance to perform actions when a module is installed, whereas
  * hook_install() is only called on the module actually being installed. See
- * module_enable() for a detailed description of the order in which install and
- * enable hooks are invoked.
+ * \Drupal\Core\Extension\ModuleHandler::install() for a detailed description of
+ * the order in which install hooks are invoked.
  *
  * @param $modules
  *   An array of the modules that were installed.
  *
- * @see module_enable()
- * @see hook_modules_enabled()
+ * @see \Drupal\Core\Extension\ModuleHandler::install()
  * @see hook_install()
  */
 function hook_modules_installed($modules) {
@@ -2026,45 +1937,13 @@ function hook_modules_installed($modules) {
 }
 
 /**
- * Perform necessary actions after modules are enabled.
+ * Perform necessary actions before a module is uninstalled.
  *
- * This function differs from hook_enable() in that it gives all other modules a
- * chance to perform actions when modules are enabled, whereas hook_enable() is
- * only called on the module actually being enabled. See module_enable() for a
- * detailed description of the order in which install and enable hooks are
- * invoked.
- *
- * @param $modules
- *   An array of the modules that were enabled.
- *
- * @see hook_enable()
- * @see hook_modules_installed()
- * @see module_enable()
+ * @param string $module
+ *   The name of the module about to be uninstalled.
  */
-function hook_modules_enabled($modules) {
-  if (in_array('lousy_module', $modules)) {
-    drupal_set_message(t('mymodule is not compatible with lousy_module'), 'error');
-    mymodule_disable_functionality();
-  }
-}
-
-/**
- * Perform necessary actions after modules are disabled.
- *
- * This function differs from hook_disable() in that it gives all other modules
- * a chance to perform actions when modules are disabled, whereas hook_disable()
- * is only called on the module actually being disabled.
- *
- * @param $modules
- *   An array of the modules that were disabled.
- *
- * @see hook_disable()
- * @see hook_modules_uninstalled()
- */
-function hook_modules_disabled($modules) {
-  if (in_array('lousy_module', $modules)) {
-    mymodule_enable_functionality();
-  }
+function hook_module_preuninstall($module) {
+  mymodule_cache_clear();
 }
 
 /**
@@ -2201,8 +2080,8 @@ function hook_file_download($uri) {
       return -1;
     }
     else {
-      $info = image_get_info($uri);
-      return array('Content-Type' => $info['mime_type']);
+      $image = \Drupal::service('image.factory')->get($uri);
+      return array('Content-Type' => $image->getMimeType());
     }
   }
 }
@@ -2226,7 +2105,7 @@ function hook_file_url_alter(&$uri) {
   global $user;
 
   // User 1 will always see the local file in this example.
-  if ($user->uid == 1) {
+  if ($user->id() == 1) {
     return;
   }
 
@@ -2328,7 +2207,7 @@ function hook_requirements($phase) {
   if ($phase == 'runtime') {
     $requirements['drupal'] = array(
       'title' => t('Drupal'),
-      'value' => VERSION,
+      'value' => \Drupal::VERSION,
       'severity' => REQUIREMENT_INFO
     );
   }
@@ -2369,37 +2248,39 @@ function hook_requirements($phase) {
 /**
  * Define the current version of the database schema.
  *
- * A Drupal schema definition is an array structure representing one or
- * more tables and their related keys and indexes. A schema is defined by
+ * A Drupal schema definition is an array structure representing one or more
+ * tables and their related keys and indexes. A schema is defined by
  * hook_schema() which must live in your module's .install file.
  *
- * This hook is called at install and uninstall time, and in the latter
- * case, it cannot rely on the .module file being loaded or hooks being known.
- * If the .module file is needed, it may be loaded with drupal_load().
+ * This hook is called at install and uninstall time, and in the latter case, it
+ * cannot rely on the .module file being loaded or hooks being known. If the
+ * .module file is needed, it may be loaded with drupal_load().
  *
- * The tables declared by this hook will be automatically created when
- * the module is first enabled, and removed when the module is uninstalled.
- * This happens before hook_install() is invoked, and after hook_uninstall()
- * is invoked, respectively.
+ * The tables declared by this hook will be automatically created when the
+ * module is installed, and removed when the module is uninstalled. This happens
+ * before hook_install() is invoked, and after hook_uninstall() is invoked,
+ * respectively.
  *
  * By declaring the tables used by your module via an implementation of
  * hook_schema(), these tables will be available on all supported database
  * engines. You don't have to deal with the different SQL dialects for table
  * creation and alteration of the supported database engines.
  *
- * See the Schema API Handbook at http://drupal.org/node/146843 for
- * details on schema definition structures.
+ * See the Schema API Handbook at http://drupal.org/node/146843 for details on
+ * schema definition structures.
  *
- * @return
+ * @return array
  *   A schema definition structure array. For each element of the
  *   array, the key is a table name and the value is a table structure
  *   definition.
+ *
+ * @see hook_schema_alter()
  *
  * @ingroup schemaapi
  */
 function hook_schema() {
   $schema['node'] = array(
-    // example (partial) specification for table "node"
+    // Example (partial) specification for table "node".
     'description' => 'The base table for nodes.',
     'fields' => array(
       'nid' => array(
@@ -2550,11 +2431,10 @@ function hook_query_TAG_alter(Drupal\Core\Database\Query\AlterableInterface $que
  *
  * Implementations of this hook are by convention declared in the module's
  * .install file. The implementation can rely on the .module file being loaded.
- * The hook will only be called the first time a module is enabled or after it
- * is re-enabled after being uninstalled. The module's schema version will be
- * set to the module's greatest numbered update hook. Because of this, any time
- * a hook_update_N() is added to the module, this function needs to be updated
- * to reflect the current version of the database schema.
+ * The hook will only be called when a module is installed. The module's schema
+ * version will be set to the module's greatest numbered update hook. Because of
+ * this, any time a hook_update_N() is added to the module, this function needs
+ * to be updated to reflect the current version of the database schema.
  *
  * See the @link http://drupal.org/node/146843 Schema API documentation @endlink
  * for details on hook_schema and how database tables are defined.
@@ -2568,9 +2448,7 @@ function hook_query_TAG_alter(Drupal\Core\Database\Query\AlterableInterface $que
  * be removed during uninstall should be removed with hook_uninstall().
  *
  * @see hook_schema()
- * @see module_enable()
- * @see hook_enable()
- * @see hook_disable()
+ * @see \Drupal\Core\Extension\ModuleHandler::install()
  * @see hook_uninstall()
  * @see hook_modules_installed()
  */
@@ -2694,14 +2572,14 @@ function hook_update_N(&$sandbox) {
     ->execute();
 
   foreach ($users as $user) {
-    $user->name .= '!';
+    $user->setUsername($user->getUsername() . '!');
     db_update('users')
-      ->fields(array('name' => $user->name))
-      ->condition('uid', $user->uid)
+      ->fields(array('name' => $user->getUsername()))
+      ->condition('uid', $user->id())
       ->execute();
 
     $sandbox['progress']++;
-    $sandbox['current_uid'] = $user->uid;
+    $sandbox['current_uid'] = $user->id();
   }
 
   $sandbox['#finished'] = empty($sandbox['max']) ? 1 : ($sandbox['progress'] / $sandbox['max']);
@@ -2811,35 +2689,6 @@ function hook_update_last_removed() {
  */
 function hook_uninstall() {
   variable_del('upload_file_types');
-}
-
-/**
- * Perform necessary actions after module is enabled.
- *
- * The hook is called every time the module is enabled. It should be
- * implemented in the module's .install file. The implementation can
- * rely on the .module file being loaded.
- *
- * @see module_enable()
- * @see hook_install()
- * @see hook_modules_enabled()
- */
-function hook_enable() {
-  mymodule_cache_rebuild();
-}
-
-/**
- * Perform necessary actions before module is disabled.
- *
- * The hook is called every time the module is disabled. It should be
- * implemented in the module's .install file. The implementation can rely
- * on the .module file being loaded.
- *
- * @see hook_uninstall()
- * @see hook_modules_disabled()
- */
-function hook_disable() {
-  mymodule_cache_rebuild();
 }
 
 /**
@@ -3125,7 +2974,7 @@ function hook_url_outbound_alter(&$path, &$options, $original_path) {
   // Instead of pointing to user/[uid]/edit, point to user/me/edit.
   if (preg_match('|^user/([0-9]*)/edit(/.*)?|', $path, $matches)) {
     global $user;
-    if ($user->uid == $matches[1]) {
+    if ($user->id() == $matches[1]) {
       $path = 'user/me/edit' . $matches[2];
     }
   }
@@ -3168,7 +3017,7 @@ function hook_url_outbound_alter(&$path, &$options, $original_path) {
  * @see hook_tokens_alter()
  */
 function hook_tokens($type, $tokens, array $data = array(), array $options = array()) {
-  $token_service = Drupal::token();
+  $token_service = \Drupal::token();
 
   $url_options = array('absolute' => TRUE);
   if (isset($options['langcode'])) {
@@ -3193,32 +3042,31 @@ function hook_tokens($type, $tokens, array $data = array(), array $options = arr
           break;
 
         case 'title':
-          $replacements[$original] = $sanitize ? check_plain($node->title) : $node->title;
+          $replacements[$original] = $sanitize ? check_plain($node->getTitle()) : $node->getTitle();
           break;
 
         case 'edit-url':
-          $replacements[$original] = url('node/' . $node->nid . '/edit', $url_options);
+          $replacements[$original] = url('node/' . $node->id() . '/edit', $url_options);
           break;
 
         // Default values for the chained tokens handled below.
         case 'author':
-          $name = ($node->uid == 0) ? config('user.settings')->get('anonymous') : $node->name;
-          $replacements[$original] = $sanitize ? filter_xss($name) : $name;
+          $account = $node->getAuthor() ? $node->getAuthor() : user_load(0);
+          $replacements[$original] = $sanitize ? check_plain($account->label()) : $account->label();
           break;
 
         case 'created':
-          $replacements[$original] = format_date($node->created, 'medium', '', NULL, $langcode);
+          $replacements[$original] = format_date($node->getCreatedTime(), 'medium', '', NULL, $langcode);
           break;
       }
     }
 
     if ($author_tokens = $token_service->findWithPrefix($tokens, 'author')) {
-      $author = user_load($node->uid);
-      $replacements += $token_service->generate('user', $author_tokens, array('user' => $author), $options);
+      $replacements += $token_service->generate('user', $author_tokens, array('user' => $node->getAuthor()), $options);
     }
 
     if ($created_tokens = $token_service->findWithPrefix($tokens, 'created')) {
-      $replacements += $token_service->generate('date', $created_tokens, array('date' => $node->created), $options);
+      $replacements += $token_service->generate('date', $created_tokens, array('date' => $node->getCreatedTime()), $options);
     }
   }
 
@@ -3468,7 +3316,7 @@ function hook_updater_info_alter(&$updaters) {
  * Alter the default country list.
  *
  * @param $countries
- *   The associative array of countries keyed by ISO 3166-1 country code.
+ *   The associative array of countries keyed by two-letter country code.
  *
  * @see \Drupal\Core\Locale\CountryManager::getList().
  */
@@ -3536,6 +3384,56 @@ function hook_filetransfer_info_alter(&$filetransfer_info) {
     unset($filetransfer_info['ftp']);
     // Make sure the SSH option is listed first.
     $filetransfer_info['ssh']['weight'] = -10;
+  }
+}
+
+/**
+ * Alter the parameters for links.
+ *
+ * @param array $variables
+ *   An associative array of variables defining a link. The link may be either a
+ *   "route link" using \Drupal\Core\Utility\LinkGenerator::link(), which is
+ *   exposed as the 'link_generator' service or a link generated by l(). If the
+ *   link is a "route link", 'route_name' will be set, otherwise 'path' will be
+ *   set. The following keys can be altered:
+ *   - text: The link text for the anchor tag as a translated string.
+ *   - url_is_active: Whether or not the link points to the currently active
+ *     URL.
+ *   - path: If this link is being generated by l(), this system path, relative
+ *     path, or external URL will be passed to url() to generate the href
+ *     attribute for this link.
+ *   - route_name: The name of the route to use to generate the link, if
+ *     this is a "route link".
+ *   - parameters: Any parameters needed to render the route path pattern, if
+ *     this is a "route link".
+ *   - options: An associative array of additional options that will be passed
+ *     to either \Drupal\Core\Routing\UrlGenerator::generateFromPath() or
+ *     \Drupal\Core\Routing\UrlGenerator::generateFromRoute() to generate the
+ *     href attribute for this link, and also used when generating the link.
+ *     Defaults to an empty array. It may contain the following elements:
+ *     - 'query': An array of query key/value-pairs (without any URL-encoding) to
+ *       append to the URL.
+ *     - absolute: Whether to force the output to be an absolute link (beginning
+ *       with http:). Useful for links that will be displayed outside the site,
+ *       such as in an RSS feed. Defaults to FALSE.
+ *     - language: An optional language object. May affect the rendering of
+ *       the anchor tag, such as by adding a language prefix to the path.
+ *     - attributes: An associative array of HTML attributes to apply to the
+ *       anchor tag. If element 'class' is included, it must be an array; 'title'
+ *       must be a string; other elements are more flexible, as they just need
+ *       to work as an argument for the constructor of the class
+ *       Drupal\Core\Template\Attribute($options['attributes']).
+ *     - html: Whether or not HTML should be allowed as the link text. If FALSE,
+ *       the text will be run through
+ *       \Drupal\Component\Utility\String::checkPlain() before being output.
+ *
+ * @see \Drupal\Core\Routing\UrlGenerator::generateFromPath()
+ * @see \Drupal\Core\Routing\UrlGenerator::generateFromRoute()
+ */
+function hook_link_alter(&$variables) {
+  // Add a warning to the end of route links to the admin section.
+  if (isset($variables['route_name']) && strpos($variables['route_name'], 'admin') !== FALSE) {
+    $variables['text'] .= ' (Warning!)';
   }
 }
 
@@ -3652,4 +3550,36 @@ function hook_filetransfer_info_alter(&$filetransfer_info) {
 
 /**
  * @} End of "defgroup update_api".
+ */
+
+/**
+ * @defgroup annotation Annotations
+ * @{
+ * Annotations for class discovery and metadata description.
+ *
+ * The Drupal plugin system has a set of reusable components that developers
+ * can use, override, and extend in their modules. Most of the plugins use
+ * annotations, which let classes register themselves as plugins and describe
+ * their metadata. (Annotations can also be used for other purposes, though
+ * at the moment, Drupal only uses them for the plugin system.)
+ *
+ * To annotate a class as a plugin, add code similar to the following to the
+ * end of the documentation block immediately preceding the class declaration:
+ * @code
+ * * @EntityType(
+ * *   id = "comment",
+ * *   label = @Translation("Comment"),
+ * *   ...
+ * *   base_table = "comment"
+ * * )
+ * @endcode
+ *
+ * The available annotation classes are listed in this topic, and can be
+ * identified when you are looking at the Drupal source code by having
+ * "@ Annotation" in their documentation blocks (without the space after @). To
+ * find examples of annotation for a particular annotation class, such as
+ * EntityType, look for class files that contain a PHP "use" declaration of the
+ * annotation class, or files that have an @ annotation section using the
+ * annotation class.
+ * @}
  */

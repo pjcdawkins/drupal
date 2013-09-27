@@ -70,7 +70,7 @@ class LocaleConfigSubscriber implements EventSubscriberInterface {
       $context->set('locale.language', $language);
     }
     elseif ($account = $context->get('user.account')) {
-      $context->set('locale.language', language_load(user_preferred_langcode($account)));
+      $context->set('locale.language', language_load($account->getPreferredLangcode()));
     }
     elseif ($language = $this->languageManager->getLanguage(Language::TYPE_INTERFACE)) {
       $context->set('locale.language', $language);
@@ -125,7 +125,7 @@ class LocaleConfigSubscriber implements EventSubscriberInterface {
    *   The localized config name.
    */
   public function getLocaleConfigName($name, Language $language) {
-    return 'locale.config.' . $language->langcode . '.' . $name;
+    return 'locale.config.' . $language->id . '.' . $name;
   }
 
   /**
@@ -134,7 +134,9 @@ class LocaleConfigSubscriber implements EventSubscriberInterface {
   static function getSubscribedEvents() {
     $events['config.context'][] = array('configContext', 20);
     $events['config.load'][] = array('configLoad', 20);
-    $events[KernelEvents::REQUEST][] = array('onKernelRequestSetDefaultConfigContextLocale', 20);
+    // Set the priority above the one from the RouteListener (priority 32)
+    // so ensure that the context is cleared before the routing system steps in.
+    $events[KernelEvents::REQUEST][] = array('onKernelRequestSetDefaultConfigContextLocale', 48);
     return $events;
   }
 }

@@ -10,7 +10,7 @@ namespace Drupal\datetime\Plugin\field\formatter;
 use Drupal\field\Annotation\FieldFormatter;
 use Drupal\Core\Annotation\Translation;
 use Drupal\field\Plugin\Type\Formatter\FormatterBase;
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Field\FieldInterface;
 use Drupal\Core\Datetime\DrupalDateTime;
 
 /**
@@ -18,7 +18,6 @@ use Drupal\Core\Datetime\DrupalDateTime;
  *
  * @FieldFormatter(
  *   id = "datetime_plain",
- *   module = "datetime",
  *   label = @Translation("Plain"),
  *   field_types = {
  *     "datetime"
@@ -30,17 +29,17 @@ class DateTimePlainFormatter extends FormatterBase {
   /**
    * {@inheritdoc}
    */
-  public function viewElements(EntityInterface $entity, $langcode, array $items) {
+  public function viewElements(FieldInterface $items) {
 
     $elements = array();
 
     foreach ($items as $delta => $item) {
 
       $output = '';
-      if (!empty($item['date'])) {
+      if (!empty($item->date)) {
         // The date was created and verified during field_load(), so it is safe
         // to use without further inspection.
-        $date = $item['date'];
+        $date = $item->date;
         $date->setTimeZone(timezone_open(drupal_get_user_timezone()));
         $format = DATETIME_DATETIME_STORAGE_FORMAT;
         if ($this->getFieldSetting('datetime_type') == 'date') {

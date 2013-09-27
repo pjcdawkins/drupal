@@ -39,7 +39,7 @@ class SortingTest extends WizardTestBase {
     $view1['page[create]'] = 1;
     $view1['page[title]'] = $this->randomName(16);
     $view1['page[path]'] = $this->randomName(16);
-    $this->drupalPost('admin/structure/views/add', $view1, t('Save and edit'));
+    $this->drupalPostForm('admin/structure/views/add', $view1, t('Save and edit'));
     $this->drupalGet($view1['page[path]']);
     $this->assertResponse(200);
 
@@ -53,7 +53,7 @@ class SortingTest extends WizardTestBase {
     $pos1 = strpos($content, $node1->label());
     $pos2 = strpos($content, $node2->label());
     $pos3 = strpos($content, $node3->label());
-    $this->assertTrue($pos1 < $pos2 && $pos2 < $pos3, t('The nodes appear in the expected order in a view that sorts by oldest first.'));
+    $this->assertTrue($pos1 < $pos2 && $pos2 < $pos3, 'The nodes appear in the expected order in a view that sorts by oldest first.');
 
     // Create a view that sorts newest first.
     $view2 = array();
@@ -64,7 +64,7 @@ class SortingTest extends WizardTestBase {
     $view2['page[create]'] = 1;
     $view2['page[title]'] = $this->randomName(16);
     $view2['page[path]'] = $this->randomName(16);
-    $this->drupalPost('admin/structure/views/add', $view2, t('Save and edit'));
+    $this->drupalPostForm('admin/structure/views/add', $view2, t('Save and edit'));
     $this->drupalGet($view2['page[path]']);
     $this->assertResponse(200);
 
@@ -78,7 +78,7 @@ class SortingTest extends WizardTestBase {
     $pos3 = strpos($content, $node3->label());
     $pos2 = strpos($content, $node2->label());
     $pos1 = strpos($content, $node1->label());
-    $this->assertTrue($pos3 < $pos2 && $pos2 < $pos1, t('The nodes appear in the expected order in a view that sorts by newest first.'));
+    $this->assertTrue($pos3 < $pos2 && $pos2 < $pos1, 'The nodes appear in the expected order in a view that sorts by newest first.');
   }
 
 }

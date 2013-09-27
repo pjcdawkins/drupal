@@ -46,13 +46,13 @@ class LocaleContentTest extends WebTestBase {
     // Install the Arabic language (which is RTL) and configure as the default.
     $edit = array();
     $edit['predefined_langcode'] = 'ar';
-    $this->drupalPost('admin/config/regional/language/add', $edit, t('Add language'));
+    $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add language'));
     drupal_static_reset('language_list');
 
     $edit = array(
       'site_default_language' => 'ar',
     );
-    $this->drupalpost('admin/config/regional/settings', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/regional/settings', $edit, t('Save configuration'));
 
     // Verify that the machine name field is still LTR for a new content type.
     $this->drupalGet('admin/structure/types/add');
@@ -85,7 +85,7 @@ class LocaleContentTest extends WebTestBase {
       'name' => $name,
       'direction' => '0',
     );
-    $this->drupalPost('admin/config/regional/language/add', $edit, t('Add custom language'));
+    $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     drupal_static_reset('language_list');
 
     // Set the content type to use multilingual support.
@@ -94,9 +94,10 @@ class LocaleContentTest extends WebTestBase {
     $edit = array(
       'language_configuration[language_show]' => TRUE,
     );
-    $this->drupalPost("admin/structure/types/manage/{$type2->type}", $edit, t('Save content type'));
+    $this->drupalPostForm("admin/structure/types/manage/{$type2->type}", $edit, t('Save content type'));
     $this->assertRaw(t('The content type %type has been updated.', array('%type' => $type2->name)));
     $this->drupalLogout();
+    drupal_static_reset('language_list');
 
     // Verify language selection is not present on the node add form.
     $this->drupalLogin($web_user);
@@ -122,14 +123,14 @@ class LocaleContentTest extends WebTestBase {
     );
     $node = $this->drupalCreateNode($edit);
     // Edit the content and ensure correct language is selected.
-    $path = 'node/' . $node->nid . '/edit';
+    $path = 'node/' . $node->id() . '/edit';
     $this->drupalGet($path);
-    $this->assertRaw('<option value="' . $langcode . '" selected="selected">' .  $name . '</option>', t('Correct language selected.'));
+    $this->assertRaw('<option value="' . $langcode . '" selected="selected">' .  $name . '</option>', 'Correct language selected.');
     // Ensure we can change the node language.
     $edit = array(
       'langcode' => 'en',
     );
-    $this->drupalPost($path, $edit, t('Save'));
+    $this->drupalPostForm($path, $edit, t('Save'));
     $this->assertRaw(t('%title has been updated.', array('%title' => $node_title)));
 
     $this->drupalLogout();
@@ -152,12 +153,13 @@ class LocaleContentTest extends WebTestBase {
     // Install Arabic language.
     $edit = array();
     $edit['predefined_langcode'] = 'ar';
-    $this->drupalPost('admin/config/regional/language/add', $edit, t('Add language'));
+    $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add language'));
+    drupal_static_reset('language_list');
 
     // Install Spanish language.
     $edit = array();
     $edit['predefined_langcode'] = 'es';
-    $this->drupalPost('admin/config/regional/language/add', $edit, t('Add language'));
+    $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add language'));
     drupal_static_reset('language_list');
 
     // Set the content type to use multilingual support.
@@ -165,7 +167,7 @@ class LocaleContentTest extends WebTestBase {
     $edit = array(
       'language_configuration[language_show]' => TRUE,
     );
-    $this->drupalPost("admin/structure/types/manage/{$type->type}", $edit, t('Save content type'));
+    $this->drupalPostForm("admin/structure/types/manage/{$type->type}", $edit, t('Save content type'));
     $this->assertRaw(t('The content type %type has been updated.', array('%type' => $type->name)));
     $this->drupalLogout();
 
@@ -184,26 +186,26 @@ class LocaleContentTest extends WebTestBase {
 
 
     // Check if English node does not have lang tag.
-    $this->drupalGet('node/' . $nodes['en']->nid);
-    $pattern = '|id="node-' . $nodes['en']->nid . '"[^<>]*lang="en"|';
+    $this->drupalGet('node/' . $nodes['en']->id());
+    $pattern = '|id="node-' . $nodes['en']->id() . '"[^<>]*lang="en"|';
     $this->assertNoPattern($pattern, 'The lang tag has not been assigned to the English node.');
 
     // Check if English node does not have dir tag.
-    $pattern = '|id="node-' . $nodes['en']->nid . '"[^<>]*dir="ltr"|';
+    $pattern = '|id="node-' . $nodes['en']->id() . '"[^<>]*dir="ltr"|';
     $this->assertNoPattern($pattern, 'The dir tag has not been assigned to the English node.');
 
     // Check if Arabic node has lang="ar" & dir="rtl" tags.
-    $this->drupalGet('node/' . $nodes['ar']->nid);
-    $pattern = '|id="node-' . $nodes['ar']->nid . '"[^<>]*lang="ar" dir="rtl"|';
+    $this->drupalGet('node/' . $nodes['ar']->id());
+    $pattern = '|id="node-' . $nodes['ar']->id() . '"[^<>]*lang="ar" dir="rtl"|';
     $this->assertPattern($pattern, 'The lang and dir tags have been assigned correctly to the Arabic node.');
 
     // Check if Spanish node has lang="es" tag.
-    $this->drupalGet('node/' . $nodes['es']->nid);
-    $pattern = '|id="node-' . $nodes['es']->nid . '"[^<>]*lang="es"|';
+    $this->drupalGet('node/' . $nodes['es']->id());
+    $pattern = '|id="node-' . $nodes['es']->id() . '"[^<>]*lang="es"|';
     $this->assertPattern($pattern, 'The lang tag has been assigned correctly to the Spanish node.');
 
     // Check if Spanish node does not have dir="ltr" tag.
-    $pattern = '|id="node-' . $nodes['es']->nid . '"[^<>]*lang="es" dir="ltr"|';
+    $pattern = '|id="node-' . $nodes['es']->id() . '"[^<>]*lang="es" dir="ltr"|';
     $this->assertNoPattern($pattern, 'The dir tag has not been assigned to the Spanish node.');
   }
 
@@ -212,7 +214,7 @@ class LocaleContentTest extends WebTestBase {
    *  Test filtering Node content by language.
    */
   function testNodeAdminLanguageFilter() {
-    module_enable(array('views'));
+    \Drupal::moduleHandler()->install(array('views'));
     // User to add and remove language.
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'access content overview', 'administer nodes', 'bypass node access'));
 
@@ -220,8 +222,8 @@ class LocaleContentTest extends WebTestBase {
     $this->drupalLogin($admin_user);
 
     // Enable multiple languages.
-    $this->drupalPost('admin/config/regional/language/edit/en', array('locale_translate_english' => TRUE), t('Save language'));
-    $this->drupalPost('admin/config/regional/language/add', array('predefined_langcode' => 'zh-hant'), t('Add language'));
+    $this->drupalPostForm('admin/config/regional/language/edit/en', array('locale_translate_english' => TRUE), t('Save language'));
+    $this->drupalPostForm('admin/config/regional/language/add', array('predefined_langcode' => 'zh-hant'), t('Add language'));
     drupal_static_reset('language_list');
 
     // Create two nodes: English and Chinese.
@@ -230,8 +232,8 @@ class LocaleContentTest extends WebTestBase {
 
     // Verify filtering by language.
     $this->drupalGet('admin/content', array('query' => array('langcode' => 'zh-hant')));
-    $this->assertLinkByHref('node/' . $node_zh_hant->nid . '/edit');
-    $this->assertNoLinkByHref('node/' . $node_en->nid . '/edit');
+    $this->assertLinkByHref('node/' . $node_zh_hant->id() . '/edit');
+    $this->assertNoLinkByHref('node/' . $node_en->id() . '/edit');
   }
 
 }

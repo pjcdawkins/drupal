@@ -19,7 +19,7 @@ class BlockUiTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('block');
+  public static $modules = array('block', 'block_test');
 
   protected $regions;
 
@@ -50,7 +50,7 @@ class BlockUiTest extends WebTestBase {
       array(
         'label' => 'Tools',
         'tr' => '5',
-        'plugin_id' => 'system_menu_block:menu-tools',
+        'plugin_id' => 'system_menu_block:tools',
         'settings' => array('region' => 'sidebar_second', 'machine_name' => 'tools'),
         'test_weight' => '-1',
       ),
@@ -89,7 +89,7 @@ class BlockUiTest extends WebTestBase {
       // Change the test block's weight.
       $edit['blocks[stark.' . $values['settings']['machine_name'] . '][weight]'] = $values['test_weight'];
     }
-    $this->drupalPost('admin/structure/block', $edit, t('Save blocks'));
+    $this->drupalPostForm('admin/structure/block', $edit, t('Save blocks'));
     foreach ($this->testBlocks as $values) {
       // Check if the region and weight settings changes have persisted.
       $this->assertOptionSelected(
@@ -106,11 +106,46 @@ class BlockUiTest extends WebTestBase {
   }
 
   /**
-   * Test block search.
+   * Tests the block categories on the listing page.
    */
-  function testBlockSearch() {
-    $block = t('Administration');
-    $blocks = drupal_json_decode($this->drupalGet('system/autocomplete/block_plugin_ui:stark', array('query' => array('q' => $block))));
-    $this->assertEqual($blocks['system_menu_block:menu-admin'], $block, t('Can search for block with name !block.', array('!block' => $block)));
+  public function testCandidateBlockList() {
+    $arguments = array(
+      ':ul_class' => 'block-list',
+      ':li_class' => 'test-block-instantiation',
+      ':href' => 'admin/structure/block/add/test_block_instantiation/stark',
+      ':text' => 'Display message',
+    );
+
+    $this->drupalGet('admin/structure/block');
+    $elements = $this->xpath('//details[@id="edit-block-test"]//ul[contains(@class, :ul_class)]/li[contains(@class, :li_class)]/a[contains(@href, :href) and text()=:text]', $arguments);
+    $this->assertTrue(!empty($elements), 'The test block appears in the category for its module.');
+
+    // Trigger the custom category addition in block_test_block_alter().
+    $this->container->get('state')->set('block_test_info_alter', TRUE);
+    $this->container->get('plugin.manager.block')->clearCachedDefinitions();
+
+    $this->drupalGet('admin/structure/block');
+    $elements = $this->xpath('//details[@id="edit-custom-category"]//ul[contains(@class, :ul_class)]/li[contains(@class, :li_class)]/a[contains(@href, :href) and text()=:text]', $arguments);
+    $this->assertTrue(!empty($elements), 'The test block appears in a custom category controlled by block_test_block_alter().');
   }
+
+  /**
+   * Tests that the BlockFormController populates machine name correctly.
+   */
+  public function testMachineNameSuggestion() {
+    $url = 'admin/structure/block/add/test_block_instantiation/stark';
+    $this->drupalGet($url);
+    $this->assertFieldByName('machine_name', 'displaymessage', 'Block form uses raw machine name suggestion when no instance already exists.');
+    $this->drupalPostForm($url, array(), 'Save block');
+
+    // Now, check to make sure the form starts by autoincrementing correctly.
+    $this->drupalGet($url);
+    $this->assertFieldByName('machine_name', 'displaymessage_2', 'Block form appends _2 to plugin-suggested machine name when an instance already exists.');
+    $this->drupalPostForm($url, array(), 'Save block');
+
+    // And verify that it continues working beyond just the first two.
+    $this->drupalGet($url);
+    $this->assertFieldByName('machine_name', 'displaymessage_3', 'Block form appends _3 to plugin-suggested machine name when two instances already exist.');
+  }
+
 }

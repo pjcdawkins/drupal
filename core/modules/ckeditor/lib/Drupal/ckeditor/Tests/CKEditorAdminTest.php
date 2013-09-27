@@ -7,7 +7,7 @@
 
 namespace Drupal\ckeditor\Tests;
 
-use Drupal\editor\Plugin\Core\Entity\Editor;
+use Drupal\editor\Entity\Editor;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -47,8 +47,7 @@ class CKEditorAdminTest extends WebTestBase {
   }
 
   function testAdmin() {
-    $manager = drupal_container()->get('plugin.manager.editor');
-    $ckeditor = $manager->createInstance('ckeditor');
+    $ckeditor = $this->container->get('plugin.manager.editor')->createInstance('ckeditor');
 
     $this->drupalLogin($this->admin_user);
     $this->drupalGet('admin/config/content/formats/manage/filtered_html');
@@ -72,7 +71,7 @@ class CKEditorAdminTest extends WebTestBase {
     $edit = array(
       'editor[editor]' => 'ckeditor',
     );
-    $this->drupalPost(NULL, $edit, t('Save configuration'));
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
     $this->assertRaw(t('You must configure the selected text editor.'));
 
     // Ensure the CKEditor editor returns the expected default settings.
@@ -81,9 +80,9 @@ class CKEditorAdminTest extends WebTestBase {
         'buttons' => array(
           array(
             'Bold', 'Italic',
-            '|', 'Link', 'Unlink',
+            '|', 'DrupalLink', 'DrupalUnlink',
             '|', 'BulletedList', 'NumberedList',
-            '|', 'Blockquote', 'Image',
+            '|', 'Blockquote', 'DrupalImage',
             '|', 'Source',
           ),
         ),
@@ -93,7 +92,7 @@ class CKEditorAdminTest extends WebTestBase {
     $this->assertIdentical($ckeditor->getDefaultSettings(), $expected_default_settings);
 
     // Keep the "CKEditor" editor selected and click the "Configure" button.
-    $this->drupalPostAjax(NULL, $edit, 'editor_configure');
+    $this->drupalPostAjaxForm(NULL, $edit, 'editor_configure');
     $editor = entity_load('editor', 'filtered_html');
     $this->assertFalse($editor, 'No Editor config entity exists yet.');
 
@@ -108,7 +107,7 @@ class CKEditorAdminTest extends WebTestBase {
     $this->assertTrue(count($styles_textarea) === 1, 'The "styles" textarea exists.');
 
     // Submit the form to save the selection of CKEditor as the chosen editor.
-    $this->drupalPost(NULL, $edit, t('Save configuration'));
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
 
     // Ensure an Editor object exists now, with the proper settings.
     $expected_settings = $expected_default_settings;
@@ -122,7 +121,7 @@ class CKEditorAdminTest extends WebTestBase {
     $edit = array(
       'editor[settings][plugins][stylescombo][styles]' => "h1.title|Title\np.callout|Callout\n\n",
     );
-    $this->drupalPost(NULL, $edit, t('Save configuration'));
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
     $expected_settings['plugins']['stylescombo']['styles'] = "h1.title|Title\np.callout|Callout\n\n";
     $editor = entity_load('editor', 'filtered_html');
     $this->assertTrue($editor instanceof Editor, 'An Editor config entity exists.');
@@ -139,15 +138,15 @@ class CKEditorAdminTest extends WebTestBase {
     $edit = array(
       'editor[settings][toolbar][buttons]' => json_encode($expected_settings['toolbar']['buttons']),
     );
-    $this->drupalPost(NULL, $edit, t('Save configuration'));
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
     $editor = entity_load('editor', 'filtered_html');
     $this->assertTrue($editor instanceof Editor, 'An Editor config entity exists.');
     $this->assertIdentical($expected_settings, $editor->settings, 'The Editor config entity has the correct settings.');
 
     // Now enable the ckeditor_test module, which provides one configurable
     // CKEditor plugin — this should not affect the Editor config entity.
-    module_enable(array('ckeditor_test'));
-    drupal_container()->get('plugin.manager.ckeditor.plugin')->clearCachedDefinitions();
+    \Drupal::moduleHandler()->install(array('ckeditor_test'));
+    $this->container->get('plugin.manager.ckeditor.plugin')->clearCachedDefinitions();
     $this->drupalGet('admin/config/content/formats/manage/filtered_html');
     $ultra_llama_mode_checkbox = $this->xpath('//input[@type="checkbox" and @name="editor[settings][plugins][llama_contextual_and_button][ultra_llama_mode]" and not(@checked)]');
     $this->assertTrue(count($ultra_llama_mode_checkbox) === 1, 'The "Ultra llama mode" checkbox exists and is not checked.');
@@ -160,7 +159,7 @@ class CKEditorAdminTest extends WebTestBase {
     $edit = array(
       'editor[settings][plugins][llama_contextual_and_button][ultra_llama_mode]' => '1',
     );
-    $this->drupalPost(NULL, $edit, t('Save configuration'));
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
     $this->drupalGet('admin/config/content/formats/manage/filtered_html');
     $ultra_llama_mode_checkbox = $this->xpath('//input[@type="checkbox" and @name="editor[settings][plugins][llama_contextual_and_button][ultra_llama_mode]" and @checked="checked"]');
     $this->assertTrue(count($ultra_llama_mode_checkbox) === 1, 'The "Ultra llama mode" checkbox exists and is checked.');

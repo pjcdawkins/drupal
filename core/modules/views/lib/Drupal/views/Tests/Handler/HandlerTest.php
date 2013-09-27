@@ -85,7 +85,7 @@ class HandlerTest extends ViewTestBase {
     $edit = array(
       'options[expose][reduce]' => TRUE,
     );
-    $this->drupalPost($path, $edit, t('Apply'));
+    $this->drupalPostForm($path, $edit, t('Apply'));
     $this->drupalGet($path);
     $this->assertFieldByName('options[expose][reduce]', TRUE);
   }
@@ -270,7 +270,7 @@ class HandlerTest extends ViewTestBase {
     $this->assertEqual($options, $expected_options);
 
     // Remove the relationship and take sure no relationship option appears.
-    $this->drupalPost('admin/structure/views/nojs/config-item/test_handler_relationships/default/relationship/nid', array(), t('Remove'));
+    $this->drupalPostForm('admin/structure/views/nojs/config-item/test_handler_relationships/default/relationship/nid', array(), t('Remove'));
     $this->drupalGet($handler_options_path);
     $this->assertNoFieldByName($relationship_name, 'Make sure that no relationship option is available');
   }
@@ -355,8 +355,8 @@ class HandlerTest extends ViewTestBase {
     $views_data = $views_data['views_test_data'];
 
     // Enable access to callback only field and deny for callback + arguments.
-    config('views_test_data.tests')->set('handler_access_callback', TRUE)->save();
-    config('views_test_data.tests')->set('handler_access_callback_argument', FALSE)->save();
+    \Drupal::config('views_test_data.tests')->set('handler_access_callback', TRUE)->save();
+    \Drupal::config('views_test_data.tests')->set('handler_access_callback_argument', FALSE)->save();
     $view->initDisplay();
     $view->initHandlers();
 
@@ -368,8 +368,8 @@ class HandlerTest extends ViewTestBase {
     }
 
     // Enable access to the callback + argument handlers and deny for callback.
-    config('views_test_data.tests')->set('handler_access_callback', FALSE)->save();
-    config('views_test_data.tests')->set('handler_access_callback_argument', TRUE)->save();
+    \Drupal::config('views_test_data.tests')->set('handler_access_callback', FALSE)->save();
+    \Drupal::config('views_test_data.tests')->set('handler_access_callback_argument', TRUE)->save();
     $view->destroy();
     $view->initDisplay();
     $view->initHandlers();

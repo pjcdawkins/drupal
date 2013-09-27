@@ -31,24 +31,10 @@ class EntityFormControllerNG extends EntityFormController {
       field_attach_form($entity, $form, $form_state, $this->getFormLangcode($form_state));
     }
 
-    // Assign the weights configured in the form display.
-    foreach ($this->getFormDisplay($form_state)->getComponents() as $name => $options) {
-      if (isset($form[$name])) {
-        $form[$name]['#weight'] = $options['weight'];
-      }
-    }
+    // Add a process callback so we can assign weights and hide extra fields.
+    $form['#process'][] = array($this, 'processForm');
 
     return $form;
-  }
-
-  /**
-   * Overrides EntityFormController::submitEntityLanguage().
-   */
-  protected function submitEntityLanguage(array $form, array &$form_state) {
-    // Nothing to do here, as original field values are always stored with
-    // Language::LANGCODE_DEFAULT language.
-    // @todo Delete this method when merging EntityFormControllerNG with
-    //   EntityFormController.
   }
 
   /**
@@ -65,11 +51,10 @@ class EntityFormControllerNG extends EntityFormController {
     // edited by this form. Values of fields handled by field API are copied
     // by field_attach_extract_form_values() below.
     $values_excluding_fields = $info['fieldable'] ? array_diff_key($form_state['values'], field_info_instances($entity_type, $entity->bundle())) : $form_state['values'];
-    $translation = $entity->getTranslation($this->getFormLangcode($form_state), FALSE);
-    $definitions = $translation->getPropertyDefinitions();
+    $definitions = $entity->getPropertyDefinitions();
     foreach ($values_excluding_fields as $key => $value) {
       if (isset($definitions[$key])) {
-        $translation->$key = $value;
+        $entity->$key = $value;
       }
     }
 
@@ -82,7 +67,7 @@ class EntityFormControllerNG extends EntityFormController {
 
     // Invoke field API for copying field values.
     if ($info['fieldable']) {
-      field_attach_extract_form_values($entity, $form, $form_state);
+      field_attach_extract_form_values($entity, $form, $form_state, array('langcode' => $this->getFormLangcode($form_state)));
     }
     return $entity;
   }

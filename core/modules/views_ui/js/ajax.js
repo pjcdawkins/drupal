@@ -2,15 +2,15 @@
  * @file
  * Handles AJAX submission and response in Views UI.
  */
-(function ($) {
+(function ($, Drupal, drupalSettings) {
 
   "use strict";
 
   Drupal.AjaxCommands.prototype.viewsSetForm = function (ajax, response, status) {
-    var ajax_title = Drupal.settings.views.ajax.title;
-    var ajax_body = Drupal.settings.views.ajax.id;
-    var ajax_popup = Drupal.settings.views.ajax.popup;
-    $(ajax_title).html(response.title);
+    var ajax_title = drupalSettings.views.ajax.title;
+    var ajax_body = drupalSettings.views.ajax.id;
+    var ajax_popup = drupalSettings.views.ajax.popup;
+    $(ajax_title).html('<h2>' + response.title + '</h2>');
     $(ajax_body).html(response.output);
     $(ajax_popup).dialog('open');
     Drupal.attachBehaviors($(ajax_popup), ajax.settings);
@@ -38,8 +38,8 @@
   };
 
   Drupal.AjaxCommands.prototype.viewsDismissForm = function (ajax, response, status) {
-    Drupal.AjaxCommands.prototype.viewsSetForm({}, {'title': '', 'output': Drupal.settings.views.ajax.defaultForm});
-    $(Drupal.settings.views.ajax.popup).dialog('close');
+    Drupal.AjaxCommands.prototype.viewsSetForm({}, {'title': '', 'output': drupalSettings.views.ajax.defaultForm});
+    $(drupalSettings.views.ajax.popup).dialog('close');
   };
 
   Drupal.AjaxCommands.prototype.viewsHighlight = function (ajax, response, status) {
@@ -156,8 +156,8 @@
           return true;
         }
 
-        element_settings.wrapper = 'views-live-preview';
-        element_settings.method = 'html';
+        element_settings.wrapper = 'views-preview-wrapper';
+        element_settings.method = 'replaceWith';
         var base = $(this).attr('id');
         Drupal.ajax[base] = new Drupal.ajax(base, this, element_settings);
       });
@@ -179,8 +179,8 @@
           return true;
         }
 
-        element_settings.wrapper = 'views-live-preview';
-        element_settings.method = 'html';
+        element_settings.wrapper = 'views-preview-wrapper';
+        element_settings.method = 'replaceWith';
         element_settings.event = 'click';
 
         var base = $(this).attr('id');
@@ -220,4 +220,4 @@
     }
   };
 
-})(jQuery);
+})(jQuery, Drupal, drupalSettings);

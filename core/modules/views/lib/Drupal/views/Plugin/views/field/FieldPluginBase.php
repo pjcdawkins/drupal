@@ -9,6 +9,7 @@ namespace Drupal\views\Plugin\views\field;
 
 use Drupal\views\Plugin\views\HandlerBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
+use Drupal\views\ResultRow;
 use Drupal\views\ViewExecutable;
 
 /**
@@ -17,23 +18,6 @@ use Drupal\views\ViewExecutable;
  * Handlers to tell Views how to build and display fields.
  *
  */
-
-/**
- * Indicator of the renderText() method for rendering a single item.
- * (If no render_item() is present).
- */
-define('VIEWS_HANDLER_RENDER_TEXT_PHASE_SINGLE_ITEM', 0);
-
-/**
- * Indicator of the renderText() method for rendering the whole element.
- * (if no render_item() method is available).
- */
-define('VIEWS_HANDLER_RENDER_TEXT_PHASE_COMPLETELY', 1);
-
-/**
- * Indicator of the renderText() method for rendering the empty text.
- */
-define('VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY', 2);
 
 /**
  * Base field handler that has no options and renders an unformatted field.
@@ -49,6 +33,23 @@ define('VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY', 2);
  * @ingroup views_field_handlers
  */
 abstract class FieldPluginBase extends HandlerBase {
+
+  /**
+   * Indicator of the renderText() method for rendering a single item.
+   * (If no render_item() is present).
+   */
+  const RENDER_TEXT_PHASE_SINGLE_ITEM = 0;
+
+  /**
+   * Indicator of the renderText() method for rendering the whole element.
+   * (if no render_item() method is available).
+   */
+  const RENDER_TEXT_PHASE_COMPLETELY = 1;
+
+  /**
+   * Indicator of the renderText() method for rendering the empty text.
+   */
+  const RENDER_TEXT_PHASE_EMPTY = 2;
 
   var $field_alias = 'unknown';
   var $aliases = array();
@@ -278,7 +279,7 @@ abstract class FieldPluginBase extends HandlerBase {
         '' => t(' - Use default -'),
         '0' => t('- None -')
       );
-      $elements += config('views.settings')->get('field_rewrite_elements');
+      $elements += \Drupal::config('views.settings')->get('field_rewrite_elements');
     }
 
     return $elements;
@@ -361,13 +362,13 @@ abstract class FieldPluginBase extends HandlerBase {
   /**
    * Gets the entity matching the current row and relationship.
    *
-   * @param \stdClass $values
+   * @param \Drupal\views\ResultRow $values
    *   An object containing all retrieved values.
    *
    * @return \Drupal\Core\Entity\EntityInterface
    *   Returns the entity matching the values.
    */
-  public function getEntity(\stdClass $values) {
+  public function getEntity(ResultRow $values) {
     $relationship_id = $this->options['relationship'];
     if ($relationship_id == 'none') {
       return $values->_entity;
@@ -859,11 +860,10 @@ abstract class FieldPluginBase extends HandlerBase {
       $this->documentSelfTokens($options[t('Fields')]);
 
       // Default text.
-      $output = t('<p>You must add some additional fields to this display before using this field. These fields may be marked as <em>Exclude from display</em> if you prefer. Note that due to rendering order, you cannot use fields that come after this field; if you need a field not listed here, rearrange your fields.</p>');
+      $output = '<p>' . t('You must add some additional fields to this display before using this field. These fields may be marked as <em>Exclude from display</em> if you prefer. Note that due to rendering order, you cannot use fields that come after this field; if you need a field not listed here, rearrange your fields.') . '</p>';
       // We have some options, so make a list.
       if (!empty($options)) {
-        $output = t('<p>The following tokens are available for this field. Note that due to rendering order, you cannot use fields that come after this field; if you need a field not listed here, rearrange your fields.
-If you would like to have the characters \'[\' and \']\' use the html entity codes \'%5B\' or  \'%5D\' or they will get replaced with empty space.</p>');
+        $output = '<p>' . t("The following tokens are available for this field. Note that due to rendering order, you cannot use fields that come after this field; if you need a field not listed here, rearrange your fields. If you would like to have the characters '[' and ']' use the html entity codes '%5B' or '%5D' or they will get replaced with empty space.") . '</p>';
         foreach (array_keys($options) as $type) {
           if (!empty($options[$type])) {
             $items = array();
@@ -1087,18 +1087,18 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
    * This gives the handlers some time to set up before any handler has
    * been rendered.
    *
-   * @param $values
-   *   An array of all objects returned from the query.
+   * @param \Drupal\views\ResultRow[] $values
+   *   An array of all ResultRow objects returned from the query.
    */
   public function preRender(&$values) { }
 
   /**
-   * Render the field.
+   * Renders the field.
    *
-   * @param $values
+   * @param \Drupal\views\ResultRow $values
    *   The values retrieved from the database.
    */
-  function render($values) {
+  public function render(ResultRow $values) {
     $value = $this->getValue($values);
     return $this->sanitizeValue($value);
   }
@@ -1108,8 +1108,11 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
    *
    * This renders a field normally, then decides if render-as-link and
    * text-replacement rendering is necessary.
+   *
+   * @param \Drupal\views\ResultRow $values
+   *   The values retrieved from the database.
    */
-  public function advancedRender($values) {
+  public function advancedRender(ResultRow $values) {
     if ($this->allowAdvancedRender() && method_exists($this, 'render_item')) {
       $raw_items = $this->getItems($values);
       // If there are no items, set the original value to NULL.
@@ -1139,14 +1142,14 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
           $this->original_value = $this->last_render;
 
           $alter = $item + $this->options['alter'];
-          $alter['phase'] = VIEWS_HANDLER_RENDER_TEXT_PHASE_SINGLE_ITEM;
+          $alter['phase'] = static::RENDER_TEXT_PHASE_SINGLE_ITEM;
           $items[] = $this->renderText($alter);
         }
 
         $value = $this->renderItems($items);
       }
       else {
-        $alter = array('phase' => VIEWS_HANDLER_RENDER_TEXT_PHASE_COMPLETELY) + $this->options['alter'];
+        $alter = array('phase' => static::RENDER_TEXT_PHASE_COMPLETELY) + $this->options['alter'];
         $value = $this->renderText($alter);
       }
 
@@ -1163,7 +1166,7 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
         $alter = $this->options['alter'];
         $alter['alter_text'] = 1;
         $alter['text'] = $this->options['empty'];
-        $alter['phase'] = VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY;
+        $alter['phase'] = static::RENDER_TEXT_PHASE_EMPTY;
         $this->last_render = $this->renderText($alter);
       }
     }
@@ -1223,12 +1226,12 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
     // First check whether the field should be hidden if the value(hide_alter_empty = TRUE) /the rewrite is empty (hide_alter_empty = FALSE).
     // For numeric values you can specify whether "0"/0 should be empty.
     if ((($this->options['hide_empty'] && empty($value))
-        || ($alter['phase'] != VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty))
+        || ($alter['phase'] != static::RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty))
       && $this->isValueEmpty($value, $this->options['empty_zero'], FALSE)) {
       return '';
     }
     // Only in empty phase.
-    if ($alter['phase'] == VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty) {
+    if ($alter['phase'] == static::RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty) {
       // If we got here then $alter contains the value of "No results text"
       // and so there is nothing left to do.
       return $value;
@@ -1365,7 +1368,8 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
 
     if (isset($url['query'])) {
       $path = strtr($path, array('?' . $url['query'] => ''));
-      $query = drupal_get_query_array($url['query']);
+      $query = array();
+      parse_str($url['query'], $query);
       // Remove query parameters that were assigned a query string replacement
       // token for which there is no value available.
       foreach ($query as $param => $val) {
@@ -1421,7 +1425,9 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
       // convert back to an array form for l().
       $options['query'] = drupal_http_build_query($alter['query']);
       $options['query'] = strtr($options['query'], $tokens);
-      $options['query'] = drupal_get_query_array($options['query']);
+      $query = array();
+      parse_str($options['query'], $query);
+      $options['query'] = $query;
     }
     if (isset($alter['alias'])) {
       // Alias is a boolean field, so no token.
@@ -1477,7 +1483,7 @@ If you would like to have the characters \'[\' and \']\' use the html entity cod
     }
 
     // Get flattened set of tokens for any array depth in $_GET parameters.
-    $tokens += $this->getTokenValuesRecursive(drupal_container()->get('request')->query->all());
+    $tokens += $this->getTokenValuesRecursive(\Drupal::request()->query->all());
 
     // Now add replacements for our fields.
     foreach ($this->view->display_handler->getHandlers('field') as $field => $handler) {

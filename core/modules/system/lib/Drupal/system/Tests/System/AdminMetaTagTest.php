@@ -25,9 +25,9 @@ class AdminMetaTagTest extends WebTestBase {
    * Verify that the meta tag HTML is generated correctly.
    */
   public function testMetaTag() {
-    list($version, ) = explode('.', VERSION);
+    list($version, ) = explode('.', \Drupal::VERSION);
     $string = '<meta name="Generator" content="Drupal ' . $version . ' (http://drupal.org)" />';
     $this->drupalGet('node');
-    $this->assertRaw($string, 'Fingerprinting meta tag generated correctly.', t('System'));
+    $this->assertRaw($string, 'Fingerprinting meta tag generated correctly.', 'System');
   }
 }

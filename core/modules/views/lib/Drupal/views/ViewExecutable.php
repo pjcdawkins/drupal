@@ -7,9 +7,10 @@
 
 namespace Drupal\views;
 
-use Drupal;
-use Symfony\Component\HttpFoundation\Response;
+use Drupal\views\Plugin\views\query\QueryPluginBase;
 use Drupal\views\ViewStorageInterface;
+use Drupal\Component\Utility\Tags;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @defgroup views_objects Objects that represent a View or part of a view
@@ -27,7 +28,7 @@ class ViewExecutable {
   /**
    * The config entity in which the view is stored.
    *
-   * @var Drupal\views\Plugin\Core\Entity\View
+   * @var Drupal\views\Entity\View
    */
   public $storage;
 
@@ -201,7 +202,7 @@ class ViewExecutable {
    * An array containing Drupal\views\Plugin\views\display\DisplayPluginBase
    * objects.
    *
-   * @var array
+   * @var \Drupal\views\DisplayBag
    */
   public $displayHandlers;
 
@@ -568,7 +569,7 @@ class ViewExecutable {
     // Fill our input either from $_GET or from something previously set on the
     // view.
     if (empty($this->exposed_input)) {
-      $this->exposed_input = drupal_container()->get('request')->query->all();
+      $this->exposed_input = \Drupal::request()->query->all();
       // unset items that are definitely not our input:
       foreach (array('page', 'q') as $key) {
         if (isset($this->exposed_input[$key])) {
@@ -635,6 +636,19 @@ class ViewExecutable {
   }
 
   /**
+   * Gets the current display plugin.
+   *
+   * @return \Drupal\views\Plugin\views\display\DisplayPluginBase
+   */
+  public function getDisplay() {
+    if (!isset($this->display_handler)) {
+      $this->initDisplay();
+    }
+
+    return $this->display_handler;
+  }
+
+  /**
    * Sets the current display.
    *
    * @param string $display_id
@@ -687,6 +701,46 @@ class ViewExecutable {
   }
 
   /**
+   * Creates a new display and a display handler instance for it.
+   *
+   * @param string $plugin_id
+   *   (optional) The plugin type from the Views plugin annotation. Defaults to
+   *   'page'.
+   * @param string $title
+   *   (optional) The title of the display. Defaults to NULL.
+   * @param string $id
+   *   (optional) The ID to use, e.g., 'default', 'page_1', 'block_2'. Defaults
+   *   to NULL.
+   *
+   * @return \Drupal\views\Plugin\views\display\DisplayPluginBase
+   *   A new display plugin instance if executable is set, the new display ID
+   *   otherwise.
+   */
+  public function newDisplay($plugin_id = 'page', $title = NULL, $id = NULL) {
+    $this->initDisplay();
+
+    $id = $this->storage->addDisplay($plugin_id, $title, $id);
+    $this->displayHandlers->addInstanceID($id);
+
+    $display = $this->displayHandlers->get($id);
+    $display->newDisplay();
+    return $display;
+  }
+
+  /**
+   * Gets the current style plugin.
+   *
+   * @return \Drupal\views\Plugin\views\style\StylePluginBase
+   */
+  public function getStyle() {
+    if (!isset($this->style_plugin)) {
+      $this->initStyle();
+    }
+
+    return $this->style_plugin;
+  }
+
+  /**
    * Find and initialize the style plugin.
    *
    * Note that arguments may have changed which style plugin we use, so
@@ -717,6 +771,19 @@ class ViewExecutable {
       }
       $this->inited = TRUE;
     }
+  }
+
+  /**
+   * Get the current pager plugin.
+   *
+   * @return \Drupal\views\Plugin\views\pager\PagerPluginBase
+   */
+  public function getPager() {
+    if (!isset($this->pager)) {
+      $this->initPager();
+    }
+
+    return $this->pager;
   }
 
   /**
@@ -934,6 +1001,19 @@ class ViewExecutable {
   }
 
   /**
+   * Gets the current query plugin.
+   *
+   * @return \Drupal\views\Plugin\views\query\QueryPluginBase
+   */
+  public function getQuery() {
+    if (!isset($this->query)) {
+      $this->initQuery();
+    }
+
+    return $this->query;
+  }
+
+  /**
    * Do some common building initialization.
    */
   public function initQuery() {
@@ -1073,7 +1153,7 @@ class ViewExecutable {
       $exposed_form->query();
     }
 
-    if (config('views.settings')->get('sql_signature')) {
+    if (\Drupal::config('views.settings')->get('sql_signature')) {
       $this->query->addSignature($this);
     }
 
@@ -1119,7 +1199,6 @@ class ViewExecutable {
         foreach ($multiple_exposed_input as $group_id) {
           // Give this handler access to the exposed filter input.
           if (!empty($this->exposed_data)) {
-            $converted = FALSE;
             if ($handlers[$id]->isAGroup()) {
               $converted = $handlers[$id]->convertExposedInput($this->exposed_data, $group_id);
               $handlers[$id]->storeGroupInput($this->exposed_data, $converted);
@@ -1224,7 +1303,6 @@ class ViewExecutable {
     }
 
     drupal_theme_initialize();
-    $config = config('views.settings');
 
     $exposed_form = $this->display_handler->getPlugin('exposed_form');
     $exposed_form->preRender($this->result);
@@ -1306,7 +1384,7 @@ class ViewExecutable {
     }
 
     // Let modules modify the view output after it is rendered.
-    $module_handler->invokeAll('views_post_render', array($this, $this->display_handler->output, $cache));
+    $module_handler->invokeAll('views_post_render', array($this, &$this->display_handler->output, $cache));
 
     // Let the themes play too, because post render is a very themey thing.
     foreach ($GLOBALS['base_theme_info'] as $base) {
@@ -1390,7 +1468,7 @@ class ViewExecutable {
     }
 
     // Let modules modify the view just prior to executing it.
-    \Drupal::moduleHandler()->invokeAll('views_pre_view', array($this, $display_id, $this->args));
+    \Drupal::moduleHandler()->invokeAll('views_pre_view', array($this, $display_id, &$this->args));
 
     // Allow hook_views_pre_view() to set the dom_id, then ensure it is set.
     $this->dom_id = !empty($this->dom_id) ? $this->dom_id : hash('sha256', $this->storage->id() . REQUEST_TIME . mt_rand());
@@ -1582,7 +1660,7 @@ class ViewExecutable {
       // Exclude arguments that were computed, not passed on the URL.
       $position = 0;
       if (!empty($this->argument)) {
-        foreach ($this->argument as $argument_id => $argument) {
+        foreach ($this->argument as $argument) {
           if (!empty($argument->is_default) && !empty($argument->options['default_argument_skip_url'])) {
             unset($args[$position]);
           }
@@ -1660,7 +1738,7 @@ class ViewExecutable {
       foreach ($this->build_info['breadcrumb'] as $path => $title) {
         // Check to see if the frontpage is in the breadcrumb trail; if it
         // is, we'll remove that from the actual breadcrumb later.
-        if ($path == config('system.site')->get('page.front')) {
+        if ($path == \Drupal::config('system.site')->get('page.front')) {
           $base = FALSE;
           $title = t('Home');
         }
@@ -1686,7 +1764,7 @@ class ViewExecutable {
    * data, ID, and UUID.
    */
   public function createDuplicate() {
-    return $this->storage->createDuplicate()->get('executable');
+    return $this->storage->createDuplicate()->getExecutable();
   }
 
   /**
@@ -1907,6 +1985,9 @@ class ViewExecutable {
     $data = Views::viewsData()->get($table);
     if (isset($data[$field][$handler_type]['id'])) {
       $fields[$id]['plugin_id'] = $data[$field][$handler_type]['id'];
+      if ($definition = Views::pluginManager($handler_type)->getDefinition($fields[$id]['plugin_id'])) {
+        $fields[$id]['provider'] = isset($definition['provider']) ? $definition['provider'] : 'views';
+      }
     }
 
     $this->displayHandlers->get($display_id)->setOption($types[$type]['plural'], $fields);
@@ -2109,6 +2190,39 @@ class ViewExecutable {
     foreach ($this->displayHandlers as $display) {
       $display->mergeDefaults();
     }
+  }
+
+  /**
+   * Provide a full array of possible theme functions to try for a given hook.
+   *
+   * @param string $hook
+   *   The hook to use. This is the base theme/template name.
+   *
+   * @return array
+   *   An array of theme hook suggestions.
+   */
+  public function buildThemeFunctions($hook) {
+    $themes = array();
+    $display = isset($this->display_handler) ? $this->display_handler->display : NULL;
+    $id = $this->storage->id();
+
+    if ($display) {
+      $themes[] = $hook . '__' . $id . '__' . $display['id'];
+      $themes[] = $hook . '__' . $display['id'];
+      // Add theme suggestions for each single tag.
+      foreach (Tags::explode($this->storage->get('tag')) as $tag) {
+        $themes[] = $hook . '__' . preg_replace('/[^a-z0-9]/', '_', strtolower($tag));
+      }
+
+      if ($display['id'] != $display['display_plugin']) {
+        $themes[] = $hook . '__' . $id . '__' . $display['display_plugin'];
+        $themes[] = $hook . '__' . $display['display_plugin'];
+      }
+    }
+    $themes[] = $hook . '__' . $id;
+    $themes[] = $hook;
+
+    return $themes;
   }
 
 }

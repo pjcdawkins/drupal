@@ -37,25 +37,19 @@ class FieldTranslationSynchronizer implements FieldTranslationSynchronizerInterf
    * {@inheritdoc}
    */
   public function synchronizeFields(EntityInterface $entity, $sync_langcode, $original_langcode = NULL) {
-    // Field synchronization is only supported for NG entities.
-    $entity = $entity->getNGEntity();
-    if (!($entity instanceof EntityNG)) {
-      return;
-    }
-
     $translations = $entity->getTranslationLanguages();
 
     // If we have no information about what to sync to, if we are creating a new
     // entity, if we have no translations for the current entity and we are not
     // creating one, then there is nothing to synchronize.
-    if (empty($sync_langcode) || $entity->isNew() || (count($translations) < 2 && !$original_langcode)) {
+    if (empty($sync_langcode) || $entity->isNew() || count($translations) < 2) {
       return;
     }
 
     // If the entity language is being changed there is nothing to synchronize.
     $entity_type = $entity->entityType();
     $entity_unchanged = isset($entity->original) ? $entity->original : $this->entityManager->getStorageController($entity_type)->loadUnchanged($entity->id());
-    if ($entity->language()->langcode != $entity_unchanged->language()->langcode) {
+    if ($entity->getUntranslated()->language()->id != $entity_unchanged->getUntranslated()->language()->id) {
       return;
     }
 

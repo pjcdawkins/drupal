@@ -20,6 +20,9 @@ class ConfigEntityListController extends EntityListController {
    */
   public function load() {
     $entities = parent::load();
+
+    // Sort the entities using the entity class's sort() method.
+    // See \Drupal\Core\Config\Entity\ConfigEntityBase::sort().
     uasort($entities, array($this->entityInfo['class'], 'sort'));
     return $entities;
   }
@@ -52,7 +55,7 @@ class ConfigEntityListController extends EntityListController {
           'title' => t('Disable'),
           'href' => $uri['path'] . '/disable',
           'options' => $uri['options'],
-          'weight' => 20,
+          'weight' => 40,
         );
       }
     }

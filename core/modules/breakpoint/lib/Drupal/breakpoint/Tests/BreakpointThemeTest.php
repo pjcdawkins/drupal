@@ -7,8 +7,8 @@
 namespace Drupal\breakpoint\Tests;
 
 use Drupal\breakpoint\Tests\BreakpointGroupTestBase;
-use Drupal\breakpoint\Plugin\Core\Entity\BreakpointGroup;
-use Drupal\breakpoint\Plugin\Core\Entity\Breakpoint;
+use Drupal\breakpoint\Entity\BreakpointGroup;
+use Drupal\breakpoint\Entity\Breakpoint;
 
 /**
  * Test breakpoints provided by themes.
@@ -117,10 +117,6 @@ class BreakpointThemeTest extends BreakpointGroupTestBase {
     // Disable the test theme and verify the breakpoint group still exists.
     theme_disable(array('breakpoint_test_theme'));
     $this->assertTrue(entity_load('breakpoint_group', $breakpoint_group_obj->id()), 'Breakpoint group still exists if theme is disabled.');
-
-    // Disable the test module and verify the breakpoint group still exists.
-    module_disable(array('breakpoint_theme_test'));
-    $this->assertTrue(entity_load('breakpoint_group', $breakpoint_group_obj->id()), 'Breakpoint group still exists if module is disabled.');
 
     // Uninstall the test module and verify the breakpoint group is deleted.
     module_uninstall(array('breakpoint_theme_test'));

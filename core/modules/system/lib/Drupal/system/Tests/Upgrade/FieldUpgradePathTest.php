@@ -6,7 +6,9 @@
  */
 
 namespace Drupal\system\Tests\Upgrade;
-use Drupal\Core\Language\Language;
+
+use Drupal\Core\Entity\DatabaseStorageController;
+use Drupal\field\Entity\Field;
 
 /**
  * Tests upgrade of system variables.
@@ -37,8 +39,8 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
 
     // Check that the configuration entries were created.
     $displays = array(
-      'default' => config('entity.display.node.article.default')->get(),
-      'teaser' => config('entity.display.node.article.teaser')->get(),
+      'default' => \Drupal::config('entity.display.node.article.default')->get(),
+      'teaser' => \Drupal::config('entity.display.node.article.teaser')->get(),
     );
     $this->assertTrue(!empty($displays['default']));
     $this->assertTrue(!empty($displays['teaser']));
@@ -67,6 +69,10 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
     $body_instance = field_info_instance('node', 'body', 'article');
     $this->assertTrue(!isset($body_instance['display']));
 
+    // Check that deleted fields were not added to the display.
+    $this->assertFalse(isset($displays['default']['content']['test_deleted_field']));
+    $this->assertFalse(isset($displays['teaser']['content']['test_deleted_field']));
+
     // Check that the 'language' extra field is configured as expected.
     $expected = array(
       'default' => array(
@@ -88,7 +94,7 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
     $this->assertTrue($this->performUpgrade(), 'The upgrade was completed successfully.');
 
     // Check that the configuration entries were created.
-    $form_display = config('entity.form_display.node.article.default')->get();
+    $form_display = \Drupal::config('entity.form_display.node.article.default')->get();
     $this->assertTrue(!empty($form_display));
 
     // Check that the 'body' field is configured as expected.
@@ -106,6 +112,9 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
     $body_instance = field_info_instance('node', 'body', 'article');
     $this->assertTrue(!isset($body_instance['widget']));
 
+    // Check that deleted fields were not added to the display.
+    $this->assertFalse(isset($form_display['content']['test_deleted_field']));
+
     // Check that the 'title' extra field is configured as expected.
     $expected = array(
       'weight' => -5,
@@ -118,30 +127,25 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
    * Tests migration of field and instance definitions to config.
    */
   function testFieldUpgradeToConfig() {
-    $this->assertTrue($this->performUpgrade(), t('The upgrade was completed successfully.'));
+    $this->assertTrue($this->performUpgrade(), 'The upgrade was completed successfully.');
 
     // Check that the configuration for the 'body' field is correct.
-    $config = \Drupal::config('field.field.body')->get();
+    $config = \Drupal::config('field.field.node.body')->get();
     // We cannot predict the value of the UUID, we just check it's present.
     $this->assertFalse(empty($config['uuid']));
     $field_uuid = $config['uuid'];
     unset($config['uuid']);
     $this->assertEqual($config, array(
-      'id' => 'body',
+      'id' => 'node.body',
+      'name' => 'body',
       'type' => 'text_with_summary',
       'module' => 'text',
       'active' => '1',
+      'entity_type' => 'node',
       'settings' => array(),
-      'storage' => array(
-        'type' => 'field_sql_storage',
-        'module' => 'field_sql_storage',
-        'active' => '1',
-        'settings' => array(),
-      ),
       'locked' => 0,
       'cardinality' => 1,
       'translatable' => 0,
-      'entity_types' => array('node'),
       'indexes' => array(
         'format' => array('format')
       ),
@@ -152,7 +156,7 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
     // Check that the configuration for the instance on article and page nodes
     // is correct.
     foreach (array('article', 'page') as $node_type) {
-      $config = config("field.instance.node.$node_type.body")->get();
+      $config = \Drupal::config("field.instance.node.$node_type.body")->get();
       // We cannot predict the value of the UUID, we just check it's present.
       $this->assertFalse(empty($config['uuid']));
       unset($config['uuid']);
@@ -170,18 +174,83 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
         'settings' => array(
           'display_summary' => TRUE,
           'text_processing' => 1,
-          'user_register_form' => FALSE,
+          // This setting has been removed in field_update_8005(). We keep it
+          // here, commented out, to prove that the upgrade path is working.
+          //'user_register_form' => FALSE,
         ),
         'status' => 1,
         'langcode' => 'und',
       ));
     }
 
-    // Check that field values in a pre-existing node are read correctly.
-    $body = node_load(1)->get('body');
-    $this->assertEqual($body->value, 'Some value');
-    $this->assertEqual($body->summary, 'Some summary');
-    $this->assertEqual($body->format, 'filtered_html');
+    // Check that the field that was shared in two entity types got split into
+    // two separate config entities.
+    $config = \Drupal::config('field.field.node.test_shared_field')->get();
+    // We cannot predict the value of the UUID, we just check it's present.
+    $this->assertFalse(empty($config['uuid']));
+    $field_uuid_node = $config['uuid'];
+    unset($config['uuid']);
+    $this->assertEqual($config, array(
+      'id' => 'node.test_shared_field',
+      'name' => 'test_shared_field',
+      'type' => 'text',
+      'module' => 'text',
+      'active' => '1',
+      'entity_type' => 'node',
+      'settings' => array(
+        'max_length' => '255',
+      ),
+      'locked' => 0,
+      'cardinality' => 1,
+      'translatable' => 0,
+      'indexes' => array(
+        'format' => array('format')
+      ),
+      'status' => 1,
+      'langcode' => 'und',
+    ));
+    $config = \Drupal::config('field.field.user.test_shared_field')->get();
+    // We cannot predict the value of the UUID, we just check it's present.
+    $this->assertFalse(empty($config['uuid']));
+    $field_uuid_user = $config['uuid'];
+    unset($config['uuid']);
+    $this->assertEqual($config, array(
+      'id' => 'user.test_shared_field',
+      'name' => 'test_shared_field',
+      'type' => 'text',
+      'module' => 'text',
+      'active' => '1',
+      'entity_type' => 'user',
+      'settings' => array(
+        'max_length' => '255',
+      ),
+      'locked' => 0,
+      'cardinality' => 1,
+      'translatable' => 0,
+      'indexes' => array(
+        'format' => array('format')
+      ),
+      'status' => 1,
+      'langcode' => 'und',
+    ));
+
+    // Check that the corresponding instances point to the correct field UUIDs.
+    $config = \Drupal::config('field.instance.node.article.test_shared_field')->get();
+    $this->assertEqual($config['field_uuid'], $field_uuid_node);
+    $config = \Drupal::config('field.instance.user.user.test_shared_field')->get();
+    $this->assertEqual($config['field_uuid'], $field_uuid_user);
+
+    // Check that field values in the pre-existing node are read correctly.
+    $node = node_load(1);
+    $this->assertEqual($node->body->value, 'Some value');
+    $this->assertEqual($node->body->summary, 'Some summary');
+    $this->assertEqual($node->body->format, 'filtered_html');
+    $this->assertEqual($node->test_shared_field->value, 'Shared field: value for node 1');
+    $this->assertEqual($node->test_shared_field->format, 'filtered_html');
+    // Check that field values in the pre-existing user are read correctly.
+    $account = user_load(1);
+    $this->assertEqual($account->test_shared_field->value, 'Shared field: value for user 1');
+    $this->assertEqual($account->test_shared_field->format, 'filtered_html');
 
     // Check that the definition of a deleted field is stored in state rather
     // than config.
@@ -193,7 +262,7 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
     $uuid_key = key($deleted_fields);
     $deleted_field = $deleted_fields[$uuid_key];
     $this->assertEqual($deleted_field['uuid'], $uuid_key);
-    $this->assertEqual($deleted_field['id'], 'test_deleted_field');
+    $this->assertEqual($deleted_field['id'], 'node.test_deleted_field');
 
     // Check that the definition of a deleted instance is stored in state rather
     // than config.
@@ -207,24 +276,19 @@ class FieldUpgradePathTest extends UpgradePathTestBase {
     // The deleted field uuid and deleted instance field_uuid must match.
     $this->assertEqual($deleted_field['uuid'], $deleted_instance['field_uuid']);
 
-    // Check that pre-existing deleted field values are read correctly.
-    $entity = _field_create_entity_from_ids((object) array(
-      'entity_type' => 'node',
-      'bundle' => 'article',
-      'entity_id' => 2,
-      'revision_id' => 2,
-    ));
-    field_attach_load('node', array(2 => $entity), FIELD_LOAD_CURRENT, array('instance' => entity_create('field_instance', $deleted_instance)));
-    $deleted_value = $entity->get('test_deleted_field');
-    $this->assertEqual($deleted_value[Language::LANGCODE_NOT_SPECIFIED][0]['value'], 'Some deleted value');
+    // Check that pre-existing deleted field table is renamed correctly.
+    $field_entity = new Field($deleted_field);
+    $table_name = DatabaseStorageController::_fieldTableName($field_entity);
+    $this->assertEqual("field_deleted_data_" . substr(hash('sha256', $deleted_field['uuid']), 0, 10), $table_name);
+    $this->assertTrue(db_table_exists($table_name));
 
     // Check that creation of a new node works as expected.
     $value = $this->randomName();
     $edit = array(
       'title' => 'Node after CMI conversion',
-      'body[und][0][value]' => $value,
+      'body[0][value]' => $value,
     );
-    $this->drupalPost('node/add/article', $edit, 'Save and publish');
+    $this->drupalPostForm('node/add/article', $edit, 'Save and publish');
     $this->assertText($value);
   }
 }

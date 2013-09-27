@@ -66,6 +66,18 @@ class EntityNormalizer extends NormalizerBase {
   /**
    * Implements \Symfony\Component\Serializer\Normalizer\DenormalizerInterface::denormalize().
    *
+   * @param array $data
+   *   Entity data to restore.
+   * @param string $class
+   *   Unused, entity_create() is used to instantiate entity objects.
+   * @param string $format
+   *   Format the given data was extracted from.
+   * @param array $context
+   *   Options available to the denormalizer. Keys that can be used:
+   *   - request_method: if set to "patch" the denormalization will clear out
+   *     all default values for entity fields before applying $data to the
+   *     entity.
+   *
    * @throws \Symfony\Component\Serializer\Exception\UnexpectedValueException
    */
   public function denormalize($data, $class, $format = NULL, array $context = array()) {
@@ -89,8 +101,16 @@ class EntityNormalizer extends NormalizerBase {
 
     $entity = entity_create($typed_data_ids['entity_type'], array('langcode' => $langcode, 'type' => $typed_data_ids['bundle']));
 
-    // Get links and remove from data array.
-    $links = $data['_links'];
+    // Special handling for PATCH: destroy all possible default values that
+    // might have been set on entity creation. We want an "empty" entity that
+    // will only get filled with fields from the data array.
+    if (isset($context['request_method']) && $context['request_method'] == 'patch') {
+      foreach ($entity as $field_name => $field) {
+        $entity->set($field_name, NULL);
+      }
+    }
+
+    // Remove links from data array.
     unset($data['_links']);
     // Get embedded resources and remove from data array.
     $embedded = array();

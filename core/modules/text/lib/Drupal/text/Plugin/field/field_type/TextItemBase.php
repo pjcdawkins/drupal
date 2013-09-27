@@ -32,7 +32,7 @@ abstract class TextItemBase extends ConfigFieldItemBase implements PrepareCacheI
         'label' => t('Text value'),
       );
       static::$propertyDefinitions['format'] = array(
-        'type' => 'string',
+        'type' => 'filter_format',
         'label' => t('Text format'),
       );
       static::$propertyDefinitions['processed'] = array(
@@ -70,38 +70,36 @@ abstract class TextItemBase extends ConfigFieldItemBase implements PrepareCacheI
   /**
    * {@inheritdoc}
    */
-  public function getConstraints() {
-    $constraint_manager = \Drupal::typedData()->getValidationConstraintManager();
-    $constraints = parent::getConstraints();
-
-    if (!empty($this->getInstance()->getField()->settings['max_length'])) {
-      $max_length = $this->getInstance()->getField()->settings['max_length'];
-      $constraints[] = $constraint_manager->create('ComplexData', array(
-        'value' => array(
-          'Length' => array(
-            'max' => $max_length,
-            'maxMessage' => t('%name: the text may not be longer than @max characters.', array('%name' => $this->getInstance()->label, '@max' => $max_length)),
-          )
-        ),
-      ));
+  public function prepareCache() {
+    // Where possible, generate the processed (sanitized) version of each
+    // textual property (e.g., 'value', 'summary') within this field item early
+    // so that it is cached in the field cache. This avoids the need to look up
+    // the sanitized value in the filter cache separately.
+    $text_processing = $this->getFieldSetting('text_processing');
+    if (!$text_processing || filter_format_allowcache($this->get('format')->getValue())) {
+      foreach ($this->getPropertyDefinitions() as $property => $definition) {
+        if (isset($definition['class']) && ($definition['class'] == '\Drupal\text\TextProcessed')) {
+          $this->get($property)->getValue();
+        }
+      }
     }
-
-    return $constraints;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function prepareCache() {
-    // Where possible, generate the sanitized version of each field early so
-    // that it is cached in the field cache. This avoids the need to look up the
-    // field in the filter cache separately.
-    if (!$this->getInstance()->settings['text_processing'] || filter_format_allowcache($this->get('format')->getValue())) {
-      $itemBC = $this->getValue();
-      $langcode = $this->getParent()->getParent()->language()->langcode;
-      $this->set('safe_value', text_sanitize($this->getInstance()->settings['text_processing'], $langcode, $itemBC, 'value'));
-      if ($this->getType() == 'field_item:text_with_summary') {
-        $this->set('safe_summary', text_sanitize($this->getInstance()->settings['text_processing'], $langcode, $itemBC, 'summary'));
+  public function onChange($property_name) {
+    // Notify the parent of changes.
+    if (isset($this->parent)) {
+      $this->parent->onChange($this->name);
+    }
+
+    // Unset processed properties that are affected by the change.
+    foreach ($this->getPropertyDefinitions() as $property => $definition) {
+      if (isset($definition['class']) && ($definition['class'] == '\Drupal\text\TextProcessed')) {
+        if ($property_name == 'format' || (isset($definition['settings']['text source']) && $definition['settings']['text source'] == $property_name)) {
+          $this->set($property, NULL, FALSE);
+        }
       }
     }
   }

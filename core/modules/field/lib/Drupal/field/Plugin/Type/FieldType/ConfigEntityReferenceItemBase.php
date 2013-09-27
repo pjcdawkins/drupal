@@ -7,9 +7,10 @@
 
 namespace Drupal\field\Plugin\Type\FieldType;
 
-use Drupal\Core\Entity\Field\Type\EntityReferenceItem;
+use Drupal\Core\Entity\Plugin\DataType\EntityReferenceItem;
 use Drupal\field\Plugin\Type\FieldType\ConfigFieldItemInterface;
-use Drupal\field\Plugin\Core\Entity\Field;
+use Drupal\field\FieldInterface;
+use Drupal\field\FieldInstanceInterface;
 
 /**
  * A common base class for configurable entity reference fields.
@@ -32,39 +33,18 @@ class ConfigEntityReferenceItemBase extends EntityReferenceItem implements Confi
   static $propertyDefinitions;
 
   /**
-   * The Field instance definition.
-   *
-   * @var \Drupal\field\Plugin\Core\Entity\FieldInstance
-   */
-  protected $instance;
-
-  /**
-   * Returns the field instance definition.
-   *
-   * Copied from \Drupal\field\Plugin\Type\FieldType\ConfigFieldItemBase,
-   * since we cannot extend it.
-   *
-   * @var \Drupal\field\Plugin\Core\Entity\FieldInstance
-   */
-  public function getInstance() {
-    if (!isset($this->instance) && $parent = $this->getParent()) {
-      $this->instance = $parent->getInstance();
-    }
-    return $this->instance;
-  }
-
-  /**
    * {@inheritdoc}
    */
   public function getPropertyDefinitions() {
-    // Definitions vary by entity type, so key them by entity type.
-    $target_type = $this->definition['settings']['target_type'];
+    // Definitions vary by entity type and bundle, so key them accordingly.
+    $key = $this->definition['settings']['target_type'] . ':';
+    $key .= isset($this->definition['settings']['target_bundle']) ? $this->definition['settings']['target_bundle'] : '';
 
-    if (!isset(self::$propertyDefinitions[$target_type])) {
+    if (!isset(static::$propertyDefinitions[$key])) {
       // Call the parent to define the target_id and entity properties.
       parent::getPropertyDefinitions();
 
-      static::$propertyDefinitions[$target_type]['revision_id'] = array(
+      static::$propertyDefinitions[$key]['revision_id'] = array(
         // @todo: Lookup the entity type's ID data type and use it here.
         'type' => 'integer',
         'label' => t('Revision ID'),
@@ -72,18 +52,18 @@ class ConfigEntityReferenceItemBase extends EntityReferenceItem implements Confi
           'Range' => array('min' => 0),
         ),
       );
-      static::$propertyDefinitions[$target_type]['label'] = array(
+      static::$propertyDefinitions[$key]['label'] = array(
         'type' => 'string',
         'label' => t('Label (auto-create)'),
         'computed' => TRUE,
       );
-      static::$propertyDefinitions[$target_type]['access'] = array(
+      static::$propertyDefinitions[$key]['access'] = array(
         'type' => 'boolean',
         'label' => t('Access'),
         'computed' => TRUE,
       );
     }
-    return static::$propertyDefinitions[$target_type];
+    return static::$propertyDefinitions[$key];
   }
 
   /**
@@ -92,9 +72,9 @@ class ConfigEntityReferenceItemBase extends EntityReferenceItem implements Confi
    * Copied from \Drupal\field\Plugin\field\field_type\LegacyConfigFieldItem,
    * since we cannot extend it.
    */
-  public static function schema(Field $field) {
+  public static function schema(FieldInterface $field) {
     $definition = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($field->type);
-    $module = $definition['module'];
+    $module = $definition['provider'];
     module_load_install($module);
     $callback = "{$module}_field_schema";
     if (function_exists($callback)) {
@@ -124,11 +104,15 @@ class ConfigEntityReferenceItemBase extends EntityReferenceItem implements Confi
    * Copied from \Drupal\field\Plugin\field\field_type\LegacyConfigFieldItem,
    * since we cannot extend it.
    */
-  public function settingsForm(array $form, array &$form_state) {
+  public function settingsForm(array $form, array &$form_state, $has_data) {
     if ($callback = $this->getLegacyCallback('settings_form')) {
+      $instance = $this->getFieldDefinition();
+      if (!($instance instanceof FieldInstanceInterface)) {
+        throw new \UnexpectedValueException('ConfigEntityReferenceItemBase::settingsForm() called for a field whose definition is not a field instance.');
+      }
       // hook_field_settings_form() used to receive the $instance (not actually
       // needed), and the value of field_has_data().
-      return $callback($this->getInstance()->getField(), $this->getInstance(), $this->getInstance()->getField()->hasData());
+      return $callback($instance->getField(), $instance, $has_data);
     }
     return array();
   }
@@ -141,9 +125,30 @@ class ConfigEntityReferenceItemBase extends EntityReferenceItem implements Confi
    */
   public function instanceSettingsForm(array $form, array &$form_state) {
     if ($callback = $this->getLegacyCallback('instance_settings_form')) {
-      return $callback($this->getInstance()->getField(), $this->getInstance(), $form_state);
+      $instance = $this->getFieldDefinition();
+      if (!($instance instanceof FieldInstanceInterface)) {
+        throw new \UnexpectedValueException('ConfigEntityReferenceItemBase::instanceSettingsForm() called for a field whose definition is not a field instance.');
+      }
+      return $callback($instance->getField(), $instance, $form_state);
     }
     return array();
+  }
+
+  /**
+   * Returns options provided via the legacy callback hook_options_list().
+   *
+   * @todo: Convert all legacy callback implementations to methods.
+   *
+   * @see \Drupal\Core\TypedData\AllowedValuesInterface
+   */
+  public function getSettableOptions() {
+    $definition = $this->getPluginDefinition();
+    $callback = "{$definition['provider']}_options_list";
+    if (function_exists($callback)) {
+      // We are at the field item level, so we need to go two levels up to get
+      // to the entity object.
+      return $callback($this->getFieldDefinition(), $this->getEntity());
+    }
   }
 
   /**
@@ -160,7 +165,7 @@ class ConfigEntityReferenceItemBase extends EntityReferenceItem implements Confi
    */
   protected function getLegacyCallback($hook) {
     $definition = $this->getPluginDefinition();
-    $module = $definition['module'];
+    $module = $definition['provider'];
     $callback = "{$module}_field_{$hook}";
     if (function_exists($callback)) {
       return $callback;

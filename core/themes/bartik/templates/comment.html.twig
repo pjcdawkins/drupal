@@ -15,7 +15,6 @@
  * - changed: Formatted date and time for when the comment was last changed.
  *   Preprocess functions can reformat it by calling format_date() with the
  *   desired parameters on the 'comment.changed' variable.
- * - new: New comment marker.
  * - permalink: Comment permalink.
  * - submitted: Submission information created from author and created
  *   during template_preprocess_comment().
@@ -32,8 +31,6 @@
  *   - preview: When previewing a new or edited comment.
  *   The following applies only to viewers who are registered users:
  *   - unpublished: An unpublished comment visible only to administrators.
- *   - by-viewer: Comment by the user currently viewing the page.
- *   - new: New comment since the last visit.
  * - title_prefix: Additional output populated by modules, intended to be
  *   displayed in front of the main title tag that appears in the template.
  * - title_suffix: Additional output populated by modules, intended to be
@@ -66,7 +63,6 @@
 <article class="{{ attributes.class }} clearfix"{{ attributes }} role="article">
 
   <header class="comment-header">
-
     <div class="attribution">
       {{ user_picture }}
 
@@ -92,38 +88,39 @@
         {% endif %}
       </div>
     </div> <!-- /.attribution -->
-
-    <div class="comment-text">
-      <div class="comment-arrow"></div>
-
-      {% if new %}
-        <span class="new">{{ new }}</span>
-      {% endif %}
-
-      {{ title_prefix }}
-      <h3{{ title_attributes }}>{{ title }}</h3>
-      {{ title_suffix }}
-    </div> <!-- /.comment-text -->
-
   </header> <!-- /.comment-header -->
 
-  <div{{ content_attributes }}>
-    {# We hide the links now so that we can render them later. #}
-    {% hide(content.links) %}
-    {{ content }}
+  <div class="comment-text">
+    <div class="comment-arrow"></div>
 
-  </div> <!-- /.content -->
+    {#
+    Hide the "new" indicator by default, let a piece of JavaScript ask
+    the server which comments are new for the user. Rendering the final
+    "new" indicator here would break the render cache.
+    #}
+    <span class="hidden new" data-comment-timestamp="{{ new_indicator_timestamp }}"></span>
 
-  <footer class="comment-footer">
-    {% if signature %}
-    <div class="user-signature clearfix">
-      {{ signature }}
-    </div>
-    {% endif %}
+    {{ title_prefix }}
+    <h3{{ title_attributes }}>{{ title }}</h3>
+    {{ title_suffix }}
 
-    <nav>
-      {{ content.links }}
-    </nav>
-  </footer> <!-- /.comment-footer -->
+    <div{{ content_attributes }}>
+      {# We hide the links now so that we can render them later. #}
+      {% hide(content.links) %}
+      {{ content }}
+    </div> <!-- /.content -->
+
+    <footer class="comment-footer">
+      {% if signature %}
+      <div class="user-signature clearfix">
+        {{ signature }}
+      </div>
+      {% endif %}
+
+      <nav>
+        {{ content.links }}
+      </nav>
+    </footer> <!-- /.comment-footer -->
+  </div> <!-- /.comment-text -->
 
 </article>

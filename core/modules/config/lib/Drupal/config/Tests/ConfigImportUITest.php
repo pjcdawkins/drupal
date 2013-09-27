@@ -41,7 +41,7 @@ class ConfigImportUITest extends WebTestBase {
     $storage = $this->container->get('config.storage');
     $staging = $this->container->get('config.storage.staging');
 
-    $this->drupalGet('admin/config/development/sync');
+    $this->drupalGet('admin/config/development/configuration/sync');
     $this->assertText('There are no configuration changes.');
     $this->assertNoFieldById('edit-submit', t('Import all'));
 
@@ -58,20 +58,20 @@ class ConfigImportUITest extends WebTestBase {
       'weight' => '0',
       'style' => '',
       'status' => '1',
-      'langcode' => language_default()->langcode,
+      'langcode' => language_default()->id,
       'protected_property' => '',
     );
     $staging->write($dynamic_name, $original_dynamic_data);
     $this->assertIdentical($staging->exists($dynamic_name), TRUE, $dynamic_name . ' found.');
 
     // Verify that both appear as ready to import.
-    $this->drupalGet('admin/config/development/sync');
+    $this->drupalGet('admin/config/development/configuration/sync');
     $this->assertText($name);
     $this->assertText($dynamic_name);
     $this->assertFieldById('edit-submit', t('Import all'));
 
     // Import and verify that both do not appear anymore.
-    $this->drupalPost(NULL, array(), t('Import all'));
+    $this->drupalPostForm(NULL, array(), t('Import all'));
     $this->assertNoText($name);
     $this->assertNoText($dynamic_name);
     $this->assertNoFieldById('edit-submit', t('Import all'));
@@ -80,10 +80,10 @@ class ConfigImportUITest extends WebTestBase {
     $this->assertText(t('There are no configuration changes.'));
 
     // Verify site name has changed.
-    $this->assertIdentical($new_site_name, config('system.site')->get('name'));
+    $this->assertIdentical($new_site_name, \Drupal::config('system.site')->get('name'));
 
     // Verify that new config entity exists.
-    $this->assertIdentical($original_dynamic_data, config($dynamic_name)->get());
+    $this->assertIdentical($original_dynamic_data, \Drupal::config($dynamic_name)->get());
 
     // Verify the cache got cleared.
     $this->assertTrue(isset($GLOBALS['hook_cache_flush']));
@@ -98,7 +98,7 @@ class ConfigImportUITest extends WebTestBase {
     $this->prepareSiteNameUpdate($new_site_name);
 
     // Verify that there are configuration differences to import.
-    $this->drupalGet('admin/config/development/sync');
+    $this->drupalGet('admin/config/development/configuration/sync');
     $this->assertNoText(t('There are no configuration changes.'));
 
     // Acquire a fake-lock on the import mechanism.
@@ -106,14 +106,14 @@ class ConfigImportUITest extends WebTestBase {
     $this->container->get('lock')->acquire($config_importer_lock);
 
     // Attempt to import configuration and verify that an error message appears.
-    $this->drupalPost(NULL, array(), t('Import all'));
+    $this->drupalPostForm(NULL, array(), t('Import all'));
     $this->assertText(t('Another request may be synchronizing configuration already.'));
 
     // Release the lock, just to keep testing sane.
     $this->container->get('lock')->release($config_importer_lock);
 
     // Verify site name has not changed.
-    $this->assertNotEqual($new_site_name, config('system.site')->get('name'));
+    $this->assertNotEqual($new_site_name, \Drupal::config('system.site')->get('name'));
   }
 
   /**
@@ -140,7 +140,7 @@ class ConfigImportUITest extends WebTestBase {
     $staging->write($config_name, $staging_data);
 
     // Load the diff UI and verify that the diff reflects the change.
-    $this->drupalGet('admin/config/development/sync/diff/' . $config_name);
+    $this->drupalGet('admin/config/development/configuration/sync/diff/' . $config_name);
     $this->assertTitle(format_string('View changes of @config_name | Drupal', array('@config_name' => $config_name)));
 
     // Reset data back to original, and remove a key
@@ -149,7 +149,7 @@ class ConfigImportUITest extends WebTestBase {
     $staging->write($config_name, $staging_data);
 
     // Load the diff UI and verify that the diff reflects a removed key.
-    $this->drupalGet('admin/config/development/sync/diff/' . $config_name);
+    $this->drupalGet('admin/config/development/configuration/sync/diff/' . $config_name);
 
     // Reset data back to original and add a key
     $staging_data = $original_data;
@@ -157,13 +157,13 @@ class ConfigImportUITest extends WebTestBase {
     $staging->write($config_name, $staging_data);
 
     // Load the diff UI and verify that the diff reflects an added key.
-    $this->drupalGet('admin/config/development/sync/diff/' . $config_name);
+    $this->drupalGet('admin/config/development/configuration/sync/diff/' . $config_name);
   }
 
   function prepareSiteNameUpdate($new_site_name) {
     $staging = $this->container->get('config.storage.staging');
     // Create updated configuration object.
-    $config_data = config('system.site')->get();
+    $config_data = \Drupal::config('system.site')->get();
     $config_data['name'] = $new_site_name;
     $staging->write('system.site', $config_data);
   }

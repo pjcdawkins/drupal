@@ -39,6 +39,7 @@ class NodeType extends ConditionPluginBase {
       $options[$type->type] = $type->name;
     }
     $form['bundles'] = array(
+      '#title' => t('Node types'),
       '#type' => 'checkboxes',
       '#options' => $options,
       '#required' => TRUE,
@@ -85,7 +86,7 @@ class NodeType extends ConditionPluginBase {
    */
   public function evaluate() {
     $node = $this->getContextValue('node');
-    return in_array($node->type, $this->configuration['bundles']);
+    return in_array($node->getType(), $this->configuration['bundles']);
   }
 
 }

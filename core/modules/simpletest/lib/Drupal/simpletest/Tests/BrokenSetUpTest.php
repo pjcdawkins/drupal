@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\simpletest\Tests\BrokenSetUpTest.
+ * Definition of \Drupal\simpletest\Tests\BrokenSetUpTest.
  */
 
 namespace Drupal\simpletest\Tests;
@@ -13,11 +13,11 @@ use Drupal\simpletest\WebTestBase;
  * Tests a test case that does not run parent::setUp() in its setUp() method.
  *
  * If a test case does not call parent::setUp(), running
- * Drupal\simpletest\WebTestBase::tearDown() would destroy the main site's
+ * \Drupal\simpletest\WebTestBase::tearDown() would destroy the main site's
  * database tables. Therefore, we ensure that tests which are not set up
  * properly are skipped.
  *
- * @see Drupal\simpletest\WebTestBase
+ * @see \Drupal\simpletest\WebTestBase
  */
 class BrokenSetUpTest extends WebTestBase {
 
@@ -70,7 +70,7 @@ class BrokenSetUpTest extends WebTestBase {
     // interface within the simpletest child site.
     if (!drupal_valid_test_ua()) {
       $edit['Drupal\simpletest\Tests\BrokenSetUpTest'] = TRUE;
-      $this->drupalPost('admin/config/development/testing', $edit, t('Run tests'));
+      $this->drupalPostForm('admin/config/development/testing', $edit, t('Run tests'));
 
       // Verify that the broken test and its tearDown() method are skipped.
       $this->assertRaw(t('The test setUp() method has been run.'));

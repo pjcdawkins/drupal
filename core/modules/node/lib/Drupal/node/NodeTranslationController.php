@@ -8,19 +8,12 @@
 namespace Drupal\node;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\content_translation\ContentTranslationController;
+use Drupal\content_translation\ContentTranslationControllerNG;
 
 /**
  * Defines the translation controller class for nodes.
  */
-class NodeTranslationController extends ContentTranslationController {
-
-  /**
-   * Overrides ContentTranslationController::getAccess().
-   */
-  public function getAccess(EntityInterface $entity, $op) {
-    return node_access($op, $entity);
-  }
+class NodeTranslationController extends ContentTranslationControllerNG {
 
   /**
    * Overrides ContentTranslationController::entityFormAlter().
@@ -61,7 +54,7 @@ class NodeTranslationController extends ContentTranslationController {
     if (isset($form_state['values']['content_translation'])) {
       $form_controller = content_translation_form_controller($form_state);
       $translation = &$form_state['values']['content_translation'];
-      $translation['status'] = $form_controller->getEntity()->status;
+      $translation['status'] = $form_controller->getEntity()->isPublished();
       $translation['name'] = $form_state['values']['name'];
       $translation['created'] = $form_state['values']['date'];
     }

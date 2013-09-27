@@ -26,7 +26,7 @@ class FileItemTest extends FieldUnitTestBase {
   /**
    * Created file entity.
    *
-   * @var \Drupal\file\Plugin\Core\Entity\File
+   * @var \Drupal\file\Entity\File
    */
   protected $file;
 
@@ -45,7 +45,8 @@ class FileItemTest extends FieldUnitTestBase {
     $this->installSchema('file', 'file_usage');
 
     entity_create('field_entity', array(
-      'field_name' => 'file_test',
+      'name' => 'file_test',
+      'entity_type' => 'entity_test',
       'type' => 'file',
       'cardinality' => FIELD_CARDINALITY_UNLIMITED,
     ))->save();

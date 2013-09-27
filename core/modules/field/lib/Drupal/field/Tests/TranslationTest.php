@@ -58,14 +58,14 @@ class TranslationTest extends FieldUnitTestBase {
   /**
    * The field to use in this test.
    *
-   * @var \Drupal\field\Plugin\Core\Entity\Field
+   * @var \Drupal\field\Entity\Field
    */
   protected $field;
 
   /**
    * The field instance to use in this test.
    *
-   * @var \Drupal\field\Plugin\Core\Entity\FieldInstance
+   * @var \Drupal\field\Entity\FieldInstance
    */
   protected $instance;
 
@@ -79,20 +79,20 @@ class TranslationTest extends FieldUnitTestBase {
 
   function setUp() {
     parent::setUp();
-    $this->installSchema('language', array('language'));
 
     $this->field_name = drupal_strtolower($this->randomName() . '_field_name');
 
     $this->entity_type = 'entity_test';
 
     $this->field_definition = array(
-      'field_name' => $this->field_name,
+      'name' => $this->field_name,
+      'entity_type' => $this->entity_type,
       'type' => 'test_field',
       'cardinality' => 4,
       'translatable' => TRUE,
     );
     entity_create('field_entity', $this->field_definition)->save();
-    $this->field = field_read_field($this->field_name);
+    $this->field = field_read_field($this->entity_type, $this->field_name);
 
     $this->instance_definition = array(
       'field_name' => $this->field_name,
@@ -104,7 +104,7 @@ class TranslationTest extends FieldUnitTestBase {
 
     for ($i = 0; $i < 3; ++$i) {
       $language = new Language(array(
-        'langcode' => 'l' . $i,
+        'id' => 'l' . $i,
         'name' => $this->randomString(),
       ));
       language_save($language);
@@ -154,8 +154,7 @@ class TranslationTest extends FieldUnitTestBase {
     // Prepare the field translations.
     $entity_type = 'entity_test';
     field_test_entity_info_translatable($entity_type, TRUE);
-    $id = $revision_id = 1;
-    $entity = entity_create($entity_type, array('id' => $id, 'revision_id' => $revision_id, 'type' => $this->instance['bundle']));
+    $entity = entity_create($entity_type, array('type' => $this->instance['bundle']));
     $field_translations = array();
     $available_langcodes = field_available_languages($entity_type, $this->field);
     $this->assertTrue(count($available_langcodes) > 1, 'Field is translatable.');
@@ -166,10 +165,7 @@ class TranslationTest extends FieldUnitTestBase {
     }
 
     // Save and reload the field translations.
-    field_attach_insert($entity);
-    $entity = entity_create($entity_type, array('id' => $id, 'revision_id' => $revision_id, 'type' => $this->instance['bundle']));
-    $entity->langcode->value = reset($available_langcodes);
-    field_attach_load($entity_type, array($id => $entity));
+    $entity = $this->entitySaveReload($entity);
 
     // Check if the correct values were saved/loaded.
     foreach ($field_translations as $langcode => $items) {
@@ -183,7 +179,7 @@ class TranslationTest extends FieldUnitTestBase {
     // Test default values.
     $field_name_default = drupal_strtolower($this->randomName() . '_field_name');
     $field_definition = $this->field_definition;
-    $field_definition['field_name'] = $field_name_default;
+    $field_definition['name'] = $field_name_default;
     entity_create('field_entity', $field_definition)->save();
 
     $instance_definition = $this->instance_definition;
@@ -198,9 +194,7 @@ class TranslationTest extends FieldUnitTestBase {
     asort($translation_langcodes);
     $translation_langcodes = array_values($translation_langcodes);
 
-    $id++;
-    $revision_id++;
-    $values = array('id' => $id, 'revision_id' => $revision_id, 'type' => $instance['bundle'], 'langcode' => $translation_langcodes[0]);
+    $values = array('type' => $instance['bundle'], 'langcode' => $translation_langcodes[0]);
     $entity = entity_create($entity_type, $values);
     foreach ($translation_langcodes as $langcode) {
       $values[$this->field_name][$langcode] = $this->_generateTestFieldValues($this->field['cardinality']);
@@ -213,14 +207,12 @@ class TranslationTest extends FieldUnitTestBase {
 
     // @todo Test every translation once the Entity Translation API allows for
     //   multilingual defaults.
-    $langcode = $entity->language()->langcode;
+    $langcode = $entity->language()->id;
     $this->assertEqual($entity->getTranslation($langcode)->{$field_name_default}->getValue(), $instance['default_value'], format_string('Default value correctly populated for language %language.', array('%language' => $langcode)));
 
     // Check that explicit empty values are not overridden with default values.
     foreach (array(NULL, array()) as $empty_items) {
-      $id++;
-      $revision_id++;
-      $values = array('id' => $id, 'revision_id' => $revision_id, 'type' => $instance['bundle'], 'langcode' => $translation_langcodes[0]);
+      $values = array('type' => $instance['bundle'], 'langcode' => $translation_langcodes[0]);
       $entity = entity_create($entity_type, $values);
       foreach ($translation_langcodes as $langcode) {
         $values[$this->field_name][$langcode] = $this->_generateTestFieldValues($this->field['cardinality']);
@@ -245,7 +237,8 @@ class TranslationTest extends FieldUnitTestBase {
     // We need an additional field here to properly test display language
     // suggestions.
     $field = array(
-      'field_name' => $field_name,
+      'name' => $field_name,
+      'entity_type' => $entity_type,
       'type' => 'test_field',
       'cardinality' => 2,
       'translatable' => TRUE,
@@ -253,7 +246,7 @@ class TranslationTest extends FieldUnitTestBase {
     entity_create('field_entity', $field)->save();
 
     $instance = array(
-      'field_name' => $field['field_name'],
+      'field_name' => $field['name'],
       'entity_type' => $entity_type,
       'bundle' => 'entity_test',
     );
@@ -273,7 +266,7 @@ class TranslationTest extends FieldUnitTestBase {
     // enabled.
     foreach ($instances as $instance) {
       $field_name = $instance['field_name'];
-      $field = field_info_field($field_name);
+      $field = $instance->getField();
       do {
         // Index 0 is reserved for the requested language, this way we ensure
         // that no field is actually populated with it.
@@ -325,7 +318,7 @@ class TranslationTest extends FieldUnitTestBase {
     \Drupal::state()->set('field_test.language_fallback', FALSE);
     $entity->getTranslation($requested_langcode)->{$this->field_name}->value = mt_rand(1, 127);
     drupal_static_reset('field_language');
-    $display_langcode = field_language($entity->getBCEntity(), $this->field_name, $requested_langcode);
+    $display_langcode = field_language($entity, $this->field_name, $requested_langcode);
     $this->assertEqual($display_langcode, $requested_langcode, 'Display language behave correctly when language fallback is disabled');
   }
 

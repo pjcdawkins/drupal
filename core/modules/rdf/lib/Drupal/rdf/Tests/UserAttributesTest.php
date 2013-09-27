@@ -53,15 +53,14 @@ class UserAttributesTest extends WebTestBase {
     $user2 = $this->drupalCreateUser();
     $this->drupalLogin($user1);
 
-    $account_uri = url('user/' . $user2->uid, array('absolute' => TRUE));
-    $person_uri = url('user/' . $user2->uid, array('fragment' => 'me', 'absolute' => TRUE));
+    $account_uri = url('user/' . $user2->id(), array('absolute' => TRUE));
 
     // Parses the user profile page where the default bundle mapping for user
     // should be used.
     $parser = new \EasyRdf_Parser_Rdfa();
     $graph = new \EasyRdf_Graph();
     $base_uri = url('<front>', array('absolute' => TRUE));
-    $parser->parse($graph, $this->drupalGet('user/' . $user2->uid), 'rdfa', $base_uri);
+    $parser->parse($graph, $this->drupalGet('user/' . $user2->id()), 'rdfa', $base_uri);
 
     // Inspects RDF graph output.
     // User type.
@@ -73,22 +72,9 @@ class UserAttributesTest extends WebTestBase {
     // User name.
     $expected_value = array(
       'type' => 'literal',
-      'value' => $user2->name,
+      'value' => $user2->getUsername(),
     );
     $this->assertTrue($graph->hasProperty($account_uri, 'http://xmlns.com/foaf/0.1/name', $expected_value), 'User name found in RDF output (foaf:name).');
-    // Person type.
-    $expected_value = array(
-      'type' => 'uri',
-      'value' => 'http://xmlns.com/foaf/0.1/Person',
-    );
-    $this->assertTrue($graph->hasProperty($person_uri, 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', $expected_value), 'Person type found in RDF output (foaf:Person).');
-    // Person relation to account.
-    $expected_value = array(
-      'type' => 'uri',
-      'value' => $account_uri,
-    );
-    $this->assertTrue($graph->hasProperty($person_uri, 'http://xmlns.com/foaf/0.1/account', $expected_value), 'Person relation to account found in RDF output (foaf:account).');
-
 
     // User 2 creates a node.
     $this->drupalLogin($user2);
@@ -100,7 +86,7 @@ class UserAttributesTest extends WebTestBase {
     $parser = new \EasyRdf_Parser_Rdfa();
     $graph = new \EasyRdf_Graph();
     $base_uri = url('<front>', array('absolute' => TRUE));
-    $parser->parse($graph, $this->drupalGet('node/' . $node->nid), 'rdfa', $base_uri);
+    $parser->parse($graph, $this->drupalGet('node/' . $node->id()), 'rdfa', $base_uri);
 
     // Ensures the default bundle mapping for user is used on the Authored By
     // information on the node.
@@ -113,7 +99,7 @@ class UserAttributesTest extends WebTestBase {
     // User name.
     $expected_value = array(
       'type' => 'literal',
-      'value' => $user2->name,
+      'value' => $user2->getUsername(),
     );
     $this->assertTrue($graph->hasProperty($account_uri, 'http://xmlns.com/foaf/0.1/name', $expected_value), 'User name found in RDF output (foaf:name).');
   }

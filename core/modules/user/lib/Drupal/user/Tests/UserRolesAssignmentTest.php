@@ -38,13 +38,13 @@ class UserRolesAssignmentTest extends WebTestBase {
     $account = $this->drupalCreateUser();
 
     // Assign the role to the user.
-    $this->drupalPost('user/' . $account->uid . '/edit', array("roles[$rid]" => $rid), t('Save'));
+    $this->drupalPostForm('user/' . $account->id() . '/edit', array("roles[$rid]" => $rid), t('Save'));
     $this->assertText(t('The changes have been saved.'));
     $this->assertFieldChecked('edit-roles-' . $rid, 'Role is assigned.');
     $this->userLoadAndCheckRoleAssigned($account, $rid);
 
     // Remove the role from the user.
-    $this->drupalPost('user/' . $account->uid . '/edit', array("roles[$rid]" => FALSE), t('Save'));
+    $this->drupalPostForm('user/' . $account->id() . '/edit', array("roles[$rid]" => FALSE), t('Save'));
     $this->assertText(t('The changes have been saved.'));
     $this->assertNoFieldChecked('edit-roles-' . $rid, 'Role is removed from user.');
     $this->userLoadAndCheckRoleAssigned($account, $rid, FALSE);
@@ -64,17 +64,17 @@ class UserRolesAssignmentTest extends WebTestBase {
       'pass[pass2]' => $pass,
       "roles[$rid]" => $rid,
     );
-    $this->drupalPost('admin/people/create', $edit, t('Create new account'));
+    $this->drupalPostForm('admin/people/create', $edit, t('Create new account'));
     $this->assertText(t('Created a new user account for !name.', array('!name' => $edit['name'])));
     // Get the newly added user.
     $account = user_load_by_name($edit['name']);
 
-    $this->drupalGet('user/' . $account->uid . '/edit');
+    $this->drupalGet('user/' . $account->id() . '/edit');
     $this->assertFieldChecked('edit-roles-' . $rid, 'Role is assigned.');
     $this->userLoadAndCheckRoleAssigned($account, $rid);
 
     // Remove the role again.
-    $this->drupalPost('user/' . $account->uid . '/edit', array("roles[$rid]" => FALSE), t('Save'));
+    $this->drupalPostForm('user/' . $account->id() . '/edit', array("roles[$rid]" => FALSE), t('Save'));
     $this->assertText(t('The changes have been saved.'));
     $this->assertNoFieldChecked('edit-roles-' . $rid, 'Role is removed from user.');
     $this->userLoadAndCheckRoleAssigned($account, $rid, FALSE);
@@ -92,12 +92,12 @@ class UserRolesAssignmentTest extends WebTestBase {
    *   Defaults to TRUE.
    */
   private function userLoadAndCheckRoleAssigned($account, $rid, $is_assigned = TRUE) {
-    $account = user_load($account->uid, TRUE);
+    $account = user_load($account->id(), TRUE);
     if ($is_assigned) {
-      $this->assertTrue(array_search($rid, $account->roles), 'The role is present in the user object.');
+      $this->assertTrue(array_search($rid, $account->getRoles()), 'The role is present in the user object.');
     }
     else {
-      $this->assertFalse(array_search($rid, $account->roles), 'The role is not present in the user object.');
+      $this->assertFalse(array_search($rid, $account->getRoles()), 'The role is not present in the user object.');
     }
   }
 }

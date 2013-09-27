@@ -12,19 +12,14 @@ function help_menu() {
   $items['admin/help'] = array(
     'title' => 'Help',
     'description' => 'Reference for usage, configuration, and modules.',
-    'route_name' => 'help_main',
+    'route_name' => 'help.main',
     'weight' => 9,
   );
 
-  $modules = module_implements('help');
-  ksort($modules);
-  foreach ($modules as $module) {
-    $items['admin/help/' . $module] = array(
-      'title' => $module,
-      'route_name' => 'help_page',
-      'type' => MENU_VISIBLE_IN_BREADCRUMB,
-    );
-  }
+  $items['admin/help/%'] = array(
+    'route_name' => 'help.page',
+    'type' => MENU_VISIBLE_IN_BREADCRUMB,
+  );
 
   return $items;
 }

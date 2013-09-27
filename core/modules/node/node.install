@@ -418,8 +418,8 @@ function node_uninstall() {
   // Delete node type variables.
   $types = config_get_storage_names_with_prefix('node.type.');
   foreach ($types as $config_name) {
-    $type = config($config_name)->get('type');
-    config('language.settings')->clear('node. ' . $type . '.language.default_configuration')->save();
+    $type = \Drupal::config($config_name)->get('type');
+    \Drupal::config('language.settings')->clear('node. ' . $type . '.language.default_configuration')->save();
   }
 
   // Delete node search ranking variables.
@@ -429,12 +429,11 @@ function node_uninstall() {
   variable_del('node_rank_recent');
 
   // Delete remaining general module variables.
-  Drupal::state()->delete('node.node_access_needs_rebuild');
-  variable_del('node_admin_theme');
+  \Drupal::state()->delete('node.node_access_needs_rebuild');
   variable_del('node_recent_block_count');
 
   // Delete any stored state.
-  Drupal::state()->delete('node.cron_last');
+  \Drupal::state()->delete('node.cron_last');
 }
 
 /**
@@ -640,7 +639,7 @@ function node_update_8007() {
     $language_show = update_variable_get('node_type_language_show_' . $type, NULL);
     if (isset($language_default) || isset($language_show)) {
       $values = array('langcode' => $language_default, 'language_show' => $language_show);
-      config('language.settings')->set('node.' . $type . '.language.default_configuration', $values)->save();
+      \Drupal::config('language.settings')->set('node.' . $type . '.language.default_configuration', $values)->save();
     }
   }
 }
@@ -697,7 +696,7 @@ function node_update_8011() {
  */
 function node_update_8012() {
   // Enable the history module without re-installing the schema.
-  module_enable(array('history'));
+  \Drupal::moduleHandler()->install(array('history'));
 }
 
 /**
@@ -712,7 +711,7 @@ function node_update_8013() {
 }
 
 /**
- * Empty update. See http://drupal.org/node/1836392.
+ * Empty update. See https://drupal.org/node/2006484.
  */
 function node_update_8014() {
 }
@@ -1069,14 +1068,14 @@ function node_update_8019() {
  * @ingroup config_upgrade
 */
 function node_update_8020() {
-  $uuid = new Uuid();
+  $uuid = \Drupal::service('uuid');
   // Properties to drop: custom, disabled.
   $locked = array();
   // Note: {node_type}.name was the label, .type the machine name.
   $result = db_query('SELECT * FROM {node_type}')
     ->fetchAllAssoc('type', PDO::FETCH_ASSOC);
   foreach ($result as $id => $node_type) {
-    $config = config('node.type.' . $id);
+    $config = \Drupal::config('node.type.' . $id);
     // Node type.
     $config->setData($node_type);
     $config->set('uuid', $uuid->generate());
@@ -1111,7 +1110,18 @@ function node_update_8020() {
       $locked[$id] = $node_type['base'];
     }
   }
-  Drupal::state()->set('node.type.locked', $locked);
+  \Drupal::state()->set('node.type.locked', $locked);
+}
+
+/**
+ * Converts node_admin_theme variable to config.
+ *
+ * @ingroup config_upgrade
+ */
+function node_update_8021() {
+  update_variables_to_config('node.settings', array(
+    'node_admin_theme' => 'use_admin_theme'
+  ));
 }
 
 /**

@@ -111,8 +111,8 @@ class AjaxResponse extends JsonResponse {
       unset($items['js']['settings']);
     }
     $styles = drupal_get_css($items['css'], TRUE);
-    $scripts_footer = drupal_get_js('footer', $items['js'], TRUE);
-    $scripts_header = drupal_get_js('header', $items['js'], TRUE);
+    $scripts_footer = drupal_get_js('footer', $items['js'], TRUE, TRUE);
+    $scripts_header = drupal_get_js('header', $items['js'], TRUE, TRUE);
 
     // Prepend commands to add the resources, preserving their relative order.
     $resource_commands = array();
@@ -129,10 +129,19 @@ class AjaxResponse extends JsonResponse {
       $this->addCommand($resource_command, TRUE);
     }
 
-    // Prepend a command to merge changes and additions to Drupal.settings.
+    // Prepend a command to merge changes and additions to drupalSettings.
     $scripts = drupal_add_js();
     if (!empty($scripts['settings'])) {
       $settings = drupal_merge_js_settings($scripts['settings']['data']);
+      // During Ajax requests basic path-specific settings are excluded from
+      // new drupalSettings values. The original page where this request comes
+      // from already has the right values for the keys below. An Ajax request
+      // would update them with values for the Ajax request and incorrectly
+      // override the page's values.
+      // @see drupal_add_js
+      foreach (array('basePath', 'currentPath', 'scriptPath', 'pathPrefix') as $item) {
+        unset($settings[$item]);
+      }
       $this->addCommand(new SettingsCommand($settings, TRUE), TRUE);
     }
 

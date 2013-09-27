@@ -9,12 +9,10 @@ namespace Drupal\Core\Database\Query;
 
 use Drupal\Core\Database\Connection;
 
-use Countable;
-
 /**
  * Generic class for a series of conditions in a query.
  */
-class Condition implements ConditionInterface, Countable {
+class Condition implements ConditionInterface, \Countable {
 
   /**
    * Array of conditions.
@@ -318,4 +316,24 @@ class Condition implements ConditionInterface, Countable {
     return $return;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function conditionGroupFactory($conjunction = 'AND') {
+    return new Condition($conjunction);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function andConditionGroup() {
+    return $this->conditionGroupFactory('AND');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function orConditionGroup() {
+    return $this->conditionGroupFactory('OR');
+  }
 }

@@ -25,9 +25,10 @@ function theme_field_multiple_value_form($variables) {
   $output = '';
 
   if ($element['#cardinality'] > 1 || $element['#cardinality'] == FIELD_CARDINALITY_UNLIMITED) {
+    $form_required_marker = array('#theme' => 'form_required_marker');
+    $required = !empty($element['#required']) ? drupal_render($form_required_marker) : '';
     $table_id = drupal_html_id($element['#field_name'] . '_values');
     $order_class = $element['#field_name'] . '-delta-order';
-    $required = !empty($element['#required']) ? theme('form_required_marker', $variables) : '';
 
     $header = array(
       array(
@@ -35,7 +36,7 @@ function theme_field_multiple_value_form($variables) {
         'colspan' => 2,
         'class' => array('field-label'),
       ),
-      t('Order'),
+      t('Order', array(), array('context' => 'Sort order')),
     );
     $rows = array();
 
@@ -67,8 +68,17 @@ function theme_field_multiple_value_form($variables) {
       );
     }
 
+    $table = array(
+      '#theme' => 'table',
+      '#header' => $header,
+      '#rows' => $rows,
+      '#attributes' => array(
+        'id' => $table_id,
+        'class' => array('field-multiple-table'),
+      ),
+    );
     $output = '<div class="form-item">';
-    $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-multiple-table'))));
+    $output .= drupal_render($table);
     $output .= $element['#description'] ? '<div class="description">' . $element['#description'] . '</div>' : '';
     $output .= '<div class="clearfix">' . drupal_render($add_more_button) . '</div>';
     $output .= '</div>';
@@ -82,6 +92,17 @@ function theme_field_multiple_value_form($variables) {
   }
 
   return $output;
+}
+
+/**
+ * Callback for usort() within theme_field_multiple_value_form().
+ *
+ * Sorts using ['_weight']['#value']
+ */
+function _field_sort_items_value_helper($a, $b) {
+  $a_weight = (is_array($a) && isset($a['_weight']['#value']) ? $a['_weight']['#value'] : 0);
+  $b_weight = (is_array($b) && isset($b['_weight']['#value']) ? $b['_weight']['#value'] : 0);
+  return $a_weight - $b_weight;
 }
 
 /**
@@ -104,11 +125,10 @@ function theme_field_multiple_value_form($variables) {
 function field_form_element_after_build($element, &$form_state) {
   $parents = $element['#field_parents'];
   $field_name = $element['#field_name'];
-  $langcode = $element['#language'];
 
-  $field_state = field_form_get_state($parents, $field_name, $langcode, $form_state);
+  $field_state = field_form_get_state($parents, $field_name, $form_state);
   $field_state['array_parents'] = $element['#array_parents'];
-  field_form_set_state($parents, $field_name, $langcode, $form_state, $field_state);
+  field_form_set_state($parents, $field_name, $form_state, $field_state);
 
   return $element;
 }
@@ -119,8 +139,8 @@ function field_form_element_after_build($element, &$form_state) {
  * This handler is run regardless of whether JS is enabled or not. It makes
  * changes to the form state. If the button was clicked with JS disabled, then
  * the page is reloaded with the complete rebuilt form. If the button was
- * clicked with JS enabled, then ajax_form_callback() calls field_add_more_js()
- * to return just the changed part of the form.
+ * clicked with JS enabled, then Drupal\system\FormAjaxController::content()
+ * calls field_add_more_js() to return just the changed part of the form.
  */
 function field_add_more_submit($form, &$form_state) {
   $button = $form_state['triggering_element'];
@@ -128,13 +148,12 @@ function field_add_more_submit($form, &$form_state) {
   // Go one level up in the form, to the widgets container.
   $element = NestedArray::getValue($form, array_slice($button['#array_parents'], 0, -1));
   $field_name = $element['#field_name'];
-  $langcode = $element['#language'];
   $parents = $element['#field_parents'];
 
   // Increment the items count.
-  $field_state = field_form_get_state($parents, $field_name, $langcode, $form_state);
+  $field_state = field_form_get_state($parents, $field_name, $form_state);
   $field_state['items_count']++;
-  field_form_set_state($parents, $field_name, $langcode, $form_state, $field_state);
+  field_form_set_state($parents, $field_name, $form_state, $field_state);
 
   $form_state['rebuild'] = TRUE;
 }
@@ -169,13 +188,11 @@ function field_add_more_js($form, $form_state) {
 /**
  * Retrieves processing information about a field from $form_state.
  *
- * @param $parents
+ * @param array $parents
  *   The array of #parents where the field lives in the form.
  * @param $field_name
  *   The field name.
- * @param $langcode
- *   The language in which the field values are entered.
- * @param $form_state
+ * @param array $form_state
  *   The form state.
  *
  * @return
@@ -188,64 +205,46 @@ function field_add_more_js($form, $form_state) {
  *
  * @see field_form_set_state()
  */
-function field_form_get_state($parents, $field_name, $langcode, &$form_state) {
-  $form_state_parents = _field_form_state_parents($parents, $field_name, $langcode);
+function field_form_get_state(array $parents, $field_name, array &$form_state) {
+  $form_state_parents = _field_form_state_parents($parents, $field_name);
   return NestedArray::getValue($form_state, $form_state_parents);
 }
 
 /**
  * Stores processing information about a field in $form_state.
  *
- * @param $parents
+ * @param array $parents
  *   The array of #parents where the field lives in the form.
  * @param $field_name
  *   The field name.
- * @param $langcode
- *   The language in which the field values are entered.
- * @param $form_state
+ * @param array $form_state
  *   The form state.
- * @param $field_state
+ * @param array $field_state
  *   The array of data to store. See field_form_get_state() for the structure
  *   and content of the array.
  *
  * @see field_form_get_state()
  */
-function field_form_set_state($parents, $field_name, $langcode, &$form_state, $field_state) {
-  $form_state_parents = _field_form_state_parents($parents, $field_name, $langcode);
+function field_form_set_state(array $parents, $field_name, array &$form_state, array $field_state) {
+  $form_state_parents = _field_form_state_parents($parents, $field_name);
   NestedArray::setValue($form_state, $form_state_parents, $field_state);
 }
 
 /**
  * Returns the location of processing information within $form_state.
  *
- * @param $parents
+ * @param array $parents
  *   The array of #parents where the field lives in the form.
  * @param $field_name
  *   The field name.
- * @param $langcode
- *   The language in which the field values are entered.
  *
  * @return
  *   The location of processing information within $form_state.
  */
-function _field_form_state_parents($parents, $field_name, $langcode) {
-  // To ensure backwards compatibility on regular entity forms for widgets that
-  // still access $form_state['field'][$field_name] directly,
-  // - top-level fields (empty $parents) are placed directly under
-  //   $form_state['fields'][$field_name].
-  // - Other fields are placed under
-  //   $form_state['field']['#parents'][...$parents...]['#fields'][$field_name]
-  //   to avoid clashes between field names and $parents parts.
-  // @todo Remove backwards compatibility in Drupal 8, and use a unique
-  // $form_state['field'][...$parents...]['#fields'][$field_name] structure.
-  if (!empty($parents)) {
-    $form_state_parents = array_merge(array('#parents'), $parents, array('#fields'));
-  }
-  else {
-    $form_state_parents = array();
-  }
-  $form_state_parents = array_merge(array('field'), $form_state_parents, array($field_name, $langcode));
-
-  return $form_state_parents;
+function _field_form_state_parents(array $parents, $field_name) {
+  // Field processing data is placed at
+  // $form_state['field']['#parents'][...$parents...]['#fields'][$field_name],
+  // to avoid clashes between field names and $parents parts.
+  return array_merge(array('field', '#parents'), $parents, array('#fields', $field_name));
 }
 

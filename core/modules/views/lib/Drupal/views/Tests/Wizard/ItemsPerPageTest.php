@@ -53,7 +53,7 @@ class ItemsPerPageTest extends WizardTestBase {
     $view['block[create]'] = 1;
     $view['block[title]'] = $this->randomName(16);
     $view['block[items_per_page]'] = 3;
-    $this->drupalPost('admin/structure/views/add', $view, t('Save and edit'));
+    $this->drupalPostForm('admin/structure/views/add', $view, t('Save and edit'));
     $this->drupalGet($view['page[path]']);
     $this->assertResponse(200);
 
@@ -72,11 +72,11 @@ class ItemsPerPageTest extends WizardTestBase {
     $pos4 = strpos($content, $node4->label());
     $pos3 = strpos($content, $node3->label());
     $pos2 = strpos($content, $node2->label());
-    $this->assertTrue($pos5 < $pos4 && $pos4 < $pos3 && $pos3 < $pos2, t('The nodes appear in the expected order in the page display.'));
+    $this->assertTrue($pos5 < $pos4 && $pos4 < $pos3 && $pos3 < $pos2, 'The nodes appear in the expected order in the page display.');
 
     // Confirm that the block is listed in the block administration UI.
-    $this->drupalGet('admin/structure/block/list/block_plugin_ui:' . config('system.theme')->get('default') . '/add');
-    $this->assertText('View: ' . $view['label']);
+    $this->drupalGet('admin/structure/block/list/' . \Drupal::config('system.theme')->get('default'));
+    $this->assertText($view['label']);
 
     // Place the block, visit a page that displays the block, and check that the
     // nodes we expect appear in the correct order.
@@ -93,7 +93,7 @@ class ItemsPerPageTest extends WizardTestBase {
     $pos5 = strpos($content, $node5->label());
     $pos4 = strpos($content, $node4->label());
     $pos3 = strpos($content, $node3->label());
-    $this->assertTrue($pos5 < $pos4 && $pos4 < $pos3, t('The nodes appear in the expected order in the block display.'));
+    $this->assertTrue($pos5 < $pos4 && $pos4 < $pos3, 'The nodes appear in the expected order in the block display.');
   }
 
 }

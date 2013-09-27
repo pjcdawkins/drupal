@@ -14,7 +14,8 @@
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\edit\Form\EditFieldForm;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\entity\Plugin\Core\Entity\EntityDisplay;
+use Drupal\entity\Entity\EntityDisplay;
+use Drupal\user\TempStoreFactory;
 
 /**
  * Implements hook_menu().
@@ -23,12 +24,14 @@ function edit_menu() {
   // @todo Remove these menu items in http://drupal.org/node/1954892 when theme
   //   callbacks are replaced with something else.
   $items['edit/metadata'] = array(
-    'route_name' => 'edit_metadata',
+    'route_name' => 'edit.metadata',
     'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
   );
   $items['edit/form/%/%/%/%/%'] = array(
-    'route_name' => 'edit_field_form',
+    'route_name' => 'edit.field_form',
     'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
   );
 
   return $items;
@@ -52,7 +55,7 @@ function edit_permission() {
  * editing' permission.
  */
 function edit_page_build(&$page) {
-  if (!user_access('access in-place editing')) {
+  if (!\Drupal::currentUser()->hasPermission('access in-place editing')) {
     return;
   }
 
@@ -76,7 +79,7 @@ function edit_library_info() {
   );
   $libraries['edit'] = array(
     'title' => 'Edit: in-place editing',
-    'version' => VERSION,
+    'version' => \Drupal::VERSION,
     'js' => array(
       // Core.
       $path . '/js/edit.js' => $options,
@@ -88,8 +91,9 @@ function edit_library_info() {
       // Views.
       $path . '/js/views/AppView.js' => $options,
       $path . '/js/views/EditorDecorationView.js' => $options,
+      $path . '/js/views/EntityView.js' => $options,
+      $path . '/js/views/EntityToolbarView.js' => $options,
       $path . '/js/views/ContextualLinkView.js' => $options,
-      $path . '/js/views/ModalView.js' => $options,
       $path . '/js/views/FieldToolbarView.js' => $options,
       $path . '/js/views/EditorView.js' => $options,
       // Other.
@@ -98,20 +102,26 @@ function edit_library_info() {
     ),
     'css' => array(
       $path . '/css/edit.module.css' => array(),
+      $path . '/css/edit.theme.css' => array(),
+      $path . '/css/edit.icons.css' => array(),
     ),
     'dependencies' => array(
       array('system', 'jquery'),
       array('system', 'underscore'),
       array('system', 'backbone'),
       array('system', 'jquery.form'),
+      array('system', 'jquery.ui.position'),
+      array('system', 'drupal.displace'),
       array('system', 'drupal.form'),
       array('system', 'drupal.ajax'),
+      array('system', 'drupal.debounce'),
       array('system', 'drupalSettings'),
+      array('system', 'drupal.dialog'),
     ),
   );
   $libraries['edit.editorWidget.form'] = array(
     'title' => 'Form in-place editor',
-    'version' => VERSION,
+    'version' => \Drupal::VERSION,
     'js' => array(
       $path . '/js/editors/formEditor.js' => $options,
     ),
@@ -121,7 +131,7 @@ function edit_library_info() {
   );
   $libraries['edit.editorWidget.direct'] = array(
     'title' => 'Direct in-place editor',
-    'version' => VERSION,
+    'version' => \Drupal::VERSION,
     'js' => array(
       $path . '/js/editors/directEditor.js' => $options,
     ),
@@ -164,14 +174,4 @@ function edit_preprocess_field(&$variables) {
  */
 function edit_entity_view_alter(&$build, EntityInterface $entity, EntityDisplay $display) {
   $build['#attributes']['data-edit-entity'] = $entity->entityType() . '/' . $entity->id();
-}
-
-/**
- * Form constructor for the field editing form.
- *
- * @ingroup forms
- */
-function edit_field_form(array $form, array &$form_state, EntityInterface $entity, $field_name) {
-  $form_handler = new EditFieldForm();
-  return $form_handler->build($form, $form_state, $entity, $field_name);
 }

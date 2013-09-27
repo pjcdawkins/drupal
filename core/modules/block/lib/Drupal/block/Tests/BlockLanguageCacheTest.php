@@ -7,20 +7,21 @@
 
 namespace Drupal\block\Tests;
 
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Language\Language;
-use Drupal\aggregator\Tests\AggregatorTestBase;
+use Drupal\simpletest\WebTestBase;
 
 /**
  * Tests multilingual block definition caching.
  */
-class BlockLanguageCacheTest extends AggregatorTestBase {
+class BlockLanguageCacheTest extends WebTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('block', 'language');
+  public static $modules = array('block', 'language', 'menu');
 
   /**
    * List of langcodes.
@@ -32,7 +33,7 @@ class BlockLanguageCacheTest extends AggregatorTestBase {
   public static function getInfo() {
     return array(
       'name' => 'Multilingual blocks',
-      'description' => 'Checks display of aggregator blocks with multiple languages.',
+      'description' => 'Checks display of menu blocks with multiple languages.',
       'group' => 'Block',
     );
   }
@@ -44,7 +45,7 @@ class BlockLanguageCacheTest extends AggregatorTestBase {
     $this->langcodes = array(language_load('en'));
     for ($i = 1; $i < 3; ++$i) {
       $language = new Language(array(
-        'langcode' => 'l' . $i,
+        'id' => 'l' . $i,
         'name' => $this->randomString(),
       ));
       language_save($language);
@@ -60,28 +61,25 @@ class BlockLanguageCacheTest extends AggregatorTestBase {
     $admin_user = $this->drupalCreateUser(array(
       'administer blocks',
       'access administration pages',
-      'administer news feeds',
-      'access news feeds',
-      'create article content',
-      'administer languages',
+      'administer menu',
     ));
     $this->drupalLogin($admin_user);
 
     // Create the block cache for all languages.
     foreach ($this->langcodes as $langcode) {
       $this->drupalGet('admin/structure/block', array('language' => $langcode));
-      $this->clickLink(t('Place blocks'));
     }
 
-    // Create a feed in the default language.
-    $this->createSampleNodes();
-    $feed = $this->createFeed();
+    // Create a menu in the default language.
+    $edit['label'] = $this->randomName();
+    $edit['id'] = Unicode::strtolower($edit['label']);
+    $this->drupalPostForm('admin/structure/menu/add', $edit, t('Save'));
+    $this->assertText(t('Menu @label has been added.', array('@label' => $edit['label'])));
 
     // Check that the block is listed for all languages.
     foreach ($this->langcodes as $langcode) {
       $this->drupalGet('admin/structure/block', array('language' => $langcode));
-      $this->clickLink(t('Place blocks'));
-      $this->assertText($feed->label());
+      $this->assertText($edit['label']);
     }
   }
 }

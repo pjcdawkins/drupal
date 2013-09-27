@@ -7,7 +7,7 @@
 
 namespace Drupal\views_test_data\Plugin\views\style;
 
-use Drupal\Component\Annotation\Plugin;
+use Drupal\views\Annotation\ViewsStyle;
 use Drupal\Core\Annotation\Translation;
 use Drupal\views\Plugin\views\style\StylePluginBase;
 
@@ -16,11 +16,12 @@ use Drupal\views\Plugin\views\style\StylePluginBase;
  *
  * @ingroup views_style_plugins
  *
- * @Plugin(
+ * @ViewsStyle(
  *   id = "test_style",
  *   title = @Translation("Test style plugin"),
  *   help = @Translation("Provides a generic style test plugin."),
  *   theme = "views_view_style_test",
+ *   register_theme = FALSE,
  *   display_types = {"normal", "test"}
  * )
  */
@@ -57,6 +58,7 @@ class StyleTest extends StylePluginBase {
     parent::buildOptionsForm($form, $form_state);
 
     $form['test_option'] = array(
+      '#title' => t('Test option'),
       '#type' => 'textfield',
       '#description' => t('This is a textfield for test_option.'),
       '#default_value' => $this->options['test_option'],

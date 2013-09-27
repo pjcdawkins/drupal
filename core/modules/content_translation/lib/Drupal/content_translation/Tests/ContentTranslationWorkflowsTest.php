@@ -56,9 +56,10 @@ class ContentTranslationWorkflowsTest extends ContentTranslationTestBase {
     $default_langcode = $this->langcodes[0];
 
     // Create a test entity.
+    $user = $this->drupalCreateUser();
     $values = array(
       'name' => $this->randomName(),
-      'user_id' => mt_rand(1, 128),
+      'user_id' => $user->id(),
       $this->fieldName => array(array('value' => $this->randomName(16))),
     );
     $id = $this->createEntity($values, $default_langcode);
@@ -67,7 +68,7 @@ class ContentTranslationWorkflowsTest extends ContentTranslationTestBase {
     // Create a translation.
     $this->drupalLogin($this->translator);
     $add_translation_path = $this->controller->getBasePath($this->entity) . "/translations/add/$default_langcode/{$this->langcodes[2]}";
-    $this->drupalPost($add_translation_path, array(), t('Save'));
+    $this->drupalPostForm($add_translation_path, array(), t('Save'));
     $this->rebuildContainer();
   }
 
@@ -118,7 +119,7 @@ class ContentTranslationWorkflowsTest extends ContentTranslationTestBase {
   protected function assertWorkflows(UserInterface $user, $expected_status) {
     $default_langcode = $this->langcodes[0];
     $languages = language_list();
-    $args = array('@user_label' => $user->name);
+    $args = array('@user_label' => $user->getUsername());
     $this->drupalLogin($user);
 
     // Check whether the user is allowed to access the entity form in edit mode.

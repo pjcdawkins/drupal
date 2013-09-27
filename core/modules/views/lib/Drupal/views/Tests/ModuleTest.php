@@ -11,7 +11,7 @@ namespace Drupal\views\Tests;
  * Tests basic functions from the Views module.
  */
 use Drupal\views\Plugin\views\filter\Standard;
-use Drupal\views\Views;
+use Drupal\Component\Utility\String;
 
 class ModuleTest extends ViewUnitTestBase {
 
@@ -20,7 +20,7 @@ class ModuleTest extends ViewUnitTestBase {
    *
    * @var array
    */
-  public static $testViews = array('test_view_status');
+  public static $testViews = array('test_view_status', 'test_view');
 
   /**
    * Stores the last triggered error, for example via debug().
@@ -51,7 +51,7 @@ class ModuleTest extends ViewUnitTestBase {
         'table' => $this->randomName(),
         'field' => $this->randomName(),
       );
-      $handler = Views::handlerManager($type)->getHandler($item);
+      $handler = $this->container->get('plugin.manager.views.' . $type)->getHandler($item);
       $this->assertEqual('Drupal\views\Plugin\views\\' . $type . '\Broken', get_class($handler), t('Make sure that a broken handler of type: @type are created', array('@type' => $type)));
     }
 
@@ -66,7 +66,7 @@ class ModuleTest extends ViewUnitTestBase {
         );
         foreach ($data as $id => $field_data) {
           if (!in_array($id, array('title', 'help'))) {
-            $handler = Views::handlerManager($id)->getHandler($item);
+            $handler = $this->container->get('plugin.manager.views.' . $id)->getHandler($item);
             $this->assertInstanceHandler($handler, $table, $field, $id);
           }
         }
@@ -78,7 +78,7 @@ class ModuleTest extends ViewUnitTestBase {
       'table' => 'views_test_data',
       'field' => 'job',
     );
-    $handler = Views::handlerManager('filter')->getHandler($item, 'standard');
+    $handler = $this->container->get('plugin.manager.views.filter')->getHandler($item, 'standard');
     $this->assertTrue($handler instanceof Standard);
 
     // @todo Reinstate these tests when the debug() in views_get_handler() is
@@ -91,7 +91,7 @@ class ModuleTest extends ViewUnitTestBase {
       'table' => 'views_test_data',
       'field' => 'field_invalid',
     );
-    Views::handlerManager('field')->getHandler($item);
+    $this->container->get('plugin.manager.views.field')->getHandler($item);
     $this->assertTrue(strpos($this->lastErrorMessage, format_string("Missing handler: @table @field @type", array('@table' => 'views_test_data', '@field' => 'field_invalid', '@type' => 'field'))) !== FALSE, 'An invalid field name throws a debug message.');
     unset($this->lastErrorMessage);
 
@@ -99,7 +99,7 @@ class ModuleTest extends ViewUnitTestBase {
       'table' => 'table_invalid',
       'field' => 'id',
     );
-    Views::handlerManager('filter')->getHandler($item);
+    $this->container->get('plugin.manager.views.filter')->getHandler($item);
     $this->assertEqual(strpos($this->lastErrorMessage, format_string("Missing handler: @table @field @type", array('@table' => 'table_invalid', '@field' => 'id', '@type' => 'filter'))) !== FALSE, 'An invalid table name throws a debug message.');
     unset($this->lastErrorMessage);
 
@@ -108,7 +108,7 @@ class ModuleTest extends ViewUnitTestBase {
       'field' => 'id',
       'optional' => FALSE,
     );
-    Views::handlerManager('filter')->getHandler($item);
+    $this->container->get('plugin.manager.views.filter')->getHandler($item);
     $this->assertEqual(strpos($this->lastErrorMessage, format_string("Missing handler: @table @field @type", array('@table' => 'table_invalid', '@field' => 'id', '@type' => 'filter'))) !== FALSE, 'An invalid table name throws a debug message.');
     unset($this->lastErrorMessage);
 
@@ -117,7 +117,7 @@ class ModuleTest extends ViewUnitTestBase {
       'field' => 'id',
       'optional' => TRUE,
     );
-    Views::handlerManager('filter')->getHandler($item);
+    $this->container->get('plugin.manager.views.filter')->getHandler($item);
     $this->assertFalse($this->lastErrorMessage, "An optional handler does not throw a debug message.");
     unset($this->lastErrorMessage);
 
@@ -151,18 +151,17 @@ class ModuleTest extends ViewUnitTestBase {
    */
   public function testLoadFunctions() {
     $this->enableModules(array('node'));
-    $controller = $this->container->get('plugin.manager.entity')->getStorageController('view');
+    $controller = $this->container->get('entity.manager')->getStorageController('view');
 
     // Test views_view_is_enabled/disabled.
-    $load = $controller->load(array('archive'));
-    $archive = reset($load);
+    $archive = $controller->load('archive');
     $this->assertTrue(views_view_is_disabled($archive), 'views_view_is_disabled works as expected.');
     // Enable the view and check this.
     $archive->enable();
     $this->assertTrue(views_view_is_enabled($archive), ' views_view_is_enabled works as expected.');
 
     // We can store this now, as we have enabled/disabled above.
-    $all_views = $controller->load();
+    $all_views = $controller->loadMultiple();
 
     // Test views_get_all_views().
     $this->assertIdentical(array_keys($all_views), array_keys(views_get_all_views()), 'views_get_all_views works as expected.');
@@ -203,7 +202,7 @@ class ModuleTest extends ViewUnitTestBase {
     // Test $exclude_view parameter.
     $this->assertFalse(array_key_exists('archive', views_get_views_as_options(TRUE, 'all', 'archive')), 'View excluded from options based on name');
     $this->assertFalse(array_key_exists('archive:default', views_get_views_as_options(FALSE, 'all', 'archive:default')), 'View display excluded from options based on name');
-    $this->assertFalse(array_key_exists('archive', views_get_views_as_options(TRUE, 'all', $archive->get('executable'))), 'View excluded from options based on object');
+    $this->assertFalse(array_key_exists('archive', views_get_views_as_options(TRUE, 'all', $archive->getExecutable())), 'View excluded from options based on object');
 
     // Test the $opt_group parameter.
     $expected_opt_groups = array();
@@ -238,7 +237,7 @@ class ModuleTest extends ViewUnitTestBase {
   public function testViewsFetchPluginNames() {
     // All style plugins should be returned, as we have not specified a type.
     $plugins = views_fetch_plugin_names('style');
-    $definitions = Views::pluginManager('style')->getDefinitions();
+    $definitions = $this->container->get('plugin.manager.views.style')->getDefinitions();
     $expected = array();
     foreach ($definitions as $id =>$definition) {
       $expected[$id] = $definition['title'];
@@ -249,7 +248,7 @@ class ModuleTest extends ViewUnitTestBase {
     // Test using the 'test' style plugin type only returns the test_style and
     // mapping_test plugins.
     $plugins = views_fetch_plugin_names('style', 'test');
-    $this->assertIdentical(array_keys($plugins), array('mapping_test', 'test_style'));
+    $this->assertIdentical(array_keys($plugins), array('mapping_test', 'test_style', 'test_template_style'));
 
     // Test a non existent style plugin type returns no plugins.
     $plugins = views_fetch_plugin_names('style', $this->randomString());
@@ -257,10 +256,30 @@ class ModuleTest extends ViewUnitTestBase {
   }
 
   /**
+   * Tests the views_plugin_list() function.
+   */
+  public function testViewsPluginList() {
+    $plugin_list = views_plugin_list();
+    // Only plugins used by 'test_view' should be in the plugin list.
+    foreach (array('display:default', 'pager:none') as $key) {
+      list($plugin_type, $plugin_id) = explode(':', $key);
+      $plugin_def = $this->container->get("plugin.manager.views.$plugin_type")->getDefinition($plugin_id);
+
+      $this->assertTrue(isset($plugin_list[$key]), String::format('The expected @key plugin list key was found.', array('@key' => $key)));
+      $plugin_details = $plugin_list[$key];
+
+      $this->assertEqual($plugin_details['type'], $plugin_type, 'The expected plugin type was found.');
+      $this->assertEqual($plugin_details['title'], $plugin_def['title'], 'The expected plugin title was found.');
+      $this->assertEqual($plugin_details['provider'], $plugin_def['provider'], 'The expected plugin provider was found.');
+      $this->assertTrue(in_array('test_view', $plugin_details['views']), 'The test_view View was found in the list of views using this plugin.');
+    }
+  }
+
+  /**
    * Helper to return an expected views option array.
    *
    * @param array $views
-   *   An array of Drupal\views\Plugin\Core\Entity\View objects for which to
+   *   An array of Drupal\views\Entity\View objects for which to
    *   create an options array.
    *
    * @return array
@@ -282,7 +301,7 @@ class ModuleTest extends ViewUnitTestBase {
    * Ensure that a certain handler is a instance of a certain table/field.
    */
   function assertInstanceHandler($handler, $table, $field, $id) {
-    $table_data = Views::viewsData()->get($table);
+    $table_data = $this->container->get('views.views_data')->get($table);
     $field_data = $table_data[$field][$id];
 
     $this->assertEqual($field_data['id'], $handler->getPluginId());

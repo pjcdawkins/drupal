@@ -8,15 +8,13 @@
 namespace Drupal\node\Form;
 
 use Drupal\Core\Entity\EntityConfirmFormBase;
-use Drupal\Core\Entity\EntityControllerInterface;
 use Drupal\Core\Database\Connection;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Provides a form for content type deletion.
  */
-class NodeTypeDeleteConfirm extends EntityConfirmFormBase implements EntityControllerInterface {
+class NodeTypeDeleteConfirm extends EntityConfirmFormBase {
 
   /**
    * The database connection.
@@ -38,7 +36,7 @@ class NodeTypeDeleteConfirm extends EntityConfirmFormBase implements EntityContr
   /**
    * {@inheritdoc}
    */
-  public static function createInstance(ContainerInterface $container, $entity_type, array $entity_info) {
+  public static function create(ContainerInterface $container) {
     return new static(
       $container->get('database')
     );
@@ -54,8 +52,10 @@ class NodeTypeDeleteConfirm extends EntityConfirmFormBase implements EntityContr
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/structure/types';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'node.overview_types',
+    );
   }
 
   /**
@@ -68,7 +68,7 @@ class NodeTypeDeleteConfirm extends EntityConfirmFormBase implements EntityContr
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state, Request $request = NULL) {
+  public function buildForm(array $form, array &$form_state) {
     $num_nodes = $this->database->query("SELECT COUNT(*) FROM {node} WHERE type = :type", array(':type' => $this->entity->id()))->fetchField();
     if ($num_nodes) {
       drupal_set_title($this->getQuestion(), PASS_THROUGH);
@@ -77,7 +77,7 @@ class NodeTypeDeleteConfirm extends EntityConfirmFormBase implements EntityContr
       return $form;
     }
 
-    return parent::buildForm($form, $form_state, $request);
+    return parent::buildForm($form, $form_state);
   }
 
   /**
@@ -89,7 +89,7 @@ class NodeTypeDeleteConfirm extends EntityConfirmFormBase implements EntityContr
     drupal_set_message(t('The content type %name has been deleted.', $t_args));
     watchdog('node', 'Deleted content type %name.', $t_args, WATCHDOG_NOTICE);
 
-    $form_state['redirect'] = $this->getCancelPath();
+    $form_state['redirect'] = 'admin/structure/types';
   }
 
 }

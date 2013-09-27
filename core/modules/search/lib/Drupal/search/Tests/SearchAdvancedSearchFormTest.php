@@ -29,7 +29,7 @@ class SearchAdvancedSearchFormTest extends SearchTestBase {
     $this->node = $this->drupalCreateNode();
 
     // First update the index. This does the initial processing.
-    node_update_index();
+    $this->container->get('plugin.manager.search')->createInstance('node_search')->updateIndex();
 
     // Then, run the shutdown function. Testing is a unique case where indexing
     // and searching has to happen in the same request, so running the shutdown
@@ -42,7 +42,7 @@ class SearchAdvancedSearchFormTest extends SearchTestBase {
    * Test using the advanced search form to limit search to nodes of type "Basic page".
    */
   function testNodeType() {
-    $this->assertTrue($this->node->type == 'page', 'Node type is Basic page.');
+    $this->assertTrue($this->node->getType() == 'page', 'Node type is Basic page.');
 
     // Assert that the dummy title doesn't equal the real title.
     $dummy_title = 'Lorem ipsum';
@@ -58,14 +58,14 @@ class SearchAdvancedSearchFormTest extends SearchTestBase {
 
     // Search for the title of the node with a POST query.
     $edit = array('or' => $this->node->label());
-    $this->drupalPost('search/node', $edit, t('Advanced search'));
+    $this->drupalPostForm('search/node', $edit, t('Advanced search'));
     $this->assertText($this->node->label(), 'Basic page node is found with POST query.');
 
     // Advanced search type option.
-    $this->drupalPost('search/node', array_merge($edit, array('type[page]' => 'page')), t('Advanced search'));
+    $this->drupalPostForm('search/node', array_merge($edit, array('type[page]' => 'page')), t('Advanced search'));
     $this->assertText($this->node->label(), 'Basic page node is found with POST query and type:page.');
 
-    $this->drupalPost('search/node', array_merge($edit, array('type[article]' => 'article')), t('Advanced search'));
+    $this->drupalPostForm('search/node', array_merge($edit, array('type[article]' => 'article')), t('Advanced search'));
     $this->assertText('bike shed', 'Article node is not found with POST query and type:article.');
   }
 }

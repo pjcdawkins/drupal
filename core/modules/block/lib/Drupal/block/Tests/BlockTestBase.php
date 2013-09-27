@@ -39,7 +39,7 @@ abstract class BlockTestBase extends WebTestBase {
     parent::setUp();
 
     // Use the test page as the front page.
-    config('system.site')->set('page.front', 'test-page')->save();
+    \Drupal::config('system.site')->set('page.front', 'test-page')->save();
 
     // Create Full HTML text format.
     $full_html_format = entity_create('filter_format', array(
@@ -53,7 +53,7 @@ abstract class BlockTestBase extends WebTestBase {
     // text format.
     $this->adminUser = $this->drupalCreateUser(array(
       'administer blocks',
-      filter_permission_name($full_html_format),
+      $full_html_format->getPermissionName(),
       'access administration pages',
     ));
     $this->drupalLogin($this->adminUser);
@@ -71,7 +71,7 @@ abstract class BlockTestBase extends WebTestBase {
     $manager = $this->container->get('plugin.manager.block');
     $instances = config_get_storage_names_with_prefix('plugin.core.block.' . $default_theme);
     foreach ($instances as $plugin_id) {
-      config($plugin_id)->delete();
+      \Drupal::config($plugin_id)->delete();
     }
   }
 
@@ -91,7 +91,7 @@ abstract class BlockTestBase extends WebTestBase {
     // Set the created block to a specific region.
     $edit = array();
     $edit['blocks[0][region]'] = $region;
-    $this->drupalPost('admin/structure/block', $edit, t('Save blocks'));
+    $this->drupalPostForm('admin/structure/block', $edit, t('Save blocks'));
 
     // Confirm that the block was moved to the proper region.
     $this->assertText(t('The block settings have been updated.'), format_string('Block successfully moved to %region_name region.', array( '%region_name' => $region)));

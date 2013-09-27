@@ -52,12 +52,12 @@ class UserLanguageTest extends WebTestBase {
       'name' => $name,
       'direction' => '0',
     );
-    $this->drupalPost('admin/config/regional/language/add', $edit, t('Add custom language'));
+    $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add custom language'));
     $this->drupalLogout();
 
     // Login as normal user and edit account settings.
     $this->drupalLogin($web_user);
-    $path = 'user/' . $web_user->uid . '/edit';
+    $path = 'user/' . $web_user->id() . '/edit';
     $this->drupalGet($path);
     // Ensure language settings widget is available.
     $this->assertText(t('Language'), 'Language selector available.');
@@ -67,7 +67,7 @@ class UserLanguageTest extends WebTestBase {
     $edit = array(
       'preferred_langcode' => $langcode,
     );
-    $this->drupalPost($path, $edit, t('Save'));
+    $this->drupalPostForm($path, $edit, t('Save'));
     // Ensure form was submitted successfully.
     $this->assertText(t('The changes have been saved.'), 'Changes were saved.');
     // Check if language was changed.

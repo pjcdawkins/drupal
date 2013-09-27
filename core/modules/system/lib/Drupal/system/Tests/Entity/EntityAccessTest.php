@@ -29,9 +29,8 @@ class EntityAccessTest extends EntityUnitTestBase  {
 
   function setUp() {
     parent::setUp();
-    $this->installSchema('user', array('users_roles'));
     $this->installSchema('system', array('variable', 'url_alias'));
-    $this->installSchema('language', 'language');
+    $this->installConfig(array('language'));
 
     // Create the default languages.
     $default_language = language_save(language_default());
@@ -95,7 +94,7 @@ class EntityAccessTest extends EntityUnitTestBase  {
 
     // Check that the default access controller is used for entities that don't
     // have a specific access controller defined.
-    $controller = $this->container->get('plugin.manager.entity')->getAccessController('entity_test_default_access');
+    $controller = $this->container->get('entity.manager')->getAccessController('entity_test_default_access');
     $this->assertTrue($controller instanceof EntityAccessController, 'The default entity controller is used for the entity_test_default_access entity type.');
 
     $entity = entity_create('entity_test_default_access', array());
@@ -119,7 +118,7 @@ class EntityAccessTest extends EntityUnitTestBase  {
     // Create two test languages.
     foreach (array('foo', 'bar') as $langcode) {
       $language = new Language(array(
-        'langcode' => $langcode,
+        'id' => $langcode,
         'name' => $this->randomString(),
       ));
       language_save($language);
@@ -135,5 +134,25 @@ class EntityAccessTest extends EntityUnitTestBase  {
     $this->assertEntityAccess(array(
       'view' => TRUE,
     ), $translation);
+  }
+
+  /**
+   * Tests hook invocations.
+   */
+  protected function testHooks() {
+    $state = $this->container->get('state');
+    $entity = entity_create('entity_test', array(
+      'name' => 'test',
+    ));
+
+    // Test hook_entity_create_access() and hook_ENTITY_TYPE_create_access().
+    $entity->access('create');
+    $this->assertEqual($state->get('entity_test_entity_create_access'), TRUE);
+    $this->assertEqual($state->get('entity_test_entity_test_create_access'), TRUE);
+
+    // Test hook_entity_access() and hook_ENTITY_TYPE_access().
+    $entity->access('view');
+    $this->assertEqual($state->get('entity_test_entity_access'), TRUE);
+    $this->assertEqual($state->get('entity_test_entity_test_access'), TRUE);
   }
 }

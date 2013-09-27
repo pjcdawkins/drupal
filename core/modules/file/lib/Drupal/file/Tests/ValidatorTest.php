@@ -27,7 +27,7 @@ class ValidatorTest extends FileManagedTestBase {
     $this->image->setFilename(drupal_basename($this->image->getFileUri()));
 
     $this->non_image = entity_create('file', array());
-    $this->non_image->setFileUri('core/misc/jquery.js');
+    $this->non_image->setFileUri('core/assets/vendor/jquery/jquery.js');
     $this->non_image->setFilename(drupal_basename($this->non_image->getFileUri()));
   }
 
@@ -87,9 +87,9 @@ class ValidatorTest extends FileManagedTestBase {
       $errors = file_validate_image_resolution($this->image, '10x5');
       $this->assertEqual(count($errors), 0, 'No errors should be reported when an oversized image can be scaled down.', 'File');
 
-      $info = image_get_info($this->image->getFileUri());
-      $this->assertTrue($info['width'] <= 10, 'Image scaled to correct width.', 'File');
-      $this->assertTrue($info['height'] <= 5, 'Image scaled to correct height.', 'File');
+      $image = $this->container->get('image.factory')->get($this->image->getFileUri());
+      $this->assertTrue($image->getWidth() <= 10, 'Image scaled to correct width.', 'File');
+      $this->assertTrue($image->getHeight() <= 5, 'Image scaled to correct height.', 'File');
 
       drupal_unlink('temporary://druplicon.png');
     }
@@ -129,7 +129,7 @@ class ValidatorTest extends FileManagedTestBase {
    * Test file_validate_size().
    */
   function testFileValidateSize() {
-    global $user;
+    $user = $this->container->get('current_user');
     $original_user = $user;
     drupal_save_session(FALSE);
 

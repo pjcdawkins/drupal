@@ -7,13 +7,14 @@
 
 namespace Drupal\Core\Action;
 
-use Drupal\Core\Action\ConfigurableActionInterface;
+use Drupal\Component\Plugin\ConfigurablePluginInterface;
 use Drupal\Core\Action\ActionBase;
+use Drupal\Core\Plugin\PluginFormInterface;
 
 /**
  * Provides a base implementation for a configurable Action plugin.
  */
-abstract class ConfigurableActionBase extends ActionBase implements ConfigurableActionInterface {
+abstract class ConfigurableActionBase extends ActionBase implements ConfigurablePluginInterface, PluginFormInterface {
 
   /**
    * {@inheritdoc}
@@ -21,15 +22,13 @@ abstract class ConfigurableActionBase extends ActionBase implements Configurable
   public function __construct(array $configuration, $plugin_id, array $plugin_definition) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
 
-    $this->configuration += $this->getDefaultConfiguration();
+    $this->configuration += $this->defaultConfiguration();
   }
 
   /**
-   * Returns default configuration for this action.
-   *
-   * @return array
+   * {@inheritdoc}
    */
-  protected function getDefaultConfiguration() {
+  public function defaultConfiguration() {
     return array();
   }
 
@@ -43,7 +42,14 @@ abstract class ConfigurableActionBase extends ActionBase implements Configurable
   /**
    * {@inheritdoc}
    */
-  public function validate(array &$form, array &$form_state) {
+  public function setConfiguration(array $configuration) {
+    $this->configuration = $configuration;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateConfigurationForm(array &$form, array &$form_state) {
   }
 
 }

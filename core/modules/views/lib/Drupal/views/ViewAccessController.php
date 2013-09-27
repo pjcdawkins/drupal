@@ -20,8 +20,15 @@ class ViewAccessController extends EntityAccessController {
   /**
    * {@inheritdoc}
    */
-  public function access(EntityInterface $entity, $operation, $langcode = Language::LANGUAGE_DEFAULT, AccountInterface $account = NULL) {
+  public function access(EntityInterface $entity, $operation, $langcode = Language::LANGCODE_DEFAULT, AccountInterface $account = NULL) {
     return $operation == 'view' || user_access('administer views', $account);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function checkCreateAccess(AccountInterface $account, array $context, $entity_bundle = NULL) {
+    return user_access('administer views', $account);
   }
 
 }

@@ -17,7 +17,7 @@ class DefaultViewsTest extends UITestBase {
    *
    * @var array
    */
-  public static $testViews = array('test_view_status');
+  public static $testViews = array('test_view_status', 'test_page_display_menu', 'test_page_display_arguments');
 
   public static function getInfo() {
     return array(
@@ -56,15 +56,15 @@ class DefaultViewsTest extends UITestBase {
     // displayed.
     $new_title = $this->randomName(16);
     $edit = array('title' => $new_title);
-    $this->drupalPost('admin/structure/views/nojs/display/glossary/page_1/title', $edit, t('Apply'));
-    $this->drupalPost('admin/structure/views/view/glossary/edit/page_1', array(), t('Save'));
+    $this->drupalPostForm('admin/structure/views/nojs/display/glossary/page_1/title', $edit, t('Apply'));
+    $this->drupalPostForm('admin/structure/views/view/glossary/edit/page_1', array(), t('Save'));
     $this->drupalGet('glossary');
     $this->assertResponse(200);
     $this->assertText($new_title);
 
     // Save another view in the UI.
-    $this->drupalPost('admin/structure/views/nojs/display/archive/page_1/title', array(), t('Apply'));
-    $this->drupalPost('admin/structure/views/view/archive/edit/page_1', array(), t('Save'));
+    $this->drupalPostForm('admin/structure/views/nojs/display/archive/page_1/title', array(), t('Apply'));
+    $this->drupalPostForm('admin/structure/views/view/archive/edit/page_1', array(), t('Save'));
 
     // Check there is an enable link. i.e. The view has not been enabled after
     // editing.
@@ -76,7 +76,7 @@ class DefaultViewsTest extends UITestBase {
     // $this->drupalGet('admin/structure/views');
     // $this->assertLink(t('Revert'));
     // $this->assertLinkByHref($revert_href);
-    // $this->drupalPost($revert_href, array(), t('Revert'));
+    // $this->drupalPostForm($revert_href, array(), t('Revert'));
     // $this->drupalGet('glossary');
     // $this->assertNoText($new_title);
 
@@ -86,15 +86,15 @@ class DefaultViewsTest extends UITestBase {
     $edit = array(
       'id' => 'clone_of_glossary',
     );
-    $this->assertTitle(t('Clone of @label | @site-name', array('@label' => 'Glossary', '@site-name' => config('system.site')->get('name'))));
-    $this->drupalPost(NULL, $edit, t('Clone'));
+    $this->assertTitle(t('Clone of @label | @site-name', array('@label' => 'Glossary', '@site-name' => \Drupal::config('system.site')->get('name'))));
+    $this->drupalPostForm(NULL, $edit, t('Clone'));
     $this->assertUrl('admin/structure/views/view/clone_of_glossary', array(), 'The normal cloning name schema is applied.');
 
     // Clone a view and set a custom name.
     $this->drupalGet('admin/structure/views');
     $this->clickViewsOperationLink(t('Clone'), '/glossary');
     $random_name = strtolower($this->randomName());
-    $this->drupalPost(NULL, array('id' => $random_name), t('Clone'));
+    $this->drupalPostForm(NULL, array('id' => $random_name), t('Clone'));
     $this->assertUrl("admin/structure/views/view/$random_name", array(), 'The custom view name got saved.');
 
     // Now disable the view, and make sure it stops appearing on the main view
@@ -116,7 +116,7 @@ class DefaultViewsTest extends UITestBase {
     $this->drupalGet('admin/structure/views');
     $this->clickViewsOperationLink(t('Delete'), '/glossary/');
     // Submit the confirmation form.
-    $this->drupalPost(NULL, array(), t('Delete'));
+    $this->drupalPostForm(NULL, array(), t('Delete'));
     // Ensure the view is no longer listed.
     $this->assertUrl('admin/structure/views');
     $this->assertNoLinkByHref($edit_href);
@@ -155,6 +155,26 @@ class DefaultViewsTest extends UITestBase {
     $arguments[':status'] = 'views-list-section enabled';
     $elements = $this->xpath($xpath, $arguments);
     $this->assertIdentical(count($elements), 1, 'After enabling a view, it is found in the enabled views table.');
+
+    // Attempt to disable the view by path directly, with no token.
+    $this->drupalGet('admin/structure/views/view/test_view_status/disable');
+    $this->assertResponse(403);
+  }
+
+  /**
+   * Tests that page displays show the correct path.
+   */
+  public function testPathDestination() {
+    $this->drupalGet('admin/structure/views');
+
+    // Check that links to views on default tabs are rendered correctly.
+    $this->assertLinkByHref('test_page_display_menu');
+    $this->assertNoLinkByHref('test_page_display_menu/default');
+    $this->assertLinkByHref('test_page_display_menu/local');
+
+    // Check that a dynamic path is shown as text.
+    $this->assertRaw('test_route_with_suffix/%/suffix');
+    $this->assertNoLinkByHref(url('test_route_with_suffix/%/suffix'));
   }
 
   /**

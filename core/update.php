@@ -22,6 +22,8 @@ use Symfony\Component\DependencyInjection\Reference;
 // Change the directory to the Drupal root.
 chdir('..');
 
+require_once __DIR__ . '/vendor/autoload.php';
+
 // Exit early if an incompatible PHP version would cause fatal errors.
 // The minimum version is specified explicitly, as DRUPAL_MINIMUM_PHP is not
 // yet available. It is defined in bootstrap.inc, but it is not possible to
@@ -107,7 +109,7 @@ function update_script_selection_form($form, &$form_state) {
   }
 
   // Find and label any incompatible updates.
-  foreach (update_resolve_dependencies($starting_updates) as $function => $data) {
+  foreach (update_resolve_dependencies($starting_updates) as $data) {
     if (!$data['allowed']) {
       $incompatible_updates_exist = TRUE;
       $incompatible_count++;
@@ -186,8 +188,8 @@ function update_helpful_links() {
  * while updates are running.
  */
 function update_flush_all_caches() {
-  unset($GLOBALS['conf']['container_bundles']['UpdateBundle']);
-  Drupal::service('kernel')->updateModules(Drupal::moduleHandler()->getModuleList());
+  unset($GLOBALS['conf']['container_service_providers']['UpdateServiceProvider']);
+  \Drupal::service('kernel')->updateModules(\Drupal::moduleHandler()->getModuleList());
 
   // No updates to run, so caches won't get flushed later.  Clear them now.
   drupal_flush_all_caches();
@@ -225,7 +227,11 @@ function update_results_page() {
     $output .= "<p><strong>Reminder: don't forget to set the <code>\$settings['update_free_access']</code> value in your <code>settings.php</code> file back to <code>FALSE</code>.</strong></p>";
   }
 
-  $output .= theme('links', array('links' => update_helpful_links()));
+  $links = array(
+    '#theme' => 'links',
+    '#links' => update_helpful_links(),
+  );
+  $output .= drupal_render($links);
 
   // Output a list of queries executed.
   if (!empty($_SESSION['update_results'])) {
@@ -345,7 +351,7 @@ function update_access_allowed() {
   // Calls to user_access() might fail during the Drupal 6 to 7 update process,
   // so we fall back on requiring that the user be logged in as user #1.
   try {
-    $module_handler = Drupal::moduleHandler();
+    $module_handler = \Drupal::moduleHandler();
     $module_filenames = $module_handler->getModuleList();
     $module_filenames['user'] = 'core/modules/user/user.module';
     $module_handler->setModuleList($module_filenames);
@@ -354,7 +360,7 @@ function update_access_allowed() {
     return user_access('administer software updates');
   }
   catch (\Exception $e) {
-    return ($user->uid == 1);
+    return ($user->id() == 1);
   }
 }
 
@@ -371,7 +377,13 @@ function update_task_list($active = NULL) {
     'finished' => 'Review log',
   );
 
-  drupal_add_region_content('sidebar_first', theme('task_list', array('items' => $tasks, 'active' => $active)));
+  $task_list = array(
+    '#theme' => 'task_list',
+    '#items' => $tasks,
+    '#active' => $active,
+  );
+
+  drupal_add_region_content('sidebar_first', drupal_render($task_list));
 }
 
 /**
@@ -395,7 +407,7 @@ function update_extra_requirements($requirements = NULL) {
  */
 function update_check_requirements($skip_warnings = FALSE) {
   // Check requirements of all loaded modules.
-  $requirements = module_invoke_all('requirements', 'update');
+  $requirements = \Drupal::moduleHandler()->invokeAll('requirements', array('update'));
   $requirements += update_extra_requirements();
   $severity = drupal_requirements_severity($requirements);
 
@@ -404,13 +416,22 @@ function update_check_requirements($skip_warnings = FALSE) {
   if ($severity == REQUIREMENT_ERROR || ($severity == REQUIREMENT_WARNING && !$skip_warnings)) {
     update_task_list('requirements');
     drupal_set_title('Requirements problem');
-    $status_report = theme('status_report', array('requirements' => $requirements));
+    $status = array(
+      '#theme' => 'status_report',
+      '#requirements' => $requirements,
+    );
+    $status_report = drupal_render($status);
     $status_report .= 'Check the messages and <a href="' . check_url(drupal_requirements_url($severity)) . '">try again</a>.';
     drupal_add_http_header('Content-Type', 'text/html; charset=utf-8');
-    print theme('maintenance_page', array('content' => $status_report));
+    $maintenance_page = array(
+      '#theme' => 'maintenance_page',
+      '#content' => $status_report,
+    );
+    print drupal_render($maintenance_page);
     exit();
   }
 }
+
 
 // Some unavoidable errors happen because the database is not yet up-to-date.
 // Our custom error handler is not yet installed, so we just suppress them.
@@ -427,14 +448,19 @@ require_once __DIR__ . '/includes/schema.inc';
 update_prepare_d8_bootstrap();
 
 // Determine if the current user has access to run update.php.
-drupal_bootstrap(DRUPAL_BOOTSTRAP_SESSION);
+drupal_bootstrap(DRUPAL_BOOTSTRAP_VARIABLES);
+require_once DRUPAL_ROOT . '/' . settings()->get('session_inc', 'core/includes/session.inc');
+drupal_session_initialize();
 
 // A request object from the HTTPFoundation to tell us about the request.
-// @todo These two lines were copied from index.php which has its own todo about
-// a change required here. Revisit this when that change has been made.
 $request = Request::createFromGlobals();
-drupal_container()
-  ->set('request', $request);
+\Drupal::getContainer()->set('request', $request);
+
+// Ensure that URLs generated for the home and admin pages don't have 'update.php'
+// in them.
+$generator = \Drupal::urlGenerator();
+$generator->setBasePath(str_replace('/core', '', $request->getBasePath()) . '/');
+$generator->setScriptPath('');
 
 // There can be conflicting 'op' parameters because both update and batch use
 // this parameter name. We need the 'op' coming from a POST request to trump
@@ -527,7 +553,7 @@ if (update_access_allowed()) {
     // Regular batch ops : defer to batch processing API.
     default:
       update_task_list('run');
-      $output = _batch_page();
+      $output = _batch_page($request);
       break;
   }
 }
@@ -544,6 +570,11 @@ if (isset($output) && $output) {
   }
   else {
     drupal_add_http_header('Content-Type', 'text/html; charset=utf-8');
-    print theme('maintenance_page', array('content' => $output, 'show_messages' => !$progress_page));
+    $maintenance_page = array(
+      '#theme' => 'maintenance_page',
+      '#content' => $output,
+      '#show_messages' => !$progress_page,
+    );
+    print drupal_render($maintenance_page);
   }
 }

@@ -40,11 +40,11 @@ class LanguageUrlRewritingTest extends WebTestBase {
     // Install French language.
     $edit = array();
     $edit['predefined_langcode'] = 'fr';
-    $this->drupalPost('admin/config/regional/language/add', $edit, t('Add language'));
+    $this->drupalPostForm('admin/config/regional/language/add', $edit, t('Add language'));
 
     // Enable URL language detection and selection.
     $edit = array('language_interface[enabled][language-url]' => 1);
-    $this->drupalPost('admin/config/regional/language/detection', $edit, t('Save settings'));
+    $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
 
     // Reset static caching.
     drupal_static_reset('language_list');
@@ -56,13 +56,13 @@ class LanguageUrlRewritingTest extends WebTestBase {
   function testUrlRewritingEdgeCases() {
     // Check URL rewriting with a non-installed language.
     $non_existing = language_default();
-    $non_existing->langcode = $this->randomName();
+    $non_existing->id = $this->randomName();
     $this->checkUrl($non_existing, 'Path language is ignored if language is not installed.', 'URL language negotiation does not work with non-installed languages');
 
     $request = $this->prepareRequestForGenerator();
     // Check that URL rewriting is not applied to subrequests.
     $this->drupalGet('language_test/subrequest');
-    $this->assertText($this->web_user->name, 'Page correctly retrieved');
+    $this->assertText($this->web_user->getUsername(), 'Page correctly retrieved');
   }
 
   /**
@@ -90,7 +90,7 @@ class LanguageUrlRewritingTest extends WebTestBase {
     // If the rewritten URL has not a language prefix we pick a random prefix so
     // we can always check the prefixed URL.
     $prefixes = language_negotiation_url_prefixes();
-    $stored_prefix = isset($prefixes[$language->langcode]) ? $prefixes[$language->langcode] : $this->randomName();
+    $stored_prefix = isset($prefixes[$language->id]) ? $prefixes[$language->id] : $this->randomName();
     if ($this->assertNotEqual($stored_prefix, $prefix, $message1)) {
       $prefix = $stored_prefix;
     }
@@ -108,13 +108,13 @@ class LanguageUrlRewritingTest extends WebTestBase {
       'language_negotiation_url_part' => LANGUAGE_NEGOTIATION_URL_DOMAIN,
       'domain[fr]' => $language_domain
     );
-    $this->drupalPost('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
     // Rebuild the container so that the new language gets picked up by services
     // that hold the list of languages.
     $this->rebuildContainer();
 
     // Enable domain configuration.
-    config('language.negotiation')
+    \Drupal::config('language.negotiation')
       ->set('url.source', LANGUAGE_NEGOTIATION_URL_DOMAIN)
       ->save();
 

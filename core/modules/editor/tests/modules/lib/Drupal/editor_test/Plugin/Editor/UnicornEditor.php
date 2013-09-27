@@ -10,7 +10,7 @@ namespace Drupal\editor_test\Plugin\Editor;
 use Drupal\editor\Plugin\EditorBase;
 use Drupal\editor\Annotation\Editor;
 use Drupal\Core\Annotation\Translation;
-use Drupal\editor\Plugin\Core\Entity\Editor as EditorEntity;
+use Drupal\editor\Entity\Editor as EditorEntity;
 
 /**
  * Defines a Unicorn-powered text editor for Drupal.
@@ -34,7 +34,11 @@ class UnicornEditor extends EditorBase {
    * Implements \Drupal\editor\Plugin\EditPluginInterface::settingsForm().
    */
   function settingsForm(array $form, array &$form_state, EditorEntity $editor) {
-    $form['foo'] = array('#type' => 'textfield', '#default_value' => 'bar');
+    $form['foo'] = array(
+      '#title' => t('Foo'),
+      '#type' => 'textfield',
+      '#default_value' => 'bar',
+    );
     return $form;
   }
 

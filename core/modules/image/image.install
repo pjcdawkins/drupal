@@ -5,9 +5,6 @@
  * Install, update and uninstall functions for the image module.
  */
 
-use Drupal\Component\Uuid\Uuid;
-use Drupal\field\Plugin\Core\Entity\Field;
-
 /**
  * Implements hook_install().
  */
@@ -23,53 +20,6 @@ function image_install() {
 function image_uninstall() {
   // Remove the styles directory and generated images.
   file_unmanaged_delete_recursive(file_default_scheme() . '://styles');
-}
-
-/**
- * Implements hook_field_schema().
- */
-function image_field_schema($field) {
-  return array(
-    'columns' => array(
-      'target_id' => array(
-        'description' => 'The ID of the target entity.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'unsigned' => TRUE,
-      ),
-      'alt' => array(
-        'description' => "Alternative image text, for the image's 'alt' attribute.",
-        'type' => 'varchar',
-        'length' => 512,
-        'not null' => FALSE,
-      ),
-      'title' => array(
-        'description' => "Image title text, for the image's 'title' attribute.",
-        'type' => 'varchar',
-        'length' => 1024,
-        'not null' => FALSE,
-      ),
-      'width' => array(
-        'description' => 'The width of the image in pixels.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-      ),
-      'height' => array(
-        'description' => 'The height of the image in pixels.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-      ),
-    ),
-    'indexes' => array(
-      'target_id' => array('target_id'),
-    ),
-    'foreign keys' => array(
-      'target_id' => array(
-        'table' => 'file_managed',
-        'columns' => array('target_id' => 'fid'),
-      ),
-    ),
-  );
 }
 
 /**
@@ -126,14 +76,19 @@ function _image_update_get_style_with_effects(array $style) {
     ->condition('isid', $style['isid'])
     ->execute();
   foreach ($result as $effect) {
-    unset($effect['isid']);
     $effect['data'] = unserialize($effect['data']);
 
     // Generate a unique image effect ID for the effect.
-    $uuid = new Uuid();
-    $effect['ieid'] = $uuid->generate();
+    $uuid = \Drupal::service('uuid');
+    $effect['uuid'] = $uuid->generate();
 
-    $effects[$effect['ieid']] = $effect;
+    // Use 'id' instead of 'name'.
+    $effect['id'] = $effect['name'];
+
+    // Clear out legacy keys.
+    unset($effect['isid'], $effect['ieid'], $effect['name']);
+
+    $effects[$effect['uuid']] = $effect;
   }
   return $effects;
 }
@@ -154,7 +109,7 @@ function image_update_8000() {
 
   // Convert each style into a configuration object.
   foreach ($styles as $name => $style) {
-    $config = config('image.style.' . $name);
+    $config = \Drupal::config('image.style.' . $name);
     $config->set('name', $name);
     $config->set('effects', $style['effects']);
     $config->save();

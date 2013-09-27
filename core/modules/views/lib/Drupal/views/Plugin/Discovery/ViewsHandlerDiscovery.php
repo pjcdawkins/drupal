@@ -7,7 +7,7 @@
 
 namespace Drupal\views\Plugin\Discovery;
 
-use Drupal\Component\Plugin\Discovery\AnnotatedClassDiscovery;
+use Drupal\Core\Plugin\Discovery\AnnotatedClassDiscovery;
 
 /**
  * Defines a discovery mechanism to find Views handlers in PSR-0 namespaces.
@@ -22,13 +22,6 @@ class ViewsHandlerDiscovery extends AnnotatedClassDiscovery {
   protected $type;
 
   /**
-   * An object containing the namespaces to look for plugin implementations.
-   *
-   * @var \Traversable
-   */
-  protected $rootNamespacesIterator;
-
-  /**
    * Constructs a ViewsHandlerDiscovery object.
    *
    * @param string $type
@@ -39,16 +32,7 @@ class ViewsHandlerDiscovery extends AnnotatedClassDiscovery {
    */
   function __construct($type, \Traversable $root_namespaces) {
     $this->type = $type;
-    $this->rootNamespacesIterator = $root_namespaces;
-
-    $annotation_namespaces = array(
-      'Drupal\Component\Annotation' => DRUPAL_ROOT . '/core/lib',
-    );
-    $plugin_namespaces = array();
-    foreach ($root_namespaces as $namespace => $dir) {
-      $plugin_namespaces["$namespace\\Plugin\\views\\{$type}"] = array($dir);
-    }
-    parent::__construct($plugin_namespaces, $annotation_namespaces, 'Drupal\Component\Annotation\PluginID');
+    parent::__construct("Plugin/views/$type", $root_namespaces, 'Drupal\Component\Annotation\PluginID');
   }
 
   /**
@@ -61,18 +45,6 @@ class ViewsHandlerDiscovery extends AnnotatedClassDiscovery {
       $definitions[$key]['plugin_type'] = $this->type;
     }
     return $definitions;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function getPluginNamespaces() {
-    $plugin_namespaces = array();
-    foreach ($this->rootNamespacesIterator as $namespace => $dir) {
-      $plugin_namespaces["$namespace\\Plugin\\views\\{$this->type}"] = array($dir);
-    }
-
-    return $plugin_namespaces;
   }
 
 }

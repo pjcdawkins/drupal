@@ -39,11 +39,11 @@ abstract class UserTestBase extends ViewTestBase {
   protected function setUp() {
     parent::setUp();
 
-    ViewTestData::importTestViews(get_class($this), array('user_test_views'));
+    ViewTestData::createTestViews(get_class($this), array('user_test_views'));
 
     $this->users[] = $this->drupalCreateUser();
     $this->users[] = user_load(1);
-    $this->nodes[] = $this->drupalCreateNode(array('uid' => $this->users[0]->uid));
+    $this->nodes[] = $this->drupalCreateNode(array('uid' => $this->users[0]->id()));
     $this->nodes[] = $this->drupalCreateNode(array('uid' => 1));
   }
 

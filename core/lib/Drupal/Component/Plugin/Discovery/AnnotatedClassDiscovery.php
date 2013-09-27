@@ -7,10 +7,8 @@
 
 namespace Drupal\Component\Plugin\Discovery;
 
-use DirectoryIterator;
-use Drupal\Component\Plugin\Discovery\DiscoveryInterface;
+use Doctrine\Common\Annotations\SimpleAnnotationReader;
 use Drupal\Component\Reflection\MockFileFinder;
-use Doctrine\Common\Annotations\AnnotationReader;
 use Doctrine\Common\Annotations\AnnotationRegistry;
 use Doctrine\Common\Reflection\StaticReflectionParser;
 
@@ -27,13 +25,6 @@ class AnnotatedClassDiscovery implements DiscoveryInterface {
   protected $pluginNamespaces;
 
   /**
-   * The namespaces of classes that can be used as annotations.
-   *
-   * @var array
-   */
-  protected $annotationNamespaces;
-
-  /**
    * The name of the annotation that contains the plugin definition.
    *
    * The class corresponding to this name must implement
@@ -44,22 +35,42 @@ class AnnotatedClassDiscovery implements DiscoveryInterface {
   protected $pluginDefinitionAnnotationName;
 
   /**
+   * The doctrine annotation reader.
+   *
+   * @var \Doctrine\Common\Annotations\Reader
+   */
+  protected $annotationReader;
+
+  /**
    * Constructs an AnnotatedClassDiscovery object.
    *
    * @param array $plugin_namespaces
    *   (optional) An array of namespace that may contain plugin implementations.
    *   Defaults to an empty array.
-   * @param array $annotation_namespaces
-   *   (optional) The namespaces of classes that can be used as annotations.
-   *   Defaults to an empty array.
    * @param string $plugin_definition_annotation_name
    *   (optional) The name of the annotation that contains the plugin definition.
    *   Defaults to 'Drupal\Component\Annotation\Plugin'.
    */
-  function __construct($plugin_namespaces = array(), $annotation_namespaces = array(), $plugin_definition_annotation_name = 'Drupal\Component\Annotation\Plugin') {
+  function __construct($plugin_namespaces = array(), $plugin_definition_annotation_name = 'Drupal\Component\Annotation\Plugin') {
     $this->pluginNamespaces = $plugin_namespaces;
-    $this->annotationNamespaces = $annotation_namespaces;
     $this->pluginDefinitionAnnotationName = $plugin_definition_annotation_name;
+  }
+
+  /**
+   * Returns the used doctrine annotation reader.
+   *
+   * @return \Doctrine\Common\Annotations\Reader
+   *   The annotation reader.
+   */
+  protected function getAnnotationReader() {
+    if (!isset($this->annotationReader)) {
+      $this->annotationReader = new SimpleAnnotationReader();
+
+      // Add the namespaces from the main plugin annotation, like @EntityType.
+      $namespace = substr($this->pluginDefinitionAnnotationName, 0, strrpos($this->pluginDefinitionAnnotationName, '\\'));
+      $this->annotationReader->addNamespace($namespace);
+    }
+    return $this->annotationReader;
   }
 
   /**
@@ -75,19 +86,20 @@ class AnnotatedClassDiscovery implements DiscoveryInterface {
    */
   public function getDefinitions() {
     $definitions = array();
-    $reader = new AnnotationReader();
-    // Prevent @endlink from being parsed as an annotation.
-    $reader->addGlobalIgnoredName('endlink');
 
+    $reader = $this->getAnnotationReader();
+
+    // Clear the annotation loaders of any previous annotation classes.
+    AnnotationRegistry::reset();
     // Register the namespaces of classes that can be used for annotations.
-    AnnotationRegistry::registerAutoloadNamespaces($this->getAnnotationNamespaces());
+    AnnotationRegistry::registerLoader('class_exists');
 
     // Search for classes within all PSR-0 namespace locations.
     foreach ($this->getPluginNamespaces() as $namespace => $dirs) {
       foreach ($dirs as $dir) {
         $dir .= DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $namespace);
         if (file_exists($dir)) {
-          foreach (new DirectoryIterator($dir) as $fileinfo) {
+          foreach (new \DirectoryIterator($dir) as $fileinfo) {
             // @todo Once core requires 5.3.6, use $fileinfo->getExtension().
             if (pathinfo($fileinfo->getFilename(), PATHINFO_EXTENSION) == 'php') {
               $class = $namespace . '\\' . $fileinfo->getBasename('.php');
@@ -110,6 +122,10 @@ class AnnotatedClassDiscovery implements DiscoveryInterface {
         }
       }
     }
+
+    // Don't let annotation loaders pile up.
+    AnnotationRegistry::reset();
+
     return $definitions;
   }
 
@@ -118,13 +134,6 @@ class AnnotatedClassDiscovery implements DiscoveryInterface {
    */
   protected function getPluginNamespaces() {
     return $this->pluginNamespaces;
-  }
-
-  /**
-   * Returns an array of PSR-0 namespaces to search for annotation classes.
-   */
-  protected function getAnnotationNamespaces() {
-    return $this->annotationNamespaces;
   }
 
 }

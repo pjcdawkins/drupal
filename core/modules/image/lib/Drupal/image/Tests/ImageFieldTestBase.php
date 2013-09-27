@@ -7,7 +7,6 @@
 
 namespace Drupal\image\Tests;
 
-use Drupal\Core\Language\Language;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -15,15 +14,11 @@ use Drupal\simpletest\WebTestBase;
  *
  * image.effects.inc:
  *   image_style_generate()
- *   image_style_create_derivative()
+ *   \Drupal\image\ImageStyleInterface::createDerivative()
  *
  * image.module:
  *   image_style_options()
- *   image_style_flush()
- *   image_effect_definition_load()
- *   image_effect_load()
- *   image_effect_save()
- *   image_effect_delete()
+ *   \Drupal\image\ImageStyleInterface::flush()
  *   image_filter_keyword()
  */
 
@@ -70,7 +65,8 @@ abstract class ImageFieldTestBase extends WebTestBase {
    */
   function createImageField($name, $type_name, $field_settings = array(), $instance_settings = array(), $widget_settings = array()) {
     $field = array(
-      'field_name' => $name,
+      'name' => $name,
+      'entity_type' => 'node',
       'type' => 'image',
       'settings' => array(),
       'cardinality' => !empty($field_settings['cardinality']) ? $field_settings['cardinality'] : 1,
@@ -79,9 +75,9 @@ abstract class ImageFieldTestBase extends WebTestBase {
     entity_create('field_entity', $field)->save();
 
     $instance = array(
-      'field_name' => $field['field_name'],
-      'entity_type' => 'node',
+      'field_name' => $field['name'],
       'label' => $name,
+      'entity_type' => 'node',
       'bundle' => $type_name,
       'required' => !empty($instance_settings['required']),
       'description' => !empty($instance_settings['description']) ? $instance_settings['description'] : '',
@@ -92,14 +88,14 @@ abstract class ImageFieldTestBase extends WebTestBase {
     $field_instance->save();
 
     entity_get_form_display('node', $type_name, 'default')
-      ->setComponent($field['field_name'], array(
+      ->setComponent($field['name'], array(
         'type' => 'image_image',
         'settings' => $widget_settings,
       ))
       ->save();
 
     entity_get_display('node', $type_name, 'default')
-      ->setComponent($field['field_name'])
+      ->setComponent($field['name'])
       ->save();
 
     return $field_instance;
@@ -120,8 +116,8 @@ abstract class ImageFieldTestBase extends WebTestBase {
     $edit = array(
       'title' => $this->randomName(),
     );
-    $edit['files[' . $field_name . '_' . Language::LANGCODE_NOT_SPECIFIED . '_0]'] = drupal_realpath($image->uri);
-    $this->drupalPost('node/add/' . $type, $edit, t('Save and publish'));
+    $edit['files[' . $field_name . '_0]'] = drupal_realpath($image->uri);
+    $this->drupalPostForm('node/add/' . $type, $edit, t('Save and publish'));
 
     // Retrieve ID of the newly created node from the current URL.
     $matches = array();

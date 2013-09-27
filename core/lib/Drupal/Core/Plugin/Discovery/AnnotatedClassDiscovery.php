@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\Core\Plugin\Discovery\AnnotatedClassDiscovery.
+ * Contains \Drupal\Core\Plugin\Discovery\AnnotatedClassDiscovery.
  */
 
 namespace Drupal\Core\Plugin\Discovery;
@@ -15,18 +15,14 @@ use Drupal\Component\Plugin\Discovery\AnnotatedClassDiscovery as ComponentAnnota
 class AnnotatedClassDiscovery extends ComponentAnnotatedClassDiscovery {
 
   /**
-   * The module name that defines the plugin type.
+   * The subdirectory within a namespace to look for plugins.
+   *
+   * If the plugins are in the top level of the namespace and not within a
+   * subdirectory, set this to an empty string.
    *
    * @var string
    */
-  protected $owner;
-
-  /**
-   * The plugin type, for example filter.
-   *
-   * @var string
-   */
-  protected $type;
+  protected $subdir = '';
 
   /**
    * An object containing the namespaces to look for plugin implementations.
@@ -39,27 +35,37 @@ class AnnotatedClassDiscovery extends ComponentAnnotatedClassDiscovery {
    * Constructs an AnnotatedClassDiscovery object.
    *
    * @param string $subdir
-   *   The plugin's subdirectory, for example views/filter.
+   *   Either the plugin's subdirectory, for example 'Plugin/views/filter', or
+   *   empty string if plugins are located at the top level of the namespace.
    * @param \Traversable $root_namespaces
    *   An object that implements \Traversable which contains the root paths
-   *   keyed by the corresponding namespace to look for plugin implementations,
-   *   \Plugin\$subdir will be appended to each namespace.
-   * @param array $annotation_namespaces
-   *   (optional) The namespaces of classes that can be used as annotations.
-   *   Defaults to an empty array.
+   *   keyed by the corresponding namespace to look for plugin implementations.
+   *   If $subdir is not an empty string, it will be appended to each namespace.
    * @param string $plugin_definition_annotation_name
    *   (optional) The name of the annotation that contains the plugin definition.
    *   Defaults to 'Drupal\Component\Annotation\Plugin'.
    */
-  function __construct($subdir, \Traversable $root_namespaces, $annotation_namespaces = array(), $plugin_definition_annotation_name = 'Drupal\Component\Annotation\Plugin') {
-    $this->subdir = str_replace('/', '\\', $subdir);
+  function __construct($subdir, \Traversable $root_namespaces, $plugin_definition_annotation_name = 'Drupal\Component\Annotation\Plugin') {
+    if ($subdir) {
+      $this->subdir = str_replace('/', '\\', $subdir);
+    }
     $this->rootNamespacesIterator = $root_namespaces;
-    $annotation_namespaces += array(
-      'Drupal\Component\Annotation' => DRUPAL_ROOT . '/core/lib',
-      'Drupal\Core\Annotation' => DRUPAL_ROOT . '/core/lib',
-    );
     $plugin_namespaces = array();
-    parent::__construct($plugin_namespaces, $annotation_namespaces, $plugin_definition_annotation_name);
+    parent::__construct($plugin_namespaces, $plugin_definition_annotation_name);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getAnnotationReader() {
+    if (!isset($this->annotationReader)) {
+      $reader = parent::getAnnotationReader();
+
+      // Add the Core annotation classes like @Translation.
+      $reader->addNamespace('Drupal\Core\Annotation', array(DRUPAL_ROOT . '/core/lib/Drupal/Core/Annotation'));
+      $this->annotationReader = $reader;
+    }
+    return $this->annotationReader;
   }
 
   /**
@@ -101,7 +107,10 @@ class AnnotatedClassDiscovery extends ComponentAnnotatedClassDiscovery {
   protected function getPluginNamespaces() {
     $plugin_namespaces = array();
     foreach ($this->rootNamespacesIterator as $namespace => $dir) {
-      $plugin_namespaces["$namespace\\Plugin\\{$this->subdir}"] = array($dir);
+      if ($this->subdir) {
+        $namespace .= "\\{$this->subdir}";
+      }
+      $plugin_namespaces[$namespace] = array($dir);
     }
 
     return $plugin_namespaces;

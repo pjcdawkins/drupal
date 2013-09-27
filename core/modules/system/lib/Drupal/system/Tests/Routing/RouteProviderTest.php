@@ -95,7 +95,7 @@ class RouteProviderTest extends UnitTestBase {
     $routes = $provider->getRouteCollectionForRequest($request);
 
     foreach ($routes as $route) {
-      $this->assertEqual($route->getPattern(), $path, 'Found path has correct pattern');
+      $this->assertEqual($route->getPath(), $path, 'Found path has correct pattern');
     }
   }
 
@@ -260,8 +260,10 @@ class RouteProviderTest extends UnitTestBase {
 
     try {
       $routes = $provider->getRouteCollectionForRequest($request);
+      $routes_array = $routes->all();
 
       $this->assertEqual(count($routes), 2, 'The correct number of routes was found.');
+      $this->assertEqual(array('narf', 'poink'), array_keys($routes_array), 'Ensure the fitness was taken into account.');
       $this->assertNotNull($routes->get('narf'), 'The first matching route was found.');
       $this->assertNotNull($routes->get('poink'), 'The second matching route was found.');
       $this->assertNull($routes->get('eep'), 'Noin-matching route was not found.');
@@ -327,7 +329,7 @@ class RouteProviderTest extends UnitTestBase {
       $routes = $provider->getRoutesByPattern($path);
       $this->assertFalse(count($routes), 'No path found with this pattern.');
 
-      $routes = $provider->getRouteCollectionForRequest($request);
+      $provider->getRouteCollectionForRequest($request);
       $this->fail(t('No exception was thrown.'));
     }
     catch (\Exception $e) {
@@ -336,7 +338,7 @@ class RouteProviderTest extends UnitTestBase {
   }
 
   /**
-   * Confirms that system_path attribute overrides request path.
+   * Confirms that _system_path attribute overrides request path.
    */
   function testSystemPathMatch() {
     $connection = Database::getConnection();
@@ -349,14 +351,14 @@ class RouteProviderTest extends UnitTestBase {
     $dumper->dump();
 
     $request = Request::create('/path/one', 'GET');
-    $request->attributes->set('system_path', 'path/two');
+    $request->attributes->set('_system_path', 'path/two');
 
     $routes_by_pattern = $provider->getRoutesByPattern('/path/two');
     $routes = $provider->getRouteCollectionForRequest($request);
     $this->assertEqual(array_keys($routes_by_pattern->all()), array_keys($routes->all()), 'Ensure the expected routes are found.');
 
     foreach ($routes as $route) {
-      $this->assertEqual($route->getPattern(), '/path/two', 'Found path has correct pattern');
+      $this->assertEqual($route->getPath(), '/path/two', 'Found path has correct pattern');
     }
   }
 
@@ -374,10 +376,10 @@ class RouteProviderTest extends UnitTestBase {
     $dumper->dump();
 
     $route = $provider->getRouteByName('route_a');
-    $this->assertEqual($route->getPattern(), '/path/one', 'The right route pattern was found.');
+    $this->assertEqual($route->getPath(), '/path/one', 'The right route pattern was found.');
     $this->assertEqual($route->getRequirement('_method'), 'GET', 'The right route method was found.');
     $route = $provider->getRouteByName('route_b');
-    $this->assertEqual($route->getPattern(), '/path/one', 'The right route pattern was found.');
+    $this->assertEqual($route->getPath(), '/path/one', 'The right route pattern was found.');
     $this->assertEqual($route->getRequirement('_method'), 'PUT', 'The right route method was found.');
 
     $exception_thrown = FALSE;
@@ -391,8 +393,8 @@ class RouteProviderTest extends UnitTestBase {
 
     $routes = $provider->getRoutesByNames(array('route_c', 'route_d', $this->randomName()));
     $this->assertEqual(count($routes), 2, 'Only two valid routes found.');
-    $this->assertEqual($routes['route_c']->getPattern(), '/path/two');
-    $this->assertEqual($routes['route_d']->getPattern(), '/path/three');
+    $this->assertEqual($routes['route_c']->getPath(), '/path/two');
+    $this->assertEqual($routes['route_d']->getPath(), '/path/three');
   }
 
 }

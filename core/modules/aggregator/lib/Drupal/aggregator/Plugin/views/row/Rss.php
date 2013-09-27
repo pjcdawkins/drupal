@@ -8,15 +8,14 @@
 namespace Drupal\aggregator\Plugin\views\row;
 
 use Drupal\views\Plugin\views\row\RowPluginBase;
-use Drupal\Component\Annotation\Plugin;
+use Drupal\views\Annotation\ViewsRow;
 use Drupal\Core\Annotation\Translation;
 
 /**
  * Defines a row plugin which loads an aggregator item and renders as RSS.
  *
- * @Plugin(
+ * @ViewsRow(
  *   id = "aggregator_rss",
- *   module = "aggregator",
  *   theme = "views_view_row_rss",
  *   title = @Translation("Aggregator item"),
  *   help = @Translation("Display the aggregator item using the data from the original source."),
@@ -71,7 +70,7 @@ class Rss extends RowPluginBase {
   /**
    * {@inheritdoc}
    */
-  function render($row) {
+  public function render($row) {
     $entity = $row->_entity;
 
     $item = new \stdClass();
@@ -99,11 +98,13 @@ class Rss extends RowPluginBase {
       ),
     );
 
-    return theme($this->themeFunctions(), array(
-      'view' => $this->view,
-      'options' => $this->options,
-      'row' => $item,
-    ));
+    $build = array(
+      '#theme' => $this->themeFunctions(),
+      '#view' => $this->view,
+      '#options' => $this->options,
+      '#row' => $item,
+    );
+    return drupal_render($build);
   }
 
 }

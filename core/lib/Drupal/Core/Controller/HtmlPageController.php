@@ -7,6 +7,8 @@
 
 namespace Drupal\Core\Controller;
 
+use Drupal\Core\StringTranslation\TranslationInterface;
+use Symfony\Cmf\Component\Routing\RouteObjectInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
@@ -24,12 +26,42 @@ class HtmlPageController {
   protected $httpKernel;
 
   /**
+   * The controller resolver.
+   *
+   * @var \Drupal\Core\Controller\ControllerResolverInterface
+   */
+  protected $controllerResolver;
+
+  /**
+   * The translation manager service.
+   *
+   * @var \Drupal\Core\StringTranslation\TranslationInterface
+   */
+  protected $translationManager;
+
+  /**
+   * The title resolver.
+   *
+   * @var \Drupal\Core\Controller\TitleResolver
+   */
+  protected $titleResolver;
+
+  /**
    * Constructs a new HtmlPageController.
    *
    * @param \Symfony\Component\HttpKernel\HttpKernelInterface $kernel
+   * @param \Drupal\Core\Controller\ControllerResolverInterface $controller_resolver
+   *   The controller resolver.
+   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation_manager
+   *   The translation manager.
+   * @param \Drupal\Core\Controller\TitleResolver $title_resolver
+   *   The title resolver.
    */
-  public function __construct(HttpKernelInterface $kernel) {
+  public function __construct(HttpKernelInterface $kernel, ControllerResolverInterface $controller_resolver, TranslationInterface $translation_manager, TitleResolver $title_resolver) {
     $this->httpKernel = $kernel;
+    $this->controllerResolver = $controller_resolver;
+    $this->translationManager = $translation_manager;
+    $this->titleResolver = $title_resolver;
   }
 
   /**
@@ -44,28 +76,36 @@ class HtmlPageController {
    *   A response object.
    */
   public function content(Request $request, $_content) {
-
-    // @todo When we have a Generator, we can replace the forward() call with
-    // a render() call, which would handle ESI and hInclude as well.  That will
-    // require an _internal route.  For examples, see:
-    // https://github.com/symfony/symfony/blob/master/src/Symfony/Bundle/FrameworkBundle/Resources/config/routing/internal.xml
-    // https://github.com/symfony/symfony/blob/master/src/Symfony/Bundle/FrameworkBundle/Controller/InternalController.php
-    $attributes = clone $request->attributes;
-    $controller = $_content;
-
-    // We need to clean off the derived information and such so that the
-    // subrequest can be processed properly without leaking data through.
-    $attributes->remove('system_path');
-    $attributes->remove('_content');
-
-    $response = $this->httpKernel->forward($controller, $attributes->all(), $request->query->all());
-
-    // For successful (HTTP status 200) responses, decorate with blocks.
-    if ($response->isOk()) {
-      $page_content = $response->getContent();
-      $response = new Response(drupal_render_page($page_content));
+    $callable = $this->controllerResolver->getControllerFromDefinition($_content);
+    $arguments = $this->controllerResolver->getArguments($request, $callable);
+    $page_content = call_user_func_array($callable, $arguments);
+    if ($page_content instanceof Response) {
+      return $page_content;
+    }
+    if (!is_array($page_content)) {
+      $page_content = array(
+        '#markup' => $page_content,
+      );
+    }
+    if (!isset($page_content['#title'])) {
+      $title = $this->titleResolver->getTitle($request, $request->attributes->get(RouteObjectInterface::ROUTE_OBJECT));
+      // Ensure that #title will not be set if no title was returned.
+      if (isset($title)) {
+        $page_content['#title'] = $title;
+      }
     }
 
+    $response = new Response(drupal_render_page($page_content));
     return $response;
   }
+
+  /**
+   * Translates a string to the current language or to a given language.
+   *
+   * See the t() documentation for details.
+   */
+  protected function t($string, array $args = array(), array $options = array()) {
+    return $this->translationManager->translate($string, $args, $options);
+  }
+
 }

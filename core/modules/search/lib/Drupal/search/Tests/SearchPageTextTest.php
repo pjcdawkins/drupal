@@ -41,13 +41,13 @@ class SearchPageTextTest extends SearchTestBase {
 
     $edit = array();
     $edit['keys'] = 'bike shed ' . $this->randomName();
-    $this->drupalPost('search/node', $edit, t('Search'));
+    $this->drupalPostForm('search/node', $edit, t('Search'));
     $this->assertText(t('Consider loosening your query with OR. bike OR shed will often show more results than bike shed.'), 'Help text is displayed when search returns no results.');
     $this->assertText(t('Search'));
     $this->assertTitle($title, 'Search page title is correct');
 
-    $edit['keys'] = $this->searching_user->name;
-    $this->drupalPost('search/user', $edit, t('Search'));
+    $edit['keys'] = $this->searching_user->getUsername();
+    $this->drupalPostForm('search/user', $edit, t('Search'));
     $this->assertText(t('Search'));
     $this->assertTitle($title, 'Search page title is correct');
 
@@ -60,7 +60,7 @@ class SearchPageTextTest extends SearchTestBase {
 
     // Test a search input exceeding the limit of AND/OR combinations to test
     // the Denial-of-Service protection.
-    $limit = config('search.settings')->get('and_or_limit');
+    $limit = \Drupal::config('search.settings')->get('and_or_limit');
     $keys = array();
     for ($i = 0; $i < $limit + 1; $i++) {
       $keys[] = $this->randomName(3);
@@ -69,7 +69,7 @@ class SearchPageTextTest extends SearchTestBase {
       }
     }
     $edit['keys'] = implode(' ', $keys);
-    $this->drupalPost('search/node', $edit, t('Search'));
+    $this->drupalPostForm('search/node', $edit, t('Search'));
     $this->assertRaw(t('Your search used too many AND/OR expressions. Only the first @count terms were included in this search.', array('@count' => $limit)));
   }
 }

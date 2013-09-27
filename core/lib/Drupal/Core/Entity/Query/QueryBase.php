@@ -8,6 +8,7 @@
 namespace Drupal\Core\Entity\Query;
 
 use Drupal\Core\Database\Query\PagerSelectExtender;
+use Drupal\Core\Entity\EntityStorageControllerInterface;
 
 /**
  * The base entity query class.
@@ -101,11 +102,12 @@ abstract class QueryBase {
   /**
    * Flag indicating whether to query the current revision or all revisions.
    *
-   * Can be either FIELD_LOAD_CURRENT or FIELD_LOAD_REVISION.
+   * Can be either EntityStorageControllerInterface::FIELD_LOAD_CURRENT or
+   * EntityStorageControllerInterface::FIELD_LOAD_REVISION.
    *
    * @var string
    */
-  protected $age = FIELD_LOAD_CURRENT;
+  protected $age = EntityStorageControllerInterface::FIELD_LOAD_CURRENT;
 
   /**
    * The query pager data.
@@ -171,6 +173,23 @@ abstract class QueryBase {
   }
 
   /**
+   * Creates an object holding a group of conditions.
+   *
+   * See andConditionGroup() and orConditionGroup() for more.
+   *
+   * @param string $conjunction
+   *   - AND (default): this is the equivalent of andConditionGroup().
+   *   - OR: this is the equivalent of orConditionGroup().
+   *
+   * @return \Drupal\Core\Entity\Query\ConditionInterface
+   *   An object holding a group of conditions.
+   */
+  protected function conditionGroupFactory($conjunction = 'AND') {
+    $class = static::getNamespace($this) . '\\Condition';
+    return new $class($conjunction, $this);
+  }
+
+  /**
    * Implements \Drupal\Core\Entity\Query\QueryInterface::andConditionGroup().
    */
   public function andConditionGroup() {
@@ -215,7 +234,7 @@ abstract class QueryBase {
   /**
    * Implements \Drupal\Core\Entity\Query\QueryInterface::age().
    */
-  public function age($age = FIELD_LOAD_CURRENT) {
+  public function age($age = EntityStorageControllerInterface::FIELD_LOAD_CURRENT) {
     $this->age = $age;
     return $this;
   }
@@ -400,6 +419,20 @@ abstract class QueryBase {
    */
   protected function getAggregationAlias($field, $function) {
     return strtolower($field . '_'. $function);
+  }
+
+  /**
+   * Returns the namespace of an object.
+   *
+   * @param $object
+   *   The object.
+   *
+   * @return string
+   *   The namespace.
+   */
+  public static function getNamespace($object) {
+    $class = get_class($object);
+    return substr($class, 0, strrpos($class, '\\'));
   }
 
 }

@@ -91,11 +91,11 @@ class BookTest extends WebTestBase {
      *  |- Node 4
      */
     $nodes = array();
-    $nodes[] = $this->createBookNode($book->nid); // Node 0.
-    $nodes[] = $this->createBookNode($book->nid, $nodes[0]->book['mlid']); // Node 1.
-    $nodes[] = $this->createBookNode($book->nid, $nodes[0]->book['mlid']); // Node 2.
-    $nodes[] = $this->createBookNode($book->nid); // Node 3.
-    $nodes[] = $this->createBookNode($book->nid); // Node 4.
+    $nodes[] = $this->createBookNode($book->id()); // Node 0.
+    $nodes[] = $this->createBookNode($book->id(), $nodes[0]->book['mlid']); // Node 1.
+    $nodes[] = $this->createBookNode($book->id(), $nodes[0]->book['mlid']); // Node 2.
+    $nodes[] = $this->createBookNode($book->id()); // Node 3.
+    $nodes[] = $this->createBookNode($book->id()); // Node 4.
 
     $this->drupalLogout();
 
@@ -126,9 +126,9 @@ class BookTest extends WebTestBase {
     // Create a second book, and move an existing book page into it.
     $this->drupalLogin($this->book_author);
     $other_book = $this->createBookNode('new');
-    $node = $this->createBookNode($book->nid);
-    $edit = array('book[bid]' => $other_book->nid);
-    $this->drupalPost('node/' . $node->nid . '/edit', $edit, t('Save'));
+    $node = $this->createBookNode($book->id());
+    $edit = array('book[bid]' => $other_book->id());
+    $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save'));
 
     $this->drupalLogout();
     $this->drupalLogin($this->web_user);
@@ -163,7 +163,7 @@ class BookTest extends WebTestBase {
     // $number does not use drupal_static as it should not be reset
     // since it uniquely identifies each call to checkBookNode().
     static $number = 0;
-    $this->drupalGet('node/' . $node->nid);
+    $this->drupalGet('node/' . $node->id());
 
     // Check outline structure.
     if ($nodes !== NULL) {
@@ -175,22 +175,22 @@ class BookTest extends WebTestBase {
 
     // Check previous, up, and next links.
     if ($previous) {
-      $this->assertRaw(l('<b>‹</b> ' . $previous->label(), 'node/' . $previous->nid, array('html' => TRUE, 'attributes' => array('rel' => array('prev'), 'title' => t('Go to previous page')))), 'Previous page link found.');
+      $this->assertRaw(l('<b>‹</b> ' . $previous->label(), 'node/' . $previous->id(), array('html' => TRUE, 'attributes' => array('rel' => array('prev'), 'title' => t('Go to previous page')))), 'Previous page link found.');
     }
 
     if ($up) {
-      $this->assertRaw(l('Up', 'node/' . $up->nid, array('html'=> TRUE, 'attributes' => array('title' => t('Go to parent page')))), 'Up page link found.');
+      $this->assertRaw(l('Up', 'node/' . $up->id(), array('html'=> TRUE, 'attributes' => array('title' => t('Go to parent page')))), 'Up page link found.');
     }
 
     if ($next) {
-      $this->assertRaw(l($next->label() . ' <b>›</b>', 'node/' . $next->nid, array('html'=> TRUE, 'attributes' => array('rel' => array('next'), 'title' => t('Go to next page')))), 'Next page link found.');
+      $this->assertRaw(l($next->label() . ' <b>›</b>', 'node/' . $next->id(), array('html'=> TRUE, 'attributes' => array('rel' => array('next'), 'title' => t('Go to next page')))), 'Next page link found.');
     }
 
     // Compute the expected breadcrumb.
     $expected_breadcrumb = array();
     $expected_breadcrumb[] = url('');
     foreach ($breadcrumb as $a_node) {
-      $expected_breadcrumb[] = url('node/' . $a_node->nid);
+      $expected_breadcrumb[] = url('node/' . $a_node->id());
     }
 
     // Fetch links in the current breadcrumb.
@@ -204,9 +204,9 @@ class BookTest extends WebTestBase {
     $this->assertIdentical($expected_breadcrumb, $got_breadcrumb, 'The breadcrumb is correctly displayed on the page.');
 
     // Check printer friendly version.
-    $this->drupalGet('book/export/html/' . $node->nid);
+    $this->drupalGet('book/export/html/' . $node->id());
     $this->assertText($node->label(), 'Printer friendly title found.');
-    $this->assertRaw(check_markup($node->body[Language::LANGCODE_NOT_SPECIFIED][0]['value'], $node->body[Language::LANGCODE_NOT_SPECIFIED][0]['format']), 'Printer friendly body found.');
+    $this->assertRaw($node->body->processed, 'Printer friendly body found.');
 
     $number++;
   }
@@ -223,10 +223,10 @@ class BookTest extends WebTestBase {
   function generateOutlinePattern($nodes) {
     $outline = '';
     foreach ($nodes as $node) {
-      $outline .= '(node\/' . $node->nid . ')(.*?)(' . $node->label() . ')(.*?)';
+      $outline .= '(node\/' . $node->id() . ')(.*?)(' . $node->label() . ')(.*?)';
     }
 
-    return '/<nav id="book-navigation-' . $this->book->nid . '"(.*?)<ul(.*?)' . $outline . '<\/ul>/s';
+    return '/<nav id="book-navigation-' . $this->book->id() . '"(.*?)<ul(.*?)' . $outline . '<\/ul>/s';
   }
 
   /**
@@ -243,19 +243,18 @@ class BookTest extends WebTestBase {
     static $number = 0; // Used to ensure that when sorted nodes stay in same order.
 
     $edit = array();
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     $edit["title"] = $number . ' - SimpleTest test node ' . $this->randomName(10);
-    $edit["body[$langcode][0][value]"] = 'SimpleTest test body ' . $this->randomName(32) . ' ' . $this->randomName(32);
+    $edit['body[0][value]'] = 'SimpleTest test body ' . $this->randomName(32) . ' ' . $this->randomName(32);
     $edit['book[bid]'] = $book_nid;
 
     if ($parent !== NULL) {
-      $this->drupalPost('node/add/book', $edit, t('Change book (update list of parents)'));
+      $this->drupalPostForm('node/add/book', $edit, t('Change book (update list of parents)'));
 
       $edit['book[plid]'] = $parent;
-      $this->drupalPost(NULL, $edit, t('Save'));
+      $this->drupalPostForm(NULL, $edit, t('Save'));
     }
     else {
-      $this->drupalPost('node/add/book', $edit, t('Save'));
+      $this->drupalPostForm('node/add/book', $edit, t('Save'));
     }
 
     // Check to make sure the book node was created.
@@ -275,17 +274,17 @@ class BookTest extends WebTestBase {
 
     // Login as web user and view printer-friendly version.
     $this->drupalLogin($this->web_user);
-    $this->drupalGet('node/' . $this->book->nid);
+    $this->drupalGet('node/' . $this->book->id());
     $this->clickLink(t('Printer-friendly version'));
 
     // Make sure each part of the book is there.
     foreach ($nodes as $node) {
       $this->assertText($node->label(), 'Node title found in printer friendly version.');
-      $this->assertRaw(check_markup($node->body[Language::LANGCODE_NOT_SPECIFIED][0]['value'], $node->body[Language::LANGCODE_NOT_SPECIFIED][0]['format']), 'Node body found in printer friendly version.');
+      $this->assertRaw($node->body->processed, 'Node body found in printer friendly version.');
     }
 
     // Make sure we can't export an unsupported format.
-    $this->drupalGet('book/export/foobar/' . $this->book->nid);
+    $this->drupalGet('book/export/foobar/' . $this->book->id());
     $this->assertResponse('404', 'Unsupported export format returned "not found".');
 
     // Make sure we get a 404 on a not existing book node.
@@ -296,18 +295,18 @@ class BookTest extends WebTestBase {
     $this->drupalLogout();
 
     // Load the book and verify there is no printer-friendly version link.
-    $this->drupalGet('node/' . $this->book->nid);
+    $this->drupalGet('node/' . $this->book->id());
     $this->assertNoLink(t('Printer-friendly version'), 'Anonymous user is not shown link to printer-friendly version.');
 
     // Try getting the URL directly, and verify it fails.
-    $this->drupalGet('book/export/html/' . $this->book->nid);
+    $this->drupalGet('book/export/html/' . $this->book->id());
     $this->assertResponse('403', 'Anonymous user properly forbidden.');
 
     // Now grant anonymous users permission to view the printer-friendly
     // version and verify that node access restrictions still prevent them from
     // seeing it.
     user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access printer-friendly version'));
-    $this->drupalGet('book/export/html/' . $this->book->nid);
+    $this->drupalGet('book/export/html/' . $this->book->id());
     $this->assertResponse('403', 'Anonymous user properly forbidden from seeing the printer-friendly version when denied by node access.');
   }
 
@@ -323,7 +322,7 @@ class BookTest extends WebTestBase {
     // Give anonymous users the permission 'node test view'.
     $edit = array();
     $edit[DRUPAL_ANONYMOUS_RID . '[node test view]'] = TRUE;
-    $this->drupalPost('admin/people/permissions/' . DRUPAL_ANONYMOUS_RID, $edit, t('Save permissions'));
+    $this->drupalPostForm('admin/people/permissions/' . DRUPAL_ANONYMOUS_RID, $edit, t('Save permissions'));
     $this->assertText(t('The changes have been saved.'), "Permission 'node test view' successfully assigned to anonymous users.");
 
     // Test correct display of the block.
@@ -344,7 +343,7 @@ class BookTest extends WebTestBase {
     // Give anonymous users the permission 'node test view'.
     $edit = array();
     $edit[DRUPAL_ANONYMOUS_RID . '[node test view]'] = TRUE;
-    $this->drupalPost('admin/people/permissions/' . DRUPAL_ANONYMOUS_RID, $edit, t('Save permissions'));
+    $this->drupalPostForm('admin/people/permissions/' . DRUPAL_ANONYMOUS_RID, $edit, t('Save permissions'));
     $this->assertText(t('The changes have been saved.'), "Permission 'node test view' successfully assigned to anonymous users.");
 
     // Create a book.
@@ -352,12 +351,12 @@ class BookTest extends WebTestBase {
 
     // Test correct display of the block to registered users.
     $this->drupalLogin($this->web_user);
-    $this->drupalGet('node/' . $this->book->nid);
+    $this->drupalGet('node/' . $this->book->id());
     $this->assertText($block->label(), 'Book navigation block is displayed to registered users.');
     $this->drupalLogout();
 
     // Test correct display of the block to anonymous users.
-    $this->drupalGet('node/' . $this->book->nid);
+    $this->drupalGet('node/' . $this->book->id());
     $this->assertText($block->label(), 'Book navigation block is displayed to anonymous users.');
 
     // Test the 'book pages' block_mode setting.
@@ -374,19 +373,19 @@ class BookTest extends WebTestBase {
      $edit = array();
 
      // Test access to delete top-level and child book nodes.
-     $this->drupalGet('node/' . $this->book->nid . '/outline/remove');
+     $this->drupalGet('node/' . $this->book->id() . '/outline/remove');
      $this->assertResponse('403', 'Deleting top-level book node properly forbidden.');
-     $this->drupalPost('node/' . $nodes[4]->nid . '/outline/remove', $edit, t('Remove'));
-     $node4 = node_load($nodes[4]->nid, TRUE);
+     $this->drupalPostForm('node/' . $nodes[4]->id() . '/outline/remove', $edit, t('Remove'));
+     $node4 = node_load($nodes[4]->id(), TRUE);
      $this->assertTrue(empty($node4->book), 'Deleting child book node properly allowed.');
 
      // Delete all child book nodes and retest top-level node deletion.
      foreach ($nodes as $node) {
-       $nids[] = $node->nid;
+       $nids[] = $node->id();
      }
      entity_delete_multiple('node', $nids);
-     $this->drupalPost('node/' . $this->book->nid . '/outline/remove', $edit, t('Remove'));
-     $node = node_load($this->book->nid, TRUE);
+     $this->drupalPostForm('node/' . $this->book->id() . '/outline/remove', $edit, t('Remove'));
+     $node = node_load($this->book->id(), TRUE);
      $this->assertTrue(empty($node->book), 'Deleting childless top-level book node properly allowed.');
    }
 
@@ -400,7 +399,7 @@ class BookTest extends WebTestBase {
       'name' => 'Bar',
       'type' => 'bar',
     );
-    $this->drupalPost('admin/structure/types/manage/book', $edit, t('Save content type'));
+    $this->drupalPostForm('admin/structure/types/manage/book', $edit, t('Save content type'));
 
     // Ensure that the config book.settings:allowed_types has been updated with
     // the new machine and the old one has been removed.
@@ -412,7 +411,7 @@ class BookTest extends WebTestBase {
       'title_label' => 'Title for basic page',
       'type' => 'page',
     );
-    $this->drupalPost('admin/structure/types/add', $edit, t('Save content type'));
+    $this->drupalPostForm('admin/structure/types/add', $edit, t('Save content type'));
 
     // Add page to the allowed node types.
     $edit = array(
@@ -420,7 +419,7 @@ class BookTest extends WebTestBase {
       'book_allowed_types[bar]' => 'bar',
     );
 
-    $this->drupalPost('admin/structure/book/settings', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/structure/book/settings', $edit, t('Save configuration'));
     $this->assertTrue(book_type_is_allowed('bar'), 'Config book.settings:allowed_types contains the bar node type.');
     $this->assertTrue(book_type_is_allowed('page'), 'Config book.settings:allowed_types contains the page node type.');
 
@@ -435,16 +434,16 @@ class BookTest extends WebTestBase {
     //   'page',
     // );
     // @endcode
-    $current_config = config('book.settings')->init()->get();
-    $this->drupalPost('admin/structure/book/settings', array(), t('Save configuration'));
-    $this->assertIdentical($current_config, config('book.settings')->init()->get());
+    $current_config = \Drupal::config('book.settings')->init()->get();
+    $this->drupalPostForm('admin/structure/book/settings', array(), t('Save configuration'));
+    $this->assertIdentical($current_config, \Drupal::config('book.settings')->init()->get());
 
     // Change the name, machine name and description.
     $edit = array(
       'name' => 'Zebra book',
       'type' => 'zebra',
     );
-    $this->drupalPost('admin/structure/types/manage/bar', $edit, t('Save content type'));
+    $this->drupalPostForm('admin/structure/types/manage/bar', $edit, t('Save content type'));
     $this->assertTrue(book_type_is_allowed('zebra'), 'Config book.settings:allowed_types contains the zebra node type.');
     $this->assertTrue(book_type_is_allowed('page'), 'Config book.settings:allowed_types contains the page node type.');
 
@@ -456,15 +455,15 @@ class BookTest extends WebTestBase {
     //   'zebra',
     // );
     // @endcode
-    $current_config = config('book.settings')->init()->get();
-    $this->drupalPost('admin/structure/book/settings', array(), t('Save configuration'));
-    $this->assertIdentical($current_config, config('book.settings')->init()->get());
+    $current_config = \Drupal::config('book.settings')->init()->get();
+    $this->drupalPostForm('admin/structure/book/settings', array(), t('Save configuration'));
+    $this->assertIdentical($current_config, \Drupal::config('book.settings')->init()->get());
 
     $edit = array(
       'name' => 'Animal book',
       'type' => 'zebra',
     );
-    $this->drupalPost('admin/structure/types/manage/zebra', $edit, t('Save content type'));
+    $this->drupalPostForm('admin/structure/types/manage/zebra', $edit, t('Save content type'));
 
     // Test the order of the book.settings::allowed_types configuration is as
     // expected. The order should be:
@@ -474,13 +473,13 @@ class BookTest extends WebTestBase {
     //   'zebra',
     // );
     // @endcode
-    $current_config = config('book.settings')->init()->get();
-    $this->drupalPost('admin/structure/book/settings', array(), t('Save configuration'));
-    $this->assertIdentical($current_config, config('book.settings')->init()->get());
+    $current_config = \Drupal::config('book.settings')->init()->get();
+    $this->drupalPostForm('admin/structure/book/settings', array(), t('Save configuration'));
+    $this->assertIdentical($current_config, \Drupal::config('book.settings')->init()->get());
 
     // Ensure that after all the node type changes book.settings:child_type has
     // the expected value.
-    $this->assertEqual(config('book.settings')->get('child_type'), 'zebra');
+    $this->assertEqual(\Drupal::config('book.settings')->get('child_type'), 'zebra');
   }
 
   /**
@@ -492,22 +491,22 @@ class BookTest extends WebTestBase {
     $book = $this->book;
 
     $this->drupalLogin($this->admin_user);
-    $node1 = $this->createBookNode($book->nid);
-    $node2 = $this->createBookNode($book->nid);
+    $node1 = $this->createBookNode($book->id());
+    $node2 = $this->createBookNode($book->id());
     $plid = $node1->book['mlid'];
 
     // Head to admin screen and attempt to re-order.
-    $this->drupalGet('admin/structure/book/' . $book->nid);
+    $this->drupalGet('admin/structure/book/' . $book->id());
     $edit = array(
-      "table[book-admin-{$node1->nid}][weight]" => 1,
-      "table[book-admin-{$node2->nid}][weight]" => 2,
+      "table[book-admin-{$node1->id()}][weight]" => 1,
+      "table[book-admin-{$node2->id()}][weight]" => 2,
       // Put node 2 under node 1.
-      "table[book-admin-{$node2->nid}][plid]" => $plid,
+      "table[book-admin-{$node2->id()}][plid]" => $plid,
     );
-    $this->drupalPost(NULL, $edit, t('Save book pages'));
+    $this->drupalPostForm(NULL, $edit, t('Save book pages'));
     // Verify weight was updated.
-    $this->assertFieldByName("table[book-admin-{$node1->nid}][weight]", 1);
-    $this->assertFieldByName("table[book-admin-{$node2->nid}][weight]", 2);
-    $this->assertFieldByName("table[book-admin-{$node2->nid}][plid]", $plid);
+    $this->assertFieldByName("table[book-admin-{$node1->id()}][weight]", 1);
+    $this->assertFieldByName("table[book-admin-{$node2->id()}][weight]", 2);
+    $this->assertFieldByName("table[book-admin-{$node2->id()}][plid]", $plid);
   }
 }

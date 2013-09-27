@@ -34,8 +34,8 @@ class ImageStyleFlushTest extends ImageFieldTestBase {
     // Make sure we have an image in our wrapper testing file directory.
     $source_uri = file_unmanaged_copy($file->uri, $wrapper . '://');
     // Build the derivative image.
-    $derivative_uri = image_style_path($style->id(), $source_uri);
-    $derivative = image_style_create_derivative($style, $source_uri, $derivative_uri);
+    $derivative_uri = $style->buildUri($source_uri);
+    $derivative = $style->createDerivative($source_uri, $derivative_uri);
 
     return $derivative ? $derivative_uri : FALSE;
   }
@@ -73,14 +73,14 @@ class ImageStyleFlushTest extends ImageFieldTestBase {
       'name' => $style_name,
       'label' => $style_label,
     );
-    $this->drupalPost('admin/config/media/image-styles/add', $edit, t('Create new style'));
+    $this->drupalPostForm('admin/config/media/image-styles/add', $edit, t('Create new style'));
 
     // Add each sample effect to the style.
     foreach ($effect_edits as $effect => $edit) {
       // Add the effect.
-      $this->drupalPost($style_path, array('new' => $effect), t('Add'));
+      $this->drupalPostForm($style_path, array('new' => $effect), t('Add'));
       if (!empty($edit)) {
-        $this->drupalPost(NULL, $edit, t('Add effect'));
+        $this->drupalPostForm(NULL, $edit, t('Add effect'));
       }
     }
 
@@ -100,13 +100,13 @@ class ImageStyleFlushTest extends ImageFieldTestBase {
     // Remove the 'image_scale' effect and updates the style, which in turn
     // forces an image style flush.
     $style_path = 'admin/config/media/image-styles/manage/' . $style->id();
-    $ieids = array();
-    foreach ($style->effects as $ieid => $effect) {
-      $ieids[$effect['name']] = $ieid;
+    $uuids = array();
+    foreach ($style->getEffects() as $uuid => $effect) {
+      $uuids[$effect->getPluginId()] = $uuid;
     }
-    $this->drupalPost($style_path . '/effects/' . $ieids['image_scale'] . '/delete', array(), t('Delete'));
+    $this->drupalPostForm($style_path . '/effects/' . $uuids['image_scale'] . '/delete', array(), t('Delete'));
     $this->assertResponse(200);
-    $this->drupalPost($style_path, array(), t('Update style'));
+    $this->drupalPostForm($style_path, array(), t('Update style'));
     $this->assertResponse(200);
 
     // Post flush, expected 1 image in the 'public' wrapper (sample.png).

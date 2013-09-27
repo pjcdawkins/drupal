@@ -9,7 +9,7 @@ namespace Drupal\field_test\Plugin\field\formatter;
 
 use Drupal\field\Annotation\FieldFormatter;
 use Drupal\Core\Annotation\Translation;
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Field\FieldInterface;
 use Drupal\field\Plugin\Type\Formatter\FormatterBase;
 
 /**
@@ -17,7 +17,6 @@ use Drupal\field\Plugin\Type\Formatter\FormatterBase;
  *
  * @FieldFormatter(
  *   id = "field_empty_test",
- *   module = "field_test",
  *   label = @Translation("Field empty test"),
  *   field_types = {
  *     "test_field",
@@ -32,25 +31,17 @@ class TestFieldEmptyFormatter extends FormatterBase {
   /**
    * {@inheritdoc}
    */
-  public function prepareView(array $entities, $langcode, array &$items) {
-    foreach ($items as $id => $entity_items) {
-      if (empty($entity_items)) {
-        // For fields with no value, just add the configured "empty" value.
-        $items[$id][0]['value'] = $this->getSetting('test_empty_string');
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function viewElements(EntityInterface $entity, $langcode, array $items) {
+  public function viewElements(FieldInterface $items) {
     $elements = array();
 
-    if (!empty($items)) {
+    if ($items->isEmpty()) {
+      // For fields with no value, just add the configured "empty" value.
+      $elements[0] = array('#markup' => $this->getSetting('test_empty_string'));
+    }
+    else {
       foreach ($items as $delta => $item) {
         // This formatter only needs to output raw for testing.
-        $elements[$delta] = array('#markup' => $item['value']);
+        $elements[$delta] = array('#markup' => $item->value);
       }
     }
 

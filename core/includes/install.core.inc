@@ -4,14 +4,14 @@ use Drupal\Component\Utility\Crypt;
 
 use Drupal\Core\Config\FileStorage;
 use Drupal\Core\DrupalKernel;
-use Drupal\Core\CoreBundle;
+use Drupal\Core\CoreServiceProvider;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Database\Install\TaskException;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageManager;
 use Drupal\Core\StringTranslation\Translator\FileTranslation;
 
-use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -298,8 +298,14 @@ function install_begin_request(&$install_state) {
   // (eg. pre-database data screens we are unable to persistently store
   // the default language), we should set language_default so the proper
   // language is used to display installer pages as early as possible.
-  if (!empty($install_state['parameters']['langcode']) && language_default()->langcode != $install_state['parameters']['langcode']) {
-    $GLOBALS['conf']['language_default'] = array('langcode' => $install_state['parameters']['langcode']);
+  // The language list is stored in configuration and cannot be saved either
+  // until later in the process. Language negotiation bootstrapping needs
+  // the new default language to be in the list though, so inject it in.
+  if (!empty($install_state['parameters']['langcode']) && language_default()->id != $install_state['parameters']['langcode']) {
+    $GLOBALS['conf']['language_default'] = array('id' => $install_state['parameters']['langcode']);
+
+    $languages = &drupal_static('language_list');
+    $languages[$install_state['parameters']['langcode']] = new Language($GLOBALS['conf']['language_default']);
   }
 
   require_once __DIR__ . '/../modules/system/system.install';
@@ -323,7 +329,7 @@ function install_begin_request(&$install_state) {
   $container = new ContainerBuilder();
   // Register the translation services.
   install_register_translation_service($container);
-  Drupal::setContainer($container);
+  \Drupal::setContainer($container);
 
   // Check existing settings.php.
   $install_state['database_verified'] = install_verify_database_settings();
@@ -354,15 +360,12 @@ function install_begin_request(&$install_state) {
   // @see drupal_install_config_directories()
   // @see install_settings_form_submit()
   if ($install_state['settings_verified']) {
-    $kernel = new DrupalKernel('install', FALSE, drupal_classloader(), FALSE);
+    $kernel = new DrupalKernel('install', drupal_classloader(), FALSE);
     $kernel->boot();
     $container = $kernel->getContainer();
     // Add the file translation service to the container.
     $container->set('string_translator.file_translation', install_file_translation_service());
     $container->get('string_translation')->addTranslator($container->get('string_translator.file_translation'));
-    // Set the request in the kernel to the new created Request above
-    // so it is available to the rest of the installation process.
-    $container->set('request', $request);
   }
   else {
     // @todo Move into a proper Drupal\Core\DependencyInjection\InstallContainerBuilder.
@@ -372,7 +375,8 @@ function install_begin_request(&$install_state) {
 
     $container->register('config.storage', 'Drupal\Core\Config\InstallStorage');
     $container->register('config.context.factory', 'Drupal\Core\Config\Context\ConfigContextFactory')
-      ->addArgument(new Reference('event_dispatcher'));
+      ->addArgument(new Reference('event_dispatcher'))
+      ->addArgument(new Reference('uuid'));
 
     $container->register('config.context', 'Drupal\Core\Config\Context\ContextInterface')
       ->setFactoryService(new Reference('config.context.factory'))
@@ -383,7 +387,9 @@ function install_begin_request(&$install_state) {
       ->addArgument(new Reference('config.context'));
 
     // Register the 'language_manager' service.
-    $container->register('language_manager', 'Drupal\Core\Language\LanguageManager');
+    $container
+      ->register('language_manager', 'Drupal\Core\Language\LanguageManager')
+      ->addArgument(NULL);
 
     // Register the translation services.
     install_register_translation_service($container);
@@ -426,23 +432,34 @@ function install_begin_request(&$install_state) {
     $conf['keyvalue_expirable_default'] = 'keyvalue.expirable.null';
 
     // Register Twig template engine for use during install.
-    CoreBundle::registerTwig($container);
+    CoreServiceProvider::registerTwig($container);
 
     $container->register('url_generator', 'Drupal\Core\Routing\NullGenerator');
 
-    Drupal::setContainer($container);
+    // Register UUID.
+    CoreServiceProvider::registerUuid($container);
+
+    // Register the CSS and JavaScript asset collection renderers.
+    $container->register('asset.css.collection_renderer', 'Drupal\Core\Asset\CssCollectionRenderer');
+    $container->register('asset.js.collection_renderer', 'Drupal\Core\Asset\JsCollectionRenderer');
+
   }
+  // Set the request in the kernel to the new created Request above
+  // so it is available to the rest of the installation process.
+  $container->set('request', $request);
+
+  \Drupal::setContainer($container);
 
   // Set up $language, so t() caller functions will still work.
   drupal_language_initialize();
   // Add in installation language if present.
   if (isset($install_state['parameters']['langcode'])) {
-    Drupal::translation()->setDefaultLangcode($install_state['parameters']['langcode']);
+    \Drupal::translation()->setDefaultLangcode($install_state['parameters']['langcode']);
   }
 
   require_once __DIR__ . '/ajax.inc';
 
-  $module_handler = Drupal::moduleHandler();
+  $module_handler = \Drupal::moduleHandler();
   if (!$module_handler->moduleExists('system')) {
     // Override the module list with a minimal set of modules.
     $module_handler->setModuleList(array('system' => 'core/modules/system/system.module'));
@@ -639,7 +656,7 @@ function install_run_task($task, &$install_state) {
     // any output from the batch process, until the task is complete.
     elseif ($current_batch == $function) {
       include_once __DIR__ . '/batch.inc';
-      $output = _batch_page();
+      $output = _batch_page(\Drupal::request());
       // Because Batch API now returns a JSON response for intermediary steps,
       // but the installer doesn't handle Response objects yet, just send the
       // output here and emulate the old model.
@@ -786,7 +803,7 @@ function install_tasks($install_state) {
     $profile = $install_state['parameters']['profile'];
     $profile_install_file = dirname($install_state['profiles'][$profile]->uri) . '/' . $profile . '.install';
     if (file_exists($profile_install_file)) {
-      include_once $profile_install_file;
+      include_once DRUPAL_ROOT . '/' . $profile_install_file;
     }
     $function = $install_state['parameters']['profile'] . '_install_tasks';
     if (function_exists($function)) {
@@ -821,7 +838,7 @@ function install_tasks($install_state) {
     $profile = $install_state['parameters']['profile'];
     $profile_file = $install_state['profiles'][$profile]->uri;
     if (file_exists($profile_file)) {
-      include_once $profile_file;
+      include_once DRUPAL_ROOT . '/' .  $profile_file;
       $function = $install_state['parameters']['profile'] . '_install_tasks_alter';
       if (function_exists($function)) {
         $function($tasks, $install_state);
@@ -936,7 +953,7 @@ function install_display_output($output, $install_state) {
     // Let the theming function know when every step of the installation has
     // been completed.
     $active_task = $install_state['installation_finished'] ? NULL : $install_state['active_task'];
-    drupal_add_region_content('sidebar_first', theme('task_list', array('items' => install_tasks_to_display($install_state), 'active' => $active_task)));
+    drupal_add_region_content('sidebar_first', theme('task_list', array('items' => install_tasks_to_display($install_state), 'active' => $active_task, 'variant' => 'install')));
   }
   print theme('install_page', array('content' => $output));
   exit;
@@ -982,7 +999,7 @@ function install_base_system(&$install_state) {
 
   // Enable the user module so that sessions can be recorded during the
   // upcoming bootstrap step.
-  module_enable(array('user'), FALSE);
+  \Drupal::moduleHandler()->install(array('user'), FALSE);
 
   // Save the list of other modules to install for the upcoming tasks.
   // variable_set() can be used now that system.module is installed.
@@ -992,7 +1009,7 @@ function install_base_system(&$install_state) {
   // after all the dependencies have been installed.
   $modules[] = drupal_get_profile();
 
-  Drupal::state()->set('install_profile_modules', array_diff($modules, array('system')));
+  \Drupal::state()->set('install_profile_modules', array_diff($modules, array('system')));
   $install_state['database_tables_exist'] = TRUE;
 }
 
@@ -1221,6 +1238,14 @@ function install_settings_form_submit($form, &$form_state) {
     );
   }
 
+  // Remember the profile which was used.
+  $settings['settings'] = array(
+    'install_profile' => (object) array(
+      'value' => $install_state['parameters']['profile'],
+      'required' => TRUE,
+    ),
+  );
+
   drupal_rewrite_settings($settings);
 
   // Add the config directories to settings.php.
@@ -1400,7 +1425,7 @@ function install_select_profile_form($form, &$form_state, $install_state) {
  */
 function install_find_translations() {
   $translations = array();
-  $files = Drupal::service('string_translator.file_translation')->findTranslationFiles();
+  $files = \Drupal::service('string_translator.file_translation')->findTranslationFiles();
   // English does not need a translation file.
   array_unshift($files, (object) array('name' => 'en'));
   foreach ($files as $uri => $file) {
@@ -1453,11 +1478,11 @@ function install_translations_directory() {
  */
 function install_register_translation_service(ContainerBuilder $container) {
   $container->register('string_translator.file_translation', 'Drupal\Core\StringTranslation\Translator\FileTranslation')
-    ->addArgument(install_translations_directory())
-    ->addTag('string_translator');
-  $container->register('string_translator.custom_strings', 'Drupal\Core\StringTranslation\Translator\CustomStrings')
-    ->addTag('string_translator');
-  $container->register('string_translation', 'Drupal\Core\StringTranslation\TranslationManager');
+    ->addArgument(install_translations_directory());
+  $container->register('string_translator.custom_strings', 'Drupal\Core\StringTranslation\Translator\CustomStrings');
+  $container->register('string_translation', 'Drupal\Core\StringTranslation\TranslationManager')
+    ->addMethodCall('addTranslator', array(new Reference('string_translator.file_translation')))
+    ->addMethodCall('addTranslator', array(new Reference('string_translator.custom_strings')));
 }
 
 /**
@@ -1547,7 +1572,7 @@ function install_select_language_form($form, &$form_state, $files = array()) {
     foreach ($files as $langcode => $uri) {
       $select_options[$langcode] = isset($standard_languages[$langcode]) ? $standard_languages[$langcode][1] : $langcode;
       $browser_options[$langcode] = new Language(array(
-        'langcode' => $langcode,
+        'id' => $langcode,
       ));
     }
   }
@@ -1556,7 +1581,7 @@ function install_select_language_form($form, &$form_state, $files = array()) {
     foreach ($standard_languages as $langcode => $language_names) {
       $select_options[$langcode] = $language_names[1];
       $browser_options[$langcode] = new Language(array(
-        'langcode' => $langcode,
+        'id' => $langcode,
       ));
     }
   }
@@ -1632,7 +1657,7 @@ function install_retrieve_file($uri, $destination) {
   }
 
   try {
-    $request = Drupal::httpClient()->get($uri, array('Accept' => 'text/plain'));
+    $request = \Drupal::httpClient()->get($uri, array('Accept' => 'text/plain'));
     $data = $request->send()->getBody(TRUE);
     if (empty($data)) {
       return FALSE;
@@ -1655,7 +1680,7 @@ function install_retrieve_file($uri, $destination) {
  */
 function install_check_localization_server($uri) {
   try {
-    $request = Drupal::httpClient()->head($uri);
+    $request = \Drupal::httpClient()->head($uri);
     $request->send();
     return TRUE;
   }
@@ -1676,8 +1701,8 @@ function install_check_localization_server($uri) {
  *   Associative array containing 'core' and 'version' of the release.
  */
 function install_get_localization_release() {
-  if (strpos(VERSION, 'dev')) {
-    list($version, ) = explode('-', VERSION);
+  if (strpos(\Drupal::VERSION, 'dev')) {
+    list($version, ) = explode('-', \Drupal::VERSION);
     list($major, $minor) = explode('.', $version);
 
     // Calculate the major and minor release numbers to fall back to.
@@ -1691,7 +1716,7 @@ function install_get_localization_release() {
     $release = "$major.$minor";
   }
   else {
-    $release = VERSION;
+    $release = \Drupal::VERSION;
   }
 
   return array(
@@ -1730,7 +1755,7 @@ function install_load_profile(&$install_state) {
   $profile = $install_state['parameters']['profile'];
   $profile_file = $install_state['profiles'][$profile]->uri;
   if (file_exists($profile_file)) {
-    include_once $profile_file;
+    include_once DRUPAL_ROOT . '/' . $profile_file;
     $install_state['profile_info'] = install_profile_info($install_state['parameters']['profile'], $install_state['parameters']['langcode']);
   }
   else {
@@ -1746,6 +1771,8 @@ function install_load_profile(&$install_state) {
  */
 function install_bootstrap_full() {
   drupal_bootstrap(DRUPAL_BOOTSTRAP_FULL);
+  require_once DRUPAL_ROOT . '/' . settings()->get('session_inc', 'core/includes/session.inc');
+  drupal_session_initialize();
 }
 
 /**
@@ -1758,9 +1785,9 @@ function install_bootstrap_full() {
  *   The batch definition.
  */
 function install_profile_modules(&$install_state) {
-  $modules = Drupal::state()->get('install_profile_modules') ?: array();
+  $modules = \Drupal::state()->get('install_profile_modules') ?: array();
   $files = system_rebuild_module_data();
-  Drupal::state()->delete('install_profile_modules');
+  \Drupal::state()->delete('install_profile_modules');
 
   // Always install required modules first. Respect the dependencies between
   // the modules.
@@ -1819,7 +1846,7 @@ function install_import_translations(&$install_state) {
     // Drupal does not know about this language, so we prefill its values with
     // our best guess. The user will be able to edit afterwards.
     $language = new Language(array(
-      'langcode' => $langcode,
+      'id' => $langcode,
       'name' => $langcode,
       'default' => TRUE,
     ));
@@ -1828,7 +1855,7 @@ function install_import_translations(&$install_state) {
   else {
     // A known predefined language, details will be filled in properly.
     $language = new Language(array(
-      'langcode' => $langcode,
+      'id' => $langcode,
       'default' => TRUE,
     ));
     language_save($language);
@@ -1956,7 +1983,7 @@ function install_import_translations_remaining(&$install_state) {
  * @see install_tasks()
  */
 function install_update_configuration_translations(&$install_state) {
-  Drupal::moduleHandler()->loadInclude('locale', 'bulk.inc');
+  \Drupal::moduleHandler()->loadInclude('locale', 'bulk.inc');
   return locale_config_batch_update_components(array(), array($install_state['parameters']['langcode']));
 }
 
@@ -1971,8 +1998,6 @@ function install_update_configuration_translations(&$install_state) {
  */
 function install_finished(&$install_state) {
   $profile = drupal_get_profile();
-  // Remember the profile which was used.
-  variable_set('install_profile', $profile);
 
   // Installation profiles are always loaded last.
   module_set_weight($profile, 1000);
@@ -1989,8 +2014,8 @@ function install_finished(&$install_state) {
   // Ensure the URL that is generated for the home page does not have 'install.php'
   // in it.
   $request = Request::createFromGlobals();
-  $generator = Drupal::urlGenerator();
-  $generator->setBasePath(str_replace('/core', '', $request->getBasePath()) . '/');
+  $generator = \Drupal::urlGenerator();
+  $generator->setBasePath(preg_replace('#/core$#', '', $request->getBasePath()) . '/' );
   $generator->setScriptPath('');
   $url = $generator->generateFromPath('');
   $output .= '<p>' . (isset($messages['error']) ? t('Review the messages above before visiting <a href="@url">your new site</a>.', array('@url' => $url)) : t('<a href="@url">Visit your new site</a>.', array('@url' => $url))) . '</p>';
@@ -2016,7 +2041,7 @@ function _install_module_batch($module, $module_name, &$context) {
   // loaded by drupal_bootstrap in subsequent batch requests, and other
   // modules possibly depending on it can safely perform their installation
   // steps.
-  module_enable(array($module), FALSE);
+  \Drupal::moduleHandler()->install(array($module), FALSE);
   $context['results'][] = $module;
   $context['message'] = t('Installed %module module.', array('%module' => $module_name));
 }
@@ -2417,23 +2442,23 @@ function _install_configure_form($form, &$form_state, &$install_state) {
     '#weight' => 0,
   );
 
-  $form['server_settings'] = array(
+  $form['regional_settings'] = array(
     '#type' => 'details',
-    '#title' => t('Server settings'),
+    '#title' => t('Regional settings'),
   );
 
-  $countries = Drupal::service('country_manager')->getList();
-  $form['server_settings']['site_default_country'] = array(
+  $countries = \Drupal::service('country_manager')->getList();
+  $form['regional_settings']['site_default_country'] = array(
     '#type' => 'select',
     '#title' => t('Default country'),
     '#empty_value' => '',
-    '#default_value' => config('system.date')->get('country.default'),
+    '#default_value' => \Drupal::config('system.date')->get('country.default'),
     '#options' => $countries,
     '#description' => t('Select the default country for the site.'),
     '#weight' => 0,
   );
 
-  $form['server_settings']['date_default_timezone'] = array(
+  $form['regional_settings']['date_default_timezone'] = array(
     '#type' => 'select',
     '#title' => t('Default time zone'),
     '#default_value' => date_default_timezone_get(),
@@ -2449,6 +2474,7 @@ function _install_configure_form($form, &$form_state, &$install_state) {
   );
   $form['update_notifications']['update_status_module'] = array(
     '#type' => 'checkboxes',
+    '#title' => t('Update notifications'),
     '#options' => array(
       1 => t('Check for updates automatically'),
       2 => t('Receive e-mail notifications'),
@@ -2494,43 +2520,40 @@ function install_configure_form_validate($form, &$form_state) {
 function install_configure_form_submit($form, &$form_state) {
   global $user;
 
-  config('system.site')
+  \Drupal::config('system.site')
     ->set('name', $form_state['values']['site_name'])
     ->set('mail', $form_state['values']['site_mail'])
-    ->set('langcode', language_default()->langcode)
+    ->set('langcode', language_default()->id)
     ->save();
 
-  config('system.timezone')
-    ->set('default', $form_state['values']['date_default_timezone'])
-    ->save();
-
-  config('system.date')
+  \Drupal::config('system.date')
+    ->set('timezone.default', $form_state['values']['date_default_timezone'])
     ->set('country.default', $form_state['values']['site_default_country'])
     ->save();
 
   // Enable update.module if this option was selected.
   if ($form_state['values']['update_status_module'][1]) {
-    module_enable(array('file', 'update'), FALSE);
+    \Drupal::moduleHandler()->install(array('file', 'update'), FALSE);
 
     // Add the site maintenance account's email address to the list of
     // addresses to be notified when updates are available, if selected.
     if ($form_state['values']['update_status_module'][2]) {
-      config('update.settings')->set('notification.emails', array($form_state['values']['account']['mail']))->save();
+      \Drupal::config('update.settings')->set('notification.emails', array($form_state['values']['account']['mail']))->save();
     }
   }
 
   // We precreated user 1 with placeholder values. Let's save the real values.
   $account = user_load(1);
   $account->init = $account->mail = $form_state['values']['account']['mail'];
-  $account->roles = !empty($account->roles) ? $account->roles : array();
-  $account->status = 1;
+  $account->roles = $account->getRoles();
+  $account->activate();
   $account->timezone = $form_state['values']['date_default_timezone'];
   $account->pass = $form_state['values']['account']['pass'];
   $account->name = $form_state['values']['account']['name'];
   $account->save();
   // Load global $user and perform final login tasks.
-  $user = user_load(1);
-  user_login_finalize();
+  $account = user_load(1);
+  user_login_finalize($account);
 
   // Record when this install ran.
   variable_set('install_time', $_SERVER['REQUEST_TIME']);

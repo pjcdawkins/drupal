@@ -34,7 +34,7 @@ class BasicTest extends WizardTestBase {
     $view1['id'] = strtolower($this->randomName(16));
     $view1['description'] = $this->randomName(16);
     $view1['page[create]'] = FALSE;
-    $this->drupalPost('admin/structure/views/add', $view1, t('Save and edit'));
+    $this->drupalPostForm('admin/structure/views/add', $view1, t('Save and edit'));
     $this->assertResponse(200);
     $this->drupalGet('admin/structure/views');
     $this->assertText($view1['label']);
@@ -45,7 +45,7 @@ class BasicTest extends WizardTestBase {
 
     // This view should not have a block.
     $this->drupalGet('admin/structure/block');
-    $this->assertNoText('View: ' . $view1['label']);
+    $this->assertNoText($view1['label']);
 
     // Create two nodes.
     $node1 = $this->drupalCreateNode(array('type' => 'page'));
@@ -61,7 +61,7 @@ class BasicTest extends WizardTestBase {
     $view2['page[path]'] = $this->randomName(16);
     $view2['page[feed]'] = 1;
     $view2['page[feed_properties][path]'] = $this->randomName(16);
-    $this->drupalPost('admin/structure/views/add', $view2, t('Save and edit'));
+    $this->drupalPostForm('admin/structure/views/add', $view2, t('Save and edit'));
     $this->drupalGet($view2['page[path]']);
     $this->assertResponse(200);
 
@@ -78,9 +78,9 @@ class BasicTest extends WizardTestBase {
     $this->assertRaw('<rss version="2.0"');
     // The feed should have the same title and nodes as the page.
     $this->assertText($view2['page[title]']);
-    $this->assertRaw(url('node/' . $node1->nid, array('absolute' => TRUE)));
+    $this->assertRaw(url('node/' . $node1->id(), array('absolute' => TRUE)));
     $this->assertText($node1->label());
-    $this->assertRaw(url('node/' . $node2->nid, array('absolute' => TRUE)));
+    $this->assertRaw(url('node/' . $node2->id(), array('absolute' => TRUE)));
     $this->assertText($node2->label());
 
     // Go back to the views page and check if this view is there.
@@ -105,7 +105,7 @@ class BasicTest extends WizardTestBase {
     $view3['page[path]'] = $this->randomName(16);
     $view3['block[create]'] = 1;
     $view3['block[title]'] = $this->randomName(16);
-    $this->drupalPost('admin/structure/views/add', $view3, t('Save and edit'));
+    $this->drupalPostForm('admin/structure/views/add', $view3, t('Save and edit'));
     $this->drupalGet($view3['page[path]']);
     $this->assertResponse(200);
 
@@ -122,8 +122,8 @@ class BasicTest extends WizardTestBase {
     $this->assertLinkByHref(url($view3['page[path]']));
 
     // Confirm that the block is available in the block administration UI.
-    $this->drupalGet('admin/structure/block/list/block_plugin_ui:' . config('system.theme')->get('default') . '/add');
-    $this->assertText('View: ' . $view3['label']);
+    $this->drupalGet('admin/structure/block/list/' . \Drupal::config('system.theme')->get('default'));
+    $this->assertText($view3['label']);
 
     // Place the block.
     $this->drupalPlaceBlock("views_block:{$view3['id']}-block_1");
@@ -135,7 +135,7 @@ class BasicTest extends WizardTestBase {
     $this->assertNoText($node2->label());
 
     // Make sure the listing page doesn't show disabled default views.
-    $this->assertNoText('tracker', t('Default tracker view does not show on the listing page.'));
+    $this->assertNoText('tracker', 'Default tracker view does not show on the listing page.');
   }
 
   /**
@@ -163,7 +163,7 @@ class BasicTest extends WizardTestBase {
     $view['id'] = $random_id;
     $view['description'] = $this->randomName(16);
     $view['page[create]'] = FALSE;
-    $this->drupalPost('admin/structure/views/add', $view, t('Save and edit'));
+    $this->drupalPostForm('admin/structure/views/add', $view, t('Save and edit'));
 
     // Make sure the plugin types that should not have empty options don't have.
     // Test against all values is unit tested.

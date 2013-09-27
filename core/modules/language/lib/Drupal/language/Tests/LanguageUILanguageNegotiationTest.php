@@ -90,11 +90,11 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
 
     // Setup the site languages by installing two languages.
     $language = new Language(array(
-      'langcode' => $langcode_browser_fallback,
+      'id' => $langcode_browser_fallback,
     ));
     language_save($language);
     $language = new Language(array(
-      'langcode' => $langcode,
+      'id' => $langcode,
     ));
     language_save($language);
 
@@ -122,32 +122,32 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
       'string' => $default_string,
       'langcode' => $langcode_browser_fallback,
     );
-    $this->drupalPost('admin/config/regional/translate/translate', $search, t('Filter'));
+    $this->drupalPostForm('admin/config/regional/translate', $search, t('Filter'));
     $textarea = current($this->xpath('//textarea'));
     $lid = (string) $textarea[0]['name'];
     $edit = array(
       $lid => $language_browser_fallback_string,
     );
-    $this->drupalPost('admin/config/regional/translate/translate', $edit, t('Save translations'));
+    $this->drupalPostForm('admin/config/regional/translate', $edit, t('Save translations'));
 
     $search = array(
       'string' => $default_string,
       'langcode' => $langcode,
     );
-    $this->drupalPost('admin/config/regional/translate/translate', $search, t('Filter'));
+    $this->drupalPostForm('admin/config/regional/translate', $search, t('Filter'));
     $textarea = current($this->xpath('//textarea'));
     $lid = (string) $textarea[0]['name'];
     $edit = array(
       $lid => $language_string,
     );
-    $this->drupalPost('admin/config/regional/translate/translate', $edit, t('Save translations'));
+    $this->drupalPostForm('admin/config/regional/translate', $edit, t('Save translations'));
 
     // Configure URL language rewrite.
     variable_set('language_negotiation_url_type', Language::TYPE_INTERFACE);
 
     // Configure selected language negotiation to use zh-hans.
     $edit = array('selected_langcode' => $langcode);
-    $this->drupalPost('admin/config/regional/language/detection/selected', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/regional/language/detection/selected', $edit, t('Save configuration'));
     $test = array(
       'language_negotiation' => array(LANGUAGE_NEGOTIATION_SELECTED),
       'path' => 'admin/config',
@@ -159,7 +159,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     $this->runTest($test);
 
     // An invalid language is selected.
-    config('language.negotiation')->set('selected_langcode', NULL)->save();
+    \Drupal::config('language.negotiation')->set('selected_langcode', NULL)->save();
     $test = array(
       'language_negotiation' => array(LANGUAGE_NEGOTIATION_SELECTED),
       'path' => 'admin/config',
@@ -171,7 +171,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     $this->runTest($test);
 
     // No selected language is available.
-    config('language.negotiation')->set('selected_langcode', $langcode_unknown)->save();
+    \Drupal::config('language.negotiation')->set('selected_langcode', $langcode_unknown)->save();
     $test = array(
       'language_negotiation' => array(LANGUAGE_NEGOTIATION_SELECTED),
       'path' => 'admin/config',
@@ -217,7 +217,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
         'expect' => $language_string,
         'expected_method_id' => LANGUAGE_NEGOTIATION_URL,
         'http_header' => $http_header_browser_fallback,
-        'message' => 'URL (PATH) > BROWSER: with langage prefix, UI language is based on path prefix',
+        'message' => 'URL (PATH) > BROWSER: with language prefix, UI language is based on path prefix',
       ),
       // Default, browser language preference is not one of site's lang.
       array(
@@ -328,7 +328,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Setup for domain negotiation, first configure the language to have domain
     // URL.
     $edit = array("domain[$langcode]" => $language_domain);
-    $this->drupalPost("admin/config/regional/language/detection/url", $edit, t('Save configuration'));
+    $this->drupalPostForm("admin/config/regional/language/detection/url", $edit, t('Save configuration'));
     // Set the site to use domain language negotiation.
 
     $tests = array(
@@ -367,7 +367,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
       language_negotiation_set(Language::TYPE_INTERFACE, $method_weights);
     }
     if (!empty($test['language_negotiation_url_part'])) {
-      config('language.negotiation')
+      \Drupal::config('language.negotiation')
         ->set('url.source', $test['language_negotiation_url_part'])
         ->save();
     }
@@ -387,7 +387,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Add the Italian language.
     $langcode_browser_fallback = 'it';
     $language = new Language(array(
-      'langcode' => $langcode_browser_fallback,
+      'id' => $langcode_browser_fallback,
     ));
     language_save($language);
     $languages = language_list();
@@ -395,7 +395,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Enable the path prefix for the default language: this way any unprefixed
     // URL must have a valid fallback value.
     $edit = array('prefix[en]' => 'en');
-    $this->drupalPost('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
 
     // Enable browser and URL language detection.
     $edit = array(
@@ -404,7 +404,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
       'language_interface[weight][language-browser]' => -8,
       'language_interface[weight][language-url]' => -10,
     );
-    $this->drupalPost('admin/config/regional/language/detection', $edit, t('Save settings'));
+    $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
     $this->drupalGet('admin/config/regional/language/detection');
 
     // Enable the language switcher block.
@@ -413,7 +413,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Access the front page without specifying any valid URL language prefix
     // and having as browser language preference a non-default language.
     $http_header = array("Accept-Language: $langcode_browser_fallback;q=1");
-    $language = new Language(array('langcode' => ''));
+    $language = new Language(array('id' => ''));
     $this->drupalGet('', array('language' => $language), $http_header);
 
     // Check that the language switcher active link matches the given browser
@@ -423,7 +423,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     $this->assertTrue($fields[0] == $languages[$langcode_browser_fallback]->name, 'The browser language is the URL active language');
 
     // Check that URLs are rewritten using the given browser language.
-    $fields = $this->xpath('//p[@id="site-name"]/strong/a[@rel="home" and @href=:url]', $args);
+    $fields = $this->xpath('//strong[@class="site-name"]/a[@rel="home" and @href=:url]', $args);
     $this->assertTrue($fields[0] == 'Drupal', 'URLs are rewritten using the browser language.');
   }
 
@@ -434,7 +434,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Add the Italian language.
     $langcode = 'it';
     $language = new Language(array(
-      'langcode' => $langcode,
+      'id' => $langcode,
     ));
     language_save($language);
     $languages = language_list();
@@ -444,14 +444,14 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
       'language_interface[enabled][language-url]' => TRUE,
       'language_interface[weight][language-url]' => -10,
     );
-    $this->drupalPost('admin/config/regional/language/detection', $edit, t('Save settings'));
+    $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
 
     // Change the domain for the Italian language.
     $edit = array(
       'language_negotiation_url_part' => LANGUAGE_NEGOTIATION_URL_DOMAIN,
       'domain[it]' => 'it.example.com',
     );
-    $this->drupalPost('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
     $this->rebuildContainer();
 
     // Build the link we're going to test.

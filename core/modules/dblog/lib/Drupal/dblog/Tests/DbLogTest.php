@@ -10,7 +10,6 @@ namespace Drupal\dblog\Tests;
 use Drupal\Core\Language\Language;
 use Drupal\dblog\Controller\DbLogController;
 use Drupal\simpletest\WebTestBase;
-use SimpleXMLElement;
 
 /**
  * Tests logging messages to the database.
@@ -86,11 +85,11 @@ class DbLogTest extends WebTestBase {
     // Change the database log row limit.
     $edit = array();
     $edit['dblog_row_limit'] = $row_limit;
-    $this->drupalPost('admin/config/development/logging', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/development/logging', $edit, t('Save configuration'));
     $this->assertResponse(200);
 
     // Check row limit variable.
-    $current_limit = config('dblog.settings')->get('row_limit');
+    $current_limit = \Drupal::config('dblog.settings')->get('row_limit');
     $this->assertTrue($current_limit == $row_limit, format_string('[Cache] Row limit variable of @count equals row limit of @limit', array('@count' => $current_limit, '@limit' => $row_limit)));
   }
 
@@ -136,7 +135,7 @@ class DbLogTest extends WebTestBase {
       'severity'    => $severity,
       'link'        => NULL,
       'user'        => $this->big_user,
-      'uid'         => isset($this->big_user->uid) ? $this->big_user->uid : 0,
+      'uid'         => $this->big_user->id(),
       'request_uri' => $base_root . request_uri(),
       'referer'     => $_SERVER['HTTP_REFERER'],
       'ip'          => '127.0.0.1',
@@ -156,8 +155,6 @@ class DbLogTest extends WebTestBase {
    *   (optional) HTTP response code. Defaults to 200.
    */
   private function verifyReports($response = 200) {
-    $quote = '&#039;';
-
     // View the database log help page.
     $this->drupalGet('admin/help/dblog');
     $this->assertResponse($response);
@@ -176,18 +173,19 @@ class DbLogTest extends WebTestBase {
     $this->drupalGet('admin/reports/page-not-found');
     $this->assertResponse($response);
     if ($response == 200) {
-      $this->assertText(t('Top ' . $quote . 'page not found' . $quote . ' errors'), 'DBLog page-not-found report was displayed');
+      $this->assertText("Top 'page not found' errors", 'DBLog page-not-found report was displayed');
     }
 
     // View the database log access-denied report page.
     $this->drupalGet('admin/reports/access-denied');
     $this->assertResponse($response);
     if ($response == 200) {
-      $this->assertText(t('Top ' . $quote . 'access denied' . $quote . ' errors'), 'DBLog access-denied report was displayed');
+      $this->assertText("Top 'access denied' errors", 'DBLog access-denied report was displayed');
     }
 
     // View the database log event page.
-    $this->drupalGet('admin/reports/event/1');
+    $wid = db_query('SELECT MIN(wid) FROM {watchdog}')->fetchField();
+    $this->drupalGet('admin/reports/event/' . $wid);
     $this->assertResponse($response);
     if ($response == 200) {
       $this->assertText(t('Details'), 'DBLog event node was displayed');
@@ -226,7 +224,7 @@ class DbLogTest extends WebTestBase {
     $edit['pass[pass1]'] = $pass;
     $edit['pass[pass2]'] = $pass;
     $edit['status'] = 1;
-    $this->drupalPost('admin/people/create', $edit, t('Create new account'));
+    $this->drupalPostForm('admin/people/create', $edit, t('Create new account'));
     $this->assertResponse(200);
     // Retrieve the user object.
     $user = user_load_by_name($name);
@@ -238,18 +236,18 @@ class DbLogTest extends WebTestBase {
     // Logout user.
     $this->drupalLogout();
     // Fetch the row IDs in watchdog that relate to the user.
-    $result = db_query('SELECT wid FROM {watchdog} WHERE uid = :uid', array(':uid' => $user->uid));
+    $result = db_query('SELECT wid FROM {watchdog} WHERE uid = :uid', array(':uid' => $user->id()));
     foreach ($result as $row) {
       $ids[] = $row->wid;
     }
     $count_before = (isset($ids)) ? count($ids) : 0;
-    $this->assertTrue($count_before > 0, format_string('DBLog contains @count records for @name', array('@count' => $count_before, '@name' => $user->name)));
+    $this->assertTrue($count_before > 0, format_string('DBLog contains @count records for @name', array('@count' => $count_before, '@name' => $user->getUsername())));
 
     // Login the admin user.
     $this->drupalLogin($this->big_user);
     // Delete the user created at the start of this test.
     // We need to POST here to invoke batch_process() in the internal browser.
-    $this->drupalPost('user/' . $user->uid . '/cancel', array('user_cancel_method' => 'user_cancel_reassign'), t('Cancel account'));
+    $this->drupalPostForm('user/' . $user->id() . '/cancel', array('user_cancel_method' => 'user_cancel_reassign'), t('Cancel account'));
 
     // View the database log report.
     $this->drupalGet('admin/reports/dblog');
@@ -259,13 +257,13 @@ class DbLogTest extends WebTestBase {
     // Add user.
     // Default display includes name and email address; if too long, the email
     // address is replaced by three periods.
-    $this->assertLogMessage(t('New user: %name %email.', array('%name' => $name, '%email' => '<' . $user->mail . '>')), 'DBLog event was recorded: [add user]');
+    $this->assertLogMessage(t('New user: %name %email.', array('%name' => $name, '%email' => '<' . $user->getEmail() . '>')), 'DBLog event was recorded: [add user]');
     // Login user.
     $this->assertLogMessage(t('Session opened for %name.', array('%name' => $name)), 'DBLog event was recorded: [login user]');
     // Logout user.
     $this->assertLogMessage(t('Session closed for %name.', array('%name' => $name)), 'DBLog event was recorded: [logout user]');
     // Delete user.
-    $message = t('Deleted user: %name %email.', array('%name' => $name, '%email' => '<' . $user->mail . '>'));
+    $message = t('Deleted user: %name %email.', array('%name' => $name, '%email' => '<' . $user->getEmail() . '>'));
     $message_text = truncate_utf8(filter_xss($message, array()), 56, TRUE, TRUE);
     // Verify that the full message displays on the details page.
     $link = FALSE;
@@ -311,22 +309,21 @@ class DbLogTest extends WebTestBase {
     // Create a node using the form in order to generate an add content event
     // (which is not triggered by drupalCreateNode).
     $edit = $this->getContent($type);
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     $title = $edit["title"];
-    $this->drupalPost('node/add/' . $type, $edit, t('Save'));
+    $this->drupalPostForm('node/add/' . $type, $edit, t('Save'));
     $this->assertResponse(200);
     // Retrieve the node object.
     $node = $this->drupalGetNodeByTitle($title);
     $this->assertTrue($node != NULL, format_string('Node @title was loaded', array('@title' => $title)));
     // Edit the node.
     $edit = $this->getContentUpdate($type);
-    $this->drupalPost('node/' . $node->nid . '/edit', $edit, t('Save'));
+    $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save'));
     $this->assertResponse(200);
     // Delete the node.
-    $this->drupalPost('node/' . $node->nid . '/delete', array(), t('Delete'));
+    $this->drupalPostForm('node/' . $node->id() . '/delete', array(), t('Delete'));
     $this->assertResponse(200);
     // View the node (to generate page not found event).
-    $this->drupalGet('node/' . $node->nid);
+    $this->drupalGet('node/' . $node->id());
     $this->assertResponse(404);
     // View the database log report (to generate access denied event).
     $this->drupalGet('admin/reports/dblog');
@@ -350,13 +347,13 @@ class DbLogTest extends WebTestBase {
     $this->drupalGet('admin/reports/access-denied');
     $this->assertResponse(200);
     // Verify that the 'access denied' event was recorded.
-    $this->assertText(t('admin/reports/dblog'), 'DBLog event was recorded: [access denied]');
+    $this->assertText('admin/reports/dblog', 'DBLog event was recorded: [access denied]');
 
     // View the database log page-not-found report page.
     $this->drupalGet('admin/reports/page-not-found');
     $this->assertResponse(200);
     // Verify that the 'page not found' event was recorded.
-    $this->assertText(t('node/@nid', array('@nid' => $node->nid)), 'DBLog event was recorded: [page not found]');
+    $this->assertText('node/' . $node->id(), 'DBLog event was recorded: [page not found]');
   }
 
   /**
@@ -369,20 +366,19 @@ class DbLogTest extends WebTestBase {
    *   Random content needed by various node types.
    */
   private function getContent($type) {
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     switch ($type) {
       case 'forum':
         $content = array(
-          "title" => $this->randomName(8),
-          "taxonomy_forums[$langcode]" => array(1),
-          "body[$langcode][0][value]" => $this->randomName(32),
+          'title' => $this->randomName(8),
+          'taxonomy_forums' => array(1),
+          'body[0][value]' => $this->randomName(32),
         );
         break;
 
       default:
         $content = array(
-          "title" => $this->randomName(8),
-          "body[$langcode][0][value]" => $this->randomName(32),
+          'title' => $this->randomName(8),
+          'body[0][value]' => $this->randomName(32),
         );
         break;
     }
@@ -399,9 +395,8 @@ class DbLogTest extends WebTestBase {
    *   Random content needed by various node types.
    */
   private function getContentUpdate($type) {
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     $content = array(
-      "body[$langcode][0][value]" => $this->randomName(32),
+      'body[0][value]' => $this->randomName(32),
     );
     return $content;
   }
@@ -423,7 +418,7 @@ class DbLogTest extends WebTestBase {
       'severity'    => WATCHDOG_NOTICE,
       'link'        => NULL,
       'user'        => $this->big_user,
-      'uid'         => isset($this->big_user->uid) ? $this->big_user->uid : 0,
+      'uid'         => $this->big_user->id(),
       'request_uri' => $base_root . request_uri(),
       'referer'     => $_SERVER['HTTP_REFERER'],
       'ip'          => '127.0.0.1',
@@ -436,7 +431,7 @@ class DbLogTest extends WebTestBase {
     // Login the admin user.
     $this->drupalLogin($this->big_user);
     // Post in order to clear the database table.
-    $this->drupalPost('admin/reports/dblog', array(), t('Clear log messages'));
+    $this->drupalPostForm('admin/reports/dblog', array(), t('Clear log messages'));
     // Count the rows in watchdog that previously related to the deleted user.
     $count = db_query('SELECT COUNT(*) FROM {watchdog}')->fetchField();
     $this->assertEqual($count, 0, format_string('DBLog contains :count records after a clear.', array(':count' => $count)));
@@ -482,7 +477,7 @@ class DbLogTest extends WebTestBase {
       $edit = array(
         'type[]' => array($type_name),
       );
-      $this->drupalPost(NULL, $edit, t('Filter'));
+      $this->drupalPostForm(NULL, $edit, t('Filter'));
 
       // Count the number of entries of this type.
       $type_count = 0;
@@ -503,7 +498,7 @@ class DbLogTest extends WebTestBase {
         'type[]' => array($type['type']),
         'severity[]' => array($type['severity']),
       );
-      $this->drupalPost(NULL, $edit, t('Filter'));
+      $this->drupalPostForm(NULL, $edit, t('Filter'));
 
       $count = $this->getTypeCount($types);
       $this->assertEqual(array_sum($count), $type['count'], 'Count matched');
@@ -514,7 +509,7 @@ class DbLogTest extends WebTestBase {
     $this->assertText(t('Operations'), 'Operations text found');
 
     // Clear all logs and make sure the confirmation message is found.
-    $this->drupalPost('admin/reports/dblog', array(), t('Clear log messages'));
+    $this->drupalPostForm('admin/reports/dblog', array(), t('Clear log messages'));
     $this->assertText(t('Database log cleared.'), 'Confirmation message found');
   }
 
@@ -592,13 +587,13 @@ class DbLogTest extends WebTestBase {
   /**
    * Extracts the text contained by the XHTML element.
    *
-   * @param SimpleXMLElement $element
+   * @param \SimpleXMLElement $element
    *   Element to extract text from.
    *
    * @return string
    *   Extracted text.
    */
-  protected function asText(SimpleXMLElement $element) {
+  protected function asText(\SimpleXMLElement $element) {
     if (!is_object($element)) {
       return $this->fail('The element is not an element.');
     }

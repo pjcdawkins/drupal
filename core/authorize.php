@@ -20,8 +20,12 @@
  * @link authorize Authorized operation helper functions @endlink
  */
 
+use Symfony\Component\HttpFoundation\Request;
+
 // Change the directory to the Drupal root.
 chdir('..');
+
+require_once __DIR__ . '/vendor/autoload.php';
 
 /**
  * Global flag to identify update.php and authorize.php runs.
@@ -48,10 +52,12 @@ function authorize_access_denied_page() {
  * The killswitch in settings.php overrides all else, otherwise, the user must
  * have access to the 'administer software updates' permission.
  *
- * @return
+ * @return bool
  *   TRUE if the current user can run authorize.php, and FALSE if not.
  */
 function authorize_access_allowed() {
+  require_once DRUPAL_ROOT . '/' . settings()->get('session_inc', 'core/includes/session.inc');
+  drupal_session_initialize();
   return settings()->get('allow_authorize_operations', TRUE) && user_access('administer software updates');
 }
 
@@ -65,7 +71,10 @@ require_once __DIR__ . '/includes/ajax.inc';
 
 // We prepare only a minimal bootstrap. This includes the database and
 // variables, however, so we have access to the class autoloader.
-drupal_bootstrap(DRUPAL_BOOTSTRAP_SESSION);
+drupal_bootstrap(DRUPAL_BOOTSTRAP_VARIABLES);
+
+$request = Request::createFromGlobals();
+\Drupal::getContainer()->set('request', $request);
 
 // This must go after drupal_bootstrap(), which unsets globals!
 global $conf;
@@ -74,9 +83,9 @@ global $conf;
 // display errors via the maintenance theme.
 $module_list['system'] = 'core/modules/system/system.module';
 $module_list['user'] = 'core/modules/user/user.module';
-Drupal::moduleHandler()->setModuleList($module_list);
-Drupal::moduleHandler()->load('system');
-Drupal::moduleHandler()->load('user');
+\Drupal::moduleHandler()->setModuleList($module_list);
+\Drupal::moduleHandler()->load('system');
+\Drupal::moduleHandler()->load('user');
 
 // Initialize the language system.
 drupal_language_initialize();
@@ -132,8 +141,8 @@ if (authorize_access_allowed()) {
     $output .= theme('item_list', array('items' => $links, 'title' => t('Next steps')));
   }
   // If a batch is running, let it run.
-  elseif (isset($_GET['batch'])) {
-    $output = _batch_page();
+  elseif ($request->query->has('batch')) {
+    $output = _batch_page($request);
   }
   else {
     if (empty($_SESSION['authorize_operation']) || empty($_SESSION['authorize_filetransfer_info'])) {

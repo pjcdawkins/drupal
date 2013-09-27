@@ -7,16 +7,13 @@
 
 namespace Drupal\views\Plugin\views\style;
 
-use Drupal\Component\Annotation\Plugin;
-use Drupal\Core\Annotation\Translation;
-
 /**
  * Unformatted style plugin to render rows one after another with no
  * decorations.
  *
  * @ingroup views_style_plugins
  *
- * @Plugin(
+ * @ViewsStyle(
  *   id = "default",
  *   title = @Translation("Unformatted list"),
  *   help = @Translation("Displays rows one after another."),

@@ -7,6 +7,7 @@
 
 namespace Drupal\Core\Entity\Query;
 
+use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\Core\Database\Query\AlterableInterface;
 
 /**
@@ -37,7 +38,7 @@ interface QueryInterface extends AlterableInterface {
    * For example, to find all entities containing both the Turkish 'merhaba'
    * and the Polish 'siema' within a 'greetings' text field:
    * @code
-   *   $entity_ids = Drupal::entityQuery($entity_type)
+   *   $entity_ids = \Drupal::entityQuery($entity_type)
    *     ->condition('greetings', 'merhaba', '=', 'tr');
    *     ->condition('greetings.value', 'siema', '=', 'pl');
    *     ->execute();
@@ -136,10 +137,9 @@ interface QueryInterface extends AlterableInterface {
    * Enables sortable tables for this query.
    *
    * @param $headers
-   *   An array of headers of the same struucture as described in
-   *   theme_table(). Use a 'specifier' in place of a 'field' to specify what
-   *   to sort on. This can be an entity or a field as described in
-   *   condition().
+   *   An array of headers of the same structure as described in theme_table().
+   *   Use a 'specifier' in place of a 'field' to specify what to sort on.
+   *   This can be an entity or a field as described in condition().
    * @return \Drupal\Core\Entity\Query\QueryInterface
    *   The called object.
    */
@@ -159,13 +159,15 @@ interface QueryInterface extends AlterableInterface {
    * @TODO: Once revision tables have been cleaned up, revisit this.
    *
    * @param $age
-   *   - FIELD_LOAD_CURRENT (default): Query the most recent revisions only,
-   *   - FIELD_LOAD_REVISION: Query all revisions.
+   *   - EntityStorageControllerInterface::FIELD_LOAD_CURRENT (default): Query
+   *     the most recent revisions only,
+   *   - EntityStorageControllerInterface::FIELD_LOAD_REVISION: Query all
+   *     revisions.
    *
    * @return \Drupal\Core\Entity\Query\QueryInterface
    *   The called object.
    */
-  public function age($age = FIELD_LOAD_CURRENT);
+  public function age($age = EntityStorageControllerInterface::FIELD_LOAD_CURRENT);
 
   /**
    * Execute the query.
@@ -178,27 +180,13 @@ interface QueryInterface extends AlterableInterface {
   public function execute();
 
   /**
-   * Creates an object holding a group of conditions.
-   *
-   * See andConditionGroup() and orConditionGroup() for more.
-   *
-   * @param $conjunction
-   *   - AND (default): this is the equivalent of andConditionGroup().
-   *   - OR: this is the equivalent of andConditionGroup().
-   *
-   * return ConditionInterface
-   *   An object holding a group of conditions.
-   */
-  public function conditionGroupFactory($conjunction = 'AND');
-
-  /**
    * Creates a new group of conditions ANDed together.
    *
    * For example, consider a drawing entity type with a 'figures' multi-value
    * field containing 'shape' and 'color' columns. To find all drawings
    * containing both a red triangle and a blue circle:
    * @code
-   *   $query = Drupal::entityQuery('drawing');
+   *   $query = \Drupal::entityQuery('drawing');
    *   $group = $query->andConditionGroup()
    *     ->condition('figures.color', 'red')
    *     ->condition('figures.shape', 'triangle');
@@ -221,7 +209,7 @@ interface QueryInterface extends AlterableInterface {
    * containing 'building_type' and 'color' columns.  To find all green and
    * red bikesheds:
    * @code
-   *   $query = Drupal::entityQuery('map');
+   *   $query = \Drupal::entityQuery('map');
    *   $group = $query->orConditionGroup()
    *     ->condition('attributes.color', 'red')
    *     ->condition('attributes.color', 'green');

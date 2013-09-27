@@ -60,9 +60,9 @@ class ContextualDynamicContextTest extends WebTestBase {
     // Now, on the front page, all article nodes should have contextual links
     // placeholders, as should the view that contains them.
     $ids = array(
-      'node:node:' . $node1->nid . ':',
-      'node:node:' . $node2->nid . ':',
-      'node:node:' . $node3->nid . ':',
+      'node:node:' . $node1->id() . ':',
+      'node:node:' . $node2->id() . ':',
+      'node:node:' . $node3->id() . ':',
       'views_ui:admin/structure/views/view:frontpage:location=page&name=frontpage&display_id=page_1',
     );
 
@@ -147,30 +147,10 @@ class ContextualDynamicContextTest extends WebTestBase {
    *   The response body.
    */
   protected function renderContextualLinks($ids, $current_path) {
-    // Build POST values.
     $post = array();
     for ($i = 0; $i < count($ids); $i++) {
       $post['ids[' . $i . ']'] = $ids[$i];
     }
-
-    // Serialize POST values.
-    foreach ($post as $key => $value) {
-      // Encode according to application/x-www-form-urlencoded
-      // Both names and values needs to be urlencoded, according to
-      // http://www.w3.org/TR/html4/interact/forms.html#h-17.13.4.1
-      $post[$key] = urlencode($key) . '=' . urlencode($value);
-    }
-    $post = implode('&', $post);
-
-    // Perform HTTP request.
-    return $this->curlExec(array(
-      CURLOPT_URL => url('contextual/render', array('absolute' => TRUE, 'query' => array('destination' => $current_path))),
-      CURLOPT_POST => TRUE,
-      CURLOPT_POSTFIELDS => $post,
-      CURLOPT_HTTPHEADER => array(
-        'Accept: application/json',
-        'Content-Type: application/x-www-form-urlencoded',
-      ),
-    ));
+    return $this->drupalPost('contextual/render', 'application/json', $post, array('query' => array('destination' => $current_path)));
   }
 }

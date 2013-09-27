@@ -95,7 +95,7 @@ function drupal_install_profile_distribution_name() {
   // installation state (it might not be saved anywhere yet).
   if (drupal_installation_attempted()) {
     global $install_state;
-    return $install_state['profile_info']['distribution_name'];
+    return isset($install_state['profile_info']['distribution_name']) ? $install_state['profile_info']['distribution_name'] : 'Drupal';
   }
   // At all other times, we load the profile via standard methods.
   else {
@@ -486,10 +486,10 @@ function drupal_install_config_directories() {
     // to the drupal core repo.
     switch ($config_type) {
       case CONFIG_ACTIVE_DIRECTORY:
-        $text = 'This directory contains the active configuration for your Drupal site. To move this configuration between environments, contents from this directory should be placed in the staging directory on the target server. To make this configuration active, see admin/config/development/sync on the target server.';
+        $text = 'This directory contains the active configuration for your Drupal site. To move this configuration between environments, contents from this directory should be placed in the staging directory on the target server. To make this configuration active, see admin/config/development/configuration/sync on the target server.';
         break;
       case CONFIG_STAGING_DIRECTORY:
-        $text = 'This directory contains configuration to be imported into your Drupal site. To make this configuration active, see admin/config/development/sync.';
+        $text = 'This directory contains configuration to be imported into your Drupal site. To make this configuration active, see admin/config/development/configuration/sync.';
         break;
     }
     $text .=  ' For information about deploying configuration between servers, see http://drupal.org/documentation/administer/config';
@@ -619,7 +619,7 @@ function drupal_install_system() {
 
   if (!drupal_container()->has('kernel')) {
     // Immediately boot a kernel to have real services ready.
-    $kernel = new DrupalKernel('install', FALSE, drupal_classloader(), FALSE);
+    $kernel = new DrupalKernel('install', drupal_classloader(), FALSE);
     $kernel->boot();
   }
 
@@ -627,18 +627,18 @@ function drupal_install_system() {
   require_once DRUPAL_ROOT . '/' . $system_path . '/system.install';
   $system_versions = drupal_get_schema_versions('system');
   $system_version = $system_versions ? max($system_versions) : SCHEMA_INSTALLED;
-  Drupal::keyValue('system.schema')->set('system', $system_version);
+  \Drupal::keyValue('system.schema')->set('system', $system_version);
 
   // System module needs to be enabled and the system/module lists need to be
   // reset first in order to allow config_install_default_config() to invoke
   // config import callbacks.
   // @todo Installation profiles may override the system.module config object.
-  config('system.module')
+  \Drupal::config('system.module')
     ->set('enabled.system', 0)
     ->save();
 
   // Update the module list to include it.
-  Drupal::moduleHandler()->setModuleList(array('system' => $system_path . '/system.module'));
+  \Drupal::moduleHandler()->setModuleList(array('system' => $system_path . '/system.module'));
 
   config_install_default_config('module', 'system');
 
@@ -993,22 +993,20 @@ function drupal_requirements_severity(&$requirements) {
  */
 function drupal_check_module($module) {
   module_load_install($module);
-  if (module_hook($module, 'requirements')) {
-    // Check requirements
-    $requirements = module_invoke($module, 'requirements', 'install');
-    if (is_array($requirements) && drupal_requirements_severity($requirements) == REQUIREMENT_ERROR) {
-      // Print any error messages
-      foreach ($requirements as $requirement) {
-        if (isset($requirement['severity']) && $requirement['severity'] == REQUIREMENT_ERROR) {
-          $message = $requirement['description'];
-          if (isset($requirement['value']) && $requirement['value']) {
-            $message .= ' (' . t('Currently using !item !version', array('!item' => $requirement['title'], '!version' => $requirement['value'])) . ')';
-          }
-          drupal_set_message($message, 'error');
+  // Check requirements
+  $requirements = module_invoke($module, 'requirements', 'install');
+  if (is_array($requirements) && drupal_requirements_severity($requirements) == REQUIREMENT_ERROR) {
+    // Print any error messages
+    foreach ($requirements as $requirement) {
+      if (isset($requirement['severity']) && $requirement['severity'] == REQUIREMENT_ERROR) {
+        $message = $requirement['description'];
+        if (isset($requirement['value']) && $requirement['value']) {
+          $message .= ' (' . t('Currently using !item !version', array('!item' => $requirement['title'], '!version' => $requirement['value'])) . ')';
         }
+        drupal_set_message($message, 'error');
       }
-      return FALSE;
     }
+    return FALSE;
   }
   return TRUE;
 }

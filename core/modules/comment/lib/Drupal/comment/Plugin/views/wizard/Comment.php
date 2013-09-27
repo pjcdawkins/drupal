@@ -8,7 +8,7 @@
 namespace Drupal\comment\Plugin\views\wizard;
 
 use Drupal\views\Plugin\views\wizard\WizardPluginBase;
-use Drupal\Component\Annotation\Plugin;
+use Drupal\views\Annotation\ViewsWizard;
 use Drupal\Core\Annotation\Translation;
 
 /**
@@ -18,9 +18,8 @@ use Drupal\Core\Annotation\Translation;
 /**
  * Tests creating comment views with the wizard.
  *
- * @Plugin(
+ * @ViewsWizard(
  *   id = "comment",
- *   module = "comment",
  *   base_table = "comment",
  *   title = @Translation("Comments")
  * )
@@ -54,12 +53,14 @@ class Comment extends WizardPluginBase {
     'status' => array(
       'value' => TRUE,
       'table' => 'comment',
-      'field' => 'status'
+      'field' => 'status',
+      'provider' => 'comment'
     ),
     'status_node' => array(
       'value' => TRUE,
       'table' => 'node_field_data',
       'field' => 'status',
+      'provider' => 'node',
       'relationship' => 'nid'
     )
   );
@@ -87,8 +88,8 @@ class Comment extends WizardPluginBase {
       case 'comment':
         $style_form['row_options']['links'] = array(
           '#type' => 'select',
-          '#title_display' => 'invisible',
           '#title' => t('Should links be displayed below each comment'),
+          '#title_display' => 'invisible',
           '#options' => array(
             1 => t('with links (allow users to reply to the comment, etc.)'),
             0 => t('without links'),
@@ -155,6 +156,7 @@ class Comment extends WizardPluginBase {
     $display_options['fields']['subject']['id'] = 'subject';
     $display_options['fields']['subject']['table'] = 'comment';
     $display_options['fields']['subject']['field'] = 'subject';
+    $display_options['fields']['subject']['provider'] = 'comment';
     $display_options['fields']['subject']['label'] = '';
     $display_options['fields']['subject']['alter']['alter_text'] = 0;
     $display_options['fields']['subject']['alter']['make_link'] = 0;

@@ -52,12 +52,13 @@ class MainContentFallbackTest extends WebTestBase {
    */
   function testMainContentFallback() {
     $edit = array();
-    // Disable the block module.
-    $edit['modules[Core][block][enable]'] = FALSE;
-    $this->drupalPost('admin/modules', $edit, t('Save configuration'));
-    $this->assertText(t('The configuration options have been saved.'), 'Modules status has been updated.');
+    // Uninstall the block module.
+    $edit['uninstall[block]'] = 'block';
+    $this->drupalPostForm('admin/modules/uninstall', $edit, t('Uninstall'));
+    $this->drupalPostForm(NULL, NULL, t('Uninstall'));
+    $this->assertText(t('The selected modules have been uninstalled.'), 'Modules status has been updated.');
     $this->rebuildContainer();
-    $this->assertFalse(module_exists('block'), 'Block module disabled.');
+    $this->assertFalse(module_exists('block'), 'Block module uninstall.');
 
     // At this point, no region is filled and fallback should be triggered.
     $this->drupalGet('admin/config/system/site-information');
@@ -81,14 +82,14 @@ class MainContentFallbackTest extends WebTestBase {
 
     // Request a user* page and see if it is displayed.
     $this->drupalLogin($this->web_user);
-    $this->drupalGet('user/' . $this->web_user->uid . '/edit');
+    $this->drupalGet('user/' . $this->web_user->id() . '/edit');
     $this->assertField('mail', 'User interface still available.');
 
     // Enable the block module again.
     $this->drupalLogin($this->admin_user);
     $edit = array();
     $edit['modules[Core][block][enable]'] = 'block';
-    $this->drupalPost('admin/modules', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/modules', $edit, t('Save configuration'));
     $this->assertText(t('The configuration options have been saved.'), 'Modules status has been updated.');
     $this->rebuildContainer();
     $this->assertTrue(module_exists('block'), 'Block module re-enabled.');

@@ -21,6 +21,16 @@ namespace Drupal\Core\Entity;
 interface EntityStorageControllerInterface {
 
   /**
+   * Load the most recent version of an entity's field data.
+   */
+  const FIELD_LOAD_CURRENT = 'FIELD_LOAD_CURRENT';
+
+  /**
+   * Load the version of an entity's field data specified in the entity.
+   */
+  const FIELD_LOAD_REVISION = 'FIELD_LOAD_REVISION';
+
+  /**
    * Resets the internal, static entity cache.
    *
    * @param $ids
@@ -38,7 +48,18 @@ interface EntityStorageControllerInterface {
    * @return
    *   An array of entity objects indexed by their ids.
    */
-  public function load(array $ids = NULL);
+  public function loadMultiple(array $ids = NULL);
+
+  /**
+   * Loads one entity.
+   *
+   * @param mixed $id
+   *   The ID of the entity to load.
+   *
+   * @return \Drupal\Core\Entity\EntityInterface
+   *   An entity object.
+   */
+  public function load($id);
 
   /**
    * Loads an unchanged entity from the database.
@@ -124,18 +145,6 @@ interface EntityStorageControllerInterface {
    *   In case of failures, an exception is thrown.
    */
   public function save(EntityInterface $entity);
-
-  /**
-   * Defines the base fields of the entity type.
-   *
-   * @return array
-   *   An array of entity field definitions as specified by
-   *   \Drupal\Core\Entity\EntityManager::getFieldDefinitions(), keyed by field
-   *   name.
-   *
-   * @see \Drupal\Core\Entity\EntityManager::getFieldDefinitions()
-   */
-  public function baseFieldDefinitions();
 
   /**
    * Gets the name of the service for the query for this entity storage.

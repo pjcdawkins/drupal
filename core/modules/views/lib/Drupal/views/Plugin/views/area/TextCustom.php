@@ -34,6 +34,7 @@ class TextCustom extends TokenizeAreaPluginBase {
     parent::buildOptionsForm($form, $form_state);
 
     $form['content'] = array(
+      '#title' => t('Content'),
       '#type' => 'textarea',
       '#default_value' => $this->options['content'],
       '#rows' => 6,
@@ -43,7 +44,7 @@ class TextCustom extends TokenizeAreaPluginBase {
   /**
    * Implements \Drupal\views\Plugin\views\area\AreaPluginBase::render().
    */
-  function render($empty = FALSE) {
+  public function render($empty = FALSE) {
     if (!$empty || !empty($this->options['empty'])) {
       return array(
         '#markup' => $this->renderTextarea($this->options['content']),

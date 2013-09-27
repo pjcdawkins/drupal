@@ -7,7 +7,7 @@
 
 namespace Drupal\views\Plugin\views\argument_default;
 
-use Drupal\Component\Annotation\Plugin;
+use Drupal\views\Annotation\ViewsArgumentDefault;
 use Drupal\Core\Annotation\Translation;
 use Drupal\Core\Path\AliasManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @ingroup views_argument_default_plugins
  *
- * @Plugin(
+ * @ViewsArgumentDefault(
  *   id = "raw",
  *   title = @Translation("Raw value from URL")
  * )
@@ -101,7 +101,7 @@ class Raw extends ArgumentDefaultPluginBase {
   }
 
   public function getArgument() {
-    $path = $this->request->attributes->get('system_path');
+    $path = $this->request->attributes->get('_system_path');
     if ($this->options['use_alias']) {
       $path = $this->aliasManager->getPathAlias($path);
     }

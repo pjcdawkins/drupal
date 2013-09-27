@@ -25,14 +25,14 @@ abstract class CommentTestBase extends ViewTestBase {
   /**
    * Stores a comment used by the tests.
    *
-   * @var \Drupal\comment\Plugin\Core\Entity\Comment
+   * @var \Drupal\comment\Entity\Comment
    */
   public $comment;
 
   function setUp() {
     parent::setUp();
 
-    ViewTestData::importTestViews(get_class($this), array('comment_test_views'));
+    ViewTestData::createTestViews(get_class($this), array('comment_test_views'));
 
     // Add two users, create a node with the user1 as author and another node
     // with user2 as author. For the second node add a comment from user1.
@@ -41,11 +41,11 @@ abstract class CommentTestBase extends ViewTestBase {
     $this->drupalLogin($this->account);
 
     $this->node_user_posted = $this->drupalCreateNode();
-    $this->node_user_commented = $this->drupalCreateNode(array('uid' => $this->account2->uid));
+    $this->node_user_commented = $this->drupalCreateNode(array('uid' => $this->account2->id()));
 
     $comment = array(
-      'uid' => $this->loggedInUser->uid,
-      'nid' => $this->node_user_commented->nid,
+      'uid' => $this->loggedInUser->id(),
+      'nid' => $this->node_user_commented->id(),
       'cid' => '',
       'pid' => '',
       'node_type' => '',

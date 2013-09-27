@@ -47,7 +47,7 @@ class CommentApprovalTest extends CommentTestBase {
     // Get unapproved comment id.
     $this->drupalLogin($this->admin_user);
     $anonymous_comment4 = $this->getUnapprovedComment($subject);
-    $anonymous_comment4 = entity_create('comment', array('cid' => $anonymous_comment4, 'node_type' => '', 'subject' => $subject, 'comment_body' => $body, 'nid' => $this->node->nid));
+    $anonymous_comment4 = entity_create('comment', array('cid' => $anonymous_comment4, 'node_type' => '', 'subject' => $subject, 'comment_body' => $body, 'nid' => $this->node->id()));
     $this->drupalLogout();
 
     $this->assertFalse($this->commentExists($anonymous_comment4), 'Anonymous comment was not published.');
@@ -57,7 +57,7 @@ class CommentApprovalTest extends CommentTestBase {
     $this->performCommentOperation($anonymous_comment4, 'publish', TRUE);
     $this->drupalLogout();
 
-    $this->drupalGet('node/' . $this->node->nid);
+    $this->drupalGet('node/' . $this->node->id());
     $this->assertTrue($this->commentExists($anonymous_comment4), 'Anonymous comment visible.');
 
     // Post 2 anonymous comments without contact info.
@@ -72,7 +72,7 @@ class CommentApprovalTest extends CommentTestBase {
       "comments[{$comments[0]->id()}]" => 1,
       "comments[{$comments[1]->id()}]" => 1,
     );
-    $this->drupalPost(NULL, $edit, t('Update'));
+    $this->drupalPostForm(NULL, $edit, t('Update'));
     $this->assertText(t('Unapproved comments (@count)', array('@count' => 0)), 'All comments were approved.');
 
     // Delete multiple comments in one operation.
@@ -82,9 +82,9 @@ class CommentApprovalTest extends CommentTestBase {
       "comments[{$comments[1]->id()}]" => 1,
       "comments[{$anonymous_comment4->id()}]" => 1,
     );
-    $this->drupalPost(NULL, $edit, t('Update'));
+    $this->drupalPostForm(NULL, $edit, t('Update'));
     $this->assertText(t('Are you sure you want to delete these comments and all their children?'), 'Confirmation required.');
-    $this->drupalPost(NULL, $edit, t('Delete comments'));
+    $this->drupalPostForm(NULL, $edit, t('Delete comments'));
     $this->assertText(t('No comments available.'), 'All comments were deleted.');
   }
 
@@ -111,7 +111,7 @@ class CommentApprovalTest extends CommentTestBase {
     // Get unapproved comment id.
     $this->drupalLogin($this->admin_user);
     $anonymous_comment4 = $this->getUnapprovedComment($subject);
-    $anonymous_comment4 = entity_create('comment', array('cid' => $anonymous_comment4, 'node_type' => '', 'subject' => $subject, 'comment_body' => $body, 'nid' => $this->node->nid));
+    $anonymous_comment4 = entity_create('comment', array('cid' => $anonymous_comment4, 'node_type' => '', 'subject' => $subject, 'comment_body' => $body, 'nid' => $this->node->id()));
     $this->drupalLogout();
 
     $this->assertFalse($this->commentExists($anonymous_comment4), 'Anonymous comment was not published.');
@@ -122,11 +122,11 @@ class CommentApprovalTest extends CommentTestBase {
     $this->assertResponse(403, 'Forged comment approval was denied.');
     $this->drupalGet('comment/1/approve', array('query' => array('token' => 'forged')));
     $this->assertResponse(403, 'Forged comment approval was denied.');
-    $this->drupalGet('node/' . $this->node->nid);
+    $this->drupalGet('node/' . $this->node->id());
     $this->clickLink(t('approve'));
     $this->drupalLogout();
 
-    $this->drupalGet('node/' . $this->node->nid);
+    $this->drupalGet('node/' . $this->node->id());
     $this->assertTrue($this->commentExists($anonymous_comment4), 'Anonymous comment visible.');
   }
 }

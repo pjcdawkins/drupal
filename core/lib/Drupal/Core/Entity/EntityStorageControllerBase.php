@@ -89,8 +89,7 @@ abstract class EntityStorageControllerBase implements EntityStorageControllerInt
    */
   public function loadUnchanged($id) {
     $this->resetCache(array($id));
-    $result = $this->load(array($id));
-    return reset($result);
+    return $this->load($id);
   }
 
   /**
@@ -145,7 +144,7 @@ abstract class EntityStorageControllerBase implements EntityStorageControllerInt
       // @todo getTranslation() only works on NG entities. Remove the condition
       // and the second code branch when all core entity types are converted.
       if ($translation = $entity->getTranslation($langcode)) {
-        foreach ($translation as $field_name => $field) {
+        foreach ($translation as $field) {
           $field->$method();
         }
       }
@@ -191,7 +190,8 @@ abstract class EntityStorageControllerBase implements EntityStorageControllerInt
             // of making LegacyConfigFieldItem implement PrepareCacheInterface.
             // @todo Remove once all core field types have been converted (see
             // http://drupal.org/node/2014671).
-            || (is_subclass_of($type_definition['class'], '\Drupal\field\Plugin\field\field_type\LegacyConfigFieldItem') && function_exists($type_definition['module'] . '_field_load'))) {
+            || (is_subclass_of($type_definition['class'], '\Drupal\field\Plugin\field\field_type\LegacyConfigFieldItem')
+              && isset($type_definition['provider']) && function_exists($type_definition['provider'] . '_field_load'))) {
 
             // Call the prepareCache() method directly on each item
             // individually.
@@ -212,7 +212,7 @@ abstract class EntityStorageControllerBase implements EntityStorageControllerInt
             if (is_subclass_of($type_definition['class'], '\Drupal\Core\Entity\Field\PrepareCacheInterface')
               // @todo Remove once all core field types have been converted
               // (see http://drupal.org/node/2014671).
-              || (is_subclass_of($type_definition['class'], '\Drupal\field\Plugin\field\field_type\LegacyConfigFieldItem') && function_exists($type_definition['module'] . '_field_load'))) {
+              || (is_subclass_of($type_definition['class'], '\Drupal\field\Plugin\field\field_type\LegacyConfigFieldItem') && function_exists($type_definition['provider'] . '_field_load'))) {
 
               // Create the items object.
               $items = isset($entity->{$field_name}[$langcode]) ? $entity->{$field_name}[$langcode] : array();
@@ -230,6 +230,44 @@ abstract class EntityStorageControllerBase implements EntityStorageControllerInt
             }
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Invokes a hook on behalf of the entity.
+   *
+   * @param string $hook
+   *   One of 'presave', 'insert', 'update', 'predelete', 'delete', or
+   *  'revision_delete'.
+   * @param \Drupal\Core\Entity\EntityInterface  $entity
+   *   The entity object.
+   */
+  protected function invokeHook($hook, EntityInterface $entity) {
+    // Invoke the hook.
+    module_invoke_all($this->entityType . '_' . $hook, $entity);
+    // Invoke the respective entity-level hook.
+    module_invoke_all('entity_' . $hook, $entity, $this->entityType);
+  }
+
+  /**
+   * Checks translation statuses and invoke the related hooks if needed.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity being saved.
+   */
+  protected function invokeTranslationHooks(EntityInterface $entity) {
+    $translations = $entity->getTranslationLanguages(FALSE);
+    $original_translations = $entity->original->getTranslationLanguages(FALSE);
+    $all_translations = array_keys($translations + $original_translations);
+
+    // Notify modules of translation insertion/deletion.
+    foreach ($all_translations as $langcode) {
+      if (isset($translations[$langcode]) && !isset($original_translations[$langcode])) {
+        $this->invokeHook('translation_insert', $entity->getTranslation($langcode));
+      }
+      elseif (!isset($translations[$langcode]) && isset($original_translations[$langcode])) {
+        $this->invokeHook('translation_delete', $entity->getTranslation($langcode));
       }
     }
   }

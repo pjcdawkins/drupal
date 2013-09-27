@@ -74,7 +74,7 @@ class ViewsTaxonomyAutocompleteTest extends ViewTestBase {
   public function testTaxonomyAutocomplete() {
     $this->user = $this->drupalCreateUser(array('access content'));
     $this->drupalLogin($this->user);
-    $base_autocomplete_path = 'admin/views/ajax/autocomplete/taxonomy/' . $this->vocabulary->vid;
+    $base_autocomplete_path = 'taxonomy/autocomplete_vid/' . $this->vocabulary->vid;
 
     // Test that no terms returns an empty array.
     $this->assertIdentical(array(), $this->drupalGetJSON($base_autocomplete_path));
@@ -94,7 +94,7 @@ class ViewsTaxonomyAutocompleteTest extends ViewTestBase {
    * @param string $name
    *   (optional) The name of the taxonomy term.
    *
-   * @return \Drupal\taxonomy\Plugin\Core\Entity\Term
+   * @return \Drupal\taxonomy\Entity\Term
    *   The created taxonomy term.
    */
   protected function createTerm($name = NULL) {

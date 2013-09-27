@@ -5,11 +5,14 @@
  * Administration toolbar for quick access to top level administration items.
  */
 
+use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Language\Language;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Drupal\Core\Template\Attribute;
 use Drupal\Component\Utility\Crypt;
 use Symfony\Component\HttpFoundation\Response;
+use Drupal\menu_link\MenuLinkInterface;
+use Drupal\user\RoleInterface;
+use Drupal\user\UserInterface;
 
 /**
  * Implements hook_help().
@@ -80,9 +83,7 @@ function toolbar_element_info() {
       // The id cannot be simply "toolbar" or it will clash with the simpletest
       // tests listing which produces a checkbox with attribute id="toolbar"
       'id' => 'toolbar-administration',
-      // The 'overlay-displace-top' class pushes the overlay down, so it appears
-      // below the toolbar.
-      'class' => array('toolbar',),
+      'class' => array('toolbar'),
       'role' => 'navigation',
     ),
     // Metadata for the administration bar.
@@ -90,8 +91,7 @@ function toolbar_element_info() {
       '#heading' => t('Toolbar items'),
       '#attributes' => array(
         'id' => 'toolbar-bar',
-        'class' => array('bar', 'clearfix',),
-        'data-offset-top' => array(),
+        'class' => array('toolbar-bar', 'clearfix'),
       ),
     ),
   );
@@ -128,13 +128,11 @@ function _toolbar_initialize_page_cache() {
 
   // If we have a cache, serve it.
   // @see _drupal_bootstrap_page_cache()
-  $cache = drupal_page_get_cache();
+  $request = \Drupal::request();
+  $cache = drupal_page_get_cache($request);
   if (is_object($cache)) {
     $response = new Response();
-    $request = \Drupal::request();
     $response->headers->set('X-Drupal-Cache', 'HIT');
-    // Restore the metadata cached with the page.
-    $_GET['q'] = $cache->data['path'];
     date_default_timezone_set(drupal_get_user_timezone());
 
     drupal_serve_page_from_cache($cache, $response, $request);
@@ -204,7 +202,7 @@ function toolbar_pre_render($element) {
   }
 
   // Get toolbar items from all modules that implement hook_toolbar().
-  $items = module_invoke_all('toolbar');
+  $items = \Drupal::moduleHandler()->invokeAll('toolbar');
   // Allow for altering of hook_toolbar().
   drupal_alter('toolbar', $items);
   // Sort the children.
@@ -254,22 +252,24 @@ function theme_toolbar(&$variables) {
  *   A renderable array.
  */
 function toolbar_pre_render_item($element) {
+  // Assign each item a unique ID.
+  $id = drupal_html_id('toolbar-item');
+
+  // Provide attributes for a toolbar item.
+  $attributes = array(
+    'id' => $id,
+  );
 
   // If tray content is present, markup the tray and its associated trigger.
   if (!empty($element['tray'])) {
-
-    // Trays are associated with their trigger by a unique ID.
-    $id = drupal_html_id('toolbar-tray');
-    $element['tab']['#tray_id'] = $id;
-
-    // Provide attributes for a tray trigger.
-    $attributes = array(
-      'id' => 'toolbar-tab-' . $id,
-      'data-toolbar-tray' => $id,
+    // Provide attributes necessary for trays.
+    $attributes += array(
+      'data-toolbar-tray' => $id . '-tray',
       'aria-owns' => $id,
       'role' => 'button',
       'aria-pressed' => 'false',
     );
+
     // Merge in module-provided attributes.
     $element['tab'] += array('#attributes' => array());
     $element['tab']['#attributes'] += $attributes;
@@ -277,27 +277,24 @@ function toolbar_pre_render_item($element) {
 
     // Provide attributes for the tray theme wrapper.
     $attributes = array(
-      'id' => $id,
-      'data-toolbar-tray' => $id,
-      'aria-owned-by' => 'toolbar-tab-' . $id,
+      'id' => $id . '-tray',
+      'data-toolbar-tray' => $id . '-tray',
+      'aria-owned-by' => $id,
     );
     // Merge in module-provided attributes.
     if (!isset($element['tray']['#wrapper_attributes'])) {
       $element['tray']['#wrapper_attributes'] = array();
     }
     $element['tray']['#wrapper_attributes'] += $attributes;
-    $element['tray']['#wrapper_attributes']['class'][] = 'tray';
+    $element['tray']['#wrapper_attributes']['class'][] = 'toolbar-tray';
 
     if (!isset($element['tray']['#theme_wrappers'])) {
       $element['tray']['#theme_wrappers'] = array();
     }
     // Add the standard theme_wrapper for trays.
     array_unshift($element['tray']['#theme_wrappers'], 'toolbar_tray_wrapper');
-    // If a #heading is provided for the tray, provided a #theme_wrapper
-    // function to append it.
-    if (!empty($element['tray']['#heading'])) {
-      array_unshift($element['tray']['#theme_wrappers'], 'toolbar_tray_heading_wrapper');
-    }
+    // Add the theme wrapper for the tray heading.
+    array_unshift($element['tray']['#theme_wrappers'], 'toolbar_tray_heading_wrapper');
   }
 
   return $element;
@@ -310,7 +307,7 @@ function template_preprocess_toolbar_tab_wrapper(&$variables) {
   if (!isset($variables['element']['#wrapper_attributes'])) {
     $variables['element']['#wrapper_attributes'] = array();
   }
-  $variables['element']['#wrapper_attributes']['class'][] = 'tab';
+  $variables['element']['#wrapper_attributes']['class'][] = 'toolbar-tab';
 }
 
 /**
@@ -363,7 +360,7 @@ function theme_toolbar_tab_wrapper(&$variables) {
 function theme_toolbar_tray_wrapper(&$variables) {
   if (!empty($variables['element']['#children'])) {
     $element = $variables['element'];
-    return '<div' . new Attribute($element['#wrapper_attributes']) . '><div class="lining clearfix">' . $element['#children'] . '</div></div>';
+    return '<div' . new Attribute($element['#wrapper_attributes']) . '><div class="toolbar-lining clearfix">' . $element['#children'] . '</div></div>';
   }
 }
 
@@ -376,9 +373,13 @@ function theme_toolbar_tray_wrapper(&$variables) {
  *     the tray. Properties used: #children and #heading.
  */
 function theme_toolbar_tray_heading_wrapper(&$variables) {
-  if (!empty($variables['element']['#children'])) {
-    $element = $variables['element'];
-    return '<h3 class="visually-hidden">' . $element['#heading'] . '</h3>' . $element['#children'];
+  $element = $variables['element'];
+  if (!empty($element['#children'])) {
+    $heading = '';
+    if (!empty($element['#heading'])) {
+      $heading = '<h3 class="toolbar-tray-name visually-hidden">' . $element['#heading'] . '</h3>';
+    }
+    return $heading . $element['#children'];
   }
 }
 
@@ -414,7 +415,7 @@ function toolbar_toolbar() {
       '#options' => array(
         'attributes' => array(
           'title' => t('Home page'),
-          'class' => array('icon', 'icon-home'),
+          'class' => array('toolbar-icon', 'toolbar-icon-home'),
         ),
       ),
     ),
@@ -439,11 +440,16 @@ function toolbar_toolbar() {
   );
 
   // To conserve bandwidth, we only include the top-level links in the HTML.
-  // The subtrees are included in a JSONP script, cached by the browser. Here we
-  // add that JSONP script. We add it as an external script, because it's a
-  // Drupal path, not a file available via a stream wrapper.
+  // The subtrees are fetched through a JSONP script that is generated at the
+  // toolbar_subtrees route. We provide the JavaScript requesting that JSONP
+  // script here with the hash parameter that is needed for that route.
   // @see toolbar_subtrees_jsonp()
-  $menu['toolbar_administration']['#attached']['js'][url('toolbar/subtrees/' . _toolbar_get_subtree_hash())] = array('type' => 'external');
+  $menu['toolbar_administration']['#attached']['js'][] = array(
+    'type' => 'setting',
+    'data' => array('toolbar' => array(
+      'subtreesHash' => _toolbar_get_subtrees_hash(),
+    )),
+  );
 
   // The administration element has a link that is themed to correspond to
   // a toolbar tray. The tray contains the full administrative menu of the site.
@@ -456,7 +462,13 @@ function toolbar_toolbar() {
       '#options' => array(
         'attributes' => array(
           'title' => t('Admin menu'),
-          'class' => array('icon', 'icon-menu'),
+          'class' => array('toolbar-icon', 'toolbar-icon-menu'),
+          // A data attribute that indicates to the client to defer loading of
+          // the admin menu subtrees until this tab is activated. Admin menu
+          // subtrees will not render to the DOM if this attribute is removed.
+          // The value of the attribute is intentionally left blank. Only the
+          // presence of the attribute is necessary.
+          'data-drupal-subtrees' => '',
         ),
       ),
     ),
@@ -475,7 +487,7 @@ function toolbar_toolbar() {
  */
 function toolbar_get_menu_tree() {
   $tree = array();
-  $query = Drupal::entityQuery('menu_link')
+  $query = \Drupal::entityQuery('menu_link')
     ->condition('menu_name', 'admin')
     ->condition('module', 'system')
     ->condition('link_path', 'admin');
@@ -512,9 +524,10 @@ function toolbar_menu_navigation_links(&$tree) {
     $tree[$key]['link']['localized_options']['attributes'] = array(
       'id' => 'toolbar-link-' . str_replace(array('/', '<', '>'), array('-', '', ''), $item['link']['link_path']),
       'class' => array(
-        'icon',
-        'icon-' . strtolower(str_replace(' ', '-', $item['link']['link_title'])),
+        'toolbar-icon',
+        'toolbar-icon-' . strtolower(str_replace(' ', '-', $item['link']['link_title'])),
       ),
+      'title' => check_plain($item['link']['description']),
     );
   }
 }
@@ -553,40 +566,12 @@ function toolbar_get_rendered_subtrees() {
 }
 
 /**
- * Checks whether an item is in the active trail.
- *
- * Useful when using a menu generated by menu_tree_all_data() which does
- * not set the 'in_active_trail' flag on items.
- *
- * @return
- *   TRUE when path is in the active trail, FALSE if not.
- *
- * @todo
- *   Look at migrating to a menu system level function.
- */
-function toolbar_in_active_trail($path) {
-  $active_paths = &drupal_static(__FUNCTION__);
-
-  // Gather active paths.
-  if (!isset($active_paths)) {
-    $active_paths = array();
-    $trail = menu_get_active_trail();
-    foreach ($trail as $item) {
-      if (!empty($item['href'])) {
-        $active_paths[] = $item['href'];
-      }
-    }
-  }
-  return in_array($path, $active_paths);
-}
-
-/**
  * Implements hook_library_info().
  */
 function toolbar_library_info() {
   $libraries['toolbar'] = array(
     'title' => 'Toolbar',
-    'version' => VERSION,
+    'version' => \Drupal::VERSION,
     'js' => array(
       drupal_get_path('module', 'toolbar') . '/js/toolbar.js' => array(),
     ),
@@ -596,12 +581,14 @@ function toolbar_library_info() {
       drupal_get_path('module', 'toolbar') . '/css/toolbar.icons.css',
     ),
     'dependencies' => array(
+      array('system', 'modernizr'),
       array('system', 'jquery'),
       array('system', 'drupal'),
       array('system', 'drupalSettings'),
+      array('system', 'drupal.announce'),
+      array('system', 'backbone'),
       array('system', 'matchmedia'),
       array('system', 'jquery.once'),
-      array('system', 'drupal.debounce'),
       array('system', 'drupal.displace'),
       array('toolbar', 'toolbar.menu'),
     ),
@@ -609,7 +596,7 @@ function toolbar_library_info() {
 
   $libraries['toolbar.menu'] = array(
     'title' => 'Toolbar nested accordion menus.',
-    'version' => VERSION,
+    'version' => \Drupal::VERSION,
     'js' => array(
       drupal_get_path('module', 'toolbar') . '/js/toolbar.menu.js' => array(),
     ),
@@ -628,17 +615,93 @@ function toolbar_library_info() {
 
 /**
  * Returns the hash of the per-user rendered toolbar subtrees.
+ *
+ * @return string
+ *   The hash of the admin_menu subtrees.
  */
-function _toolbar_get_subtree_hash() {
-  global $user;
-  $cid = $user->uid . ':' . language(Language::TYPE_INTERFACE)->langcode;
+function _toolbar_get_subtrees_hash() {
+  $uid = \Drupal::currentUser()->id();
+  $cid = _toolbar_get_user_cid($uid);
   if ($cache = cache('toolbar')->get($cid)) {
     $hash = $cache->data;
   }
   else {
     $subtrees = toolbar_get_rendered_subtrees();
     $hash = Crypt::hashBase64(serialize($subtrees));
-    cache('toolbar')->set($cid, $hash);
+    // Cache using a tag 'user' so that we can invalidate all user-specific
+    // caches later, based on the user's ID regardless of language.
+    // Clear the cache when the 'locale' tag is deleted. This ensures a fresh
+    // subtrees rendering when string translations are made.
+    cache('toolbar')->set($cid, $hash, CacheBackendInterface::CACHE_PERMANENT, array('user' => array($uid), 'locale' => TRUE,));
   }
   return $hash;
+}
+
+/**
+ * Implements hook_modules_installed().
+ */
+function toolbar_modules_installed($modules) {
+  _toolbar_clear_user_cache();
+}
+
+/**
+ * Implements hook_modules_uninstalled().
+ */
+function toolbar_modules_uninstalled($modules) {
+  _toolbar_clear_user_cache();
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ */
+function toolbar_menu_link_update(MenuLinkInterface $menu_link) {
+  if ($menu_link->get('menu_name') === 'admin') {
+    _toolbar_clear_user_cache();
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ */
+function toolbar_user_update(UserInterface $user) {
+  _toolbar_clear_user_cache($user->id());
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ */
+function toolbar_user_role_update(RoleInterface $role) {
+  _toolbar_clear_user_cache();
+}
+
+/**
+ * Returns a cache ID from the user and language IDs.
+ *
+ * @param int $uid
+ *   A user ID.
+ *
+ * @return string
+ *   A unique cache ID for the user.
+ */
+function _toolbar_get_user_cid($uid) {
+  return $uid . ':' . \Drupal::languageManager()->getLanguage(Language::TYPE_INTERFACE)->id;
+}
+
+/**
+ * Clears the Toolbar user cache.
+ *
+ * @param int $uid
+ *   (optional) The user ID whose toolbar cache entry to clear.
+ */
+function _toolbar_clear_user_cache($uid = NULL) {
+  $cache = cache('toolbar');
+  if (!$cache->isEmpty()) {
+    // Clear by the 'user' tag in order to delete all caches, in any language,
+    // associated with this user.
+    if (isset($uid)) {
+      $cache->deleteTags(array('user' => array($uid)));
+    } else {
+      $cache->deleteAll();
+    }
+  }
 }

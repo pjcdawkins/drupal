@@ -138,6 +138,14 @@ class EntityType extends Plugin {
   public $static_cache = TRUE;
 
   /**
+   * Boolean indicating whether the rendered output of entities should be
+   * cached.
+   *
+   * @var bool (optional)
+   */
+  public $render_cache = TRUE;
+
+  /**
    * Boolean indicating whether entities of this type have multilingual support.
    *
    * At an entity level, this indicates language support and at a bundle level
@@ -153,6 +161,17 @@ class EntityType extends Plugin {
    * @var array
    */
   public $translation = array();
+
+  /**
+   * The name of the entity type for which bundles are provided.
+   *
+   * It can be used by other modules to act accordingly; for example,
+   * the Field UI module uses it to add operation links to manage fields and
+   * displays.
+   *
+   * @var string
+   */
+  public $bundle_of;
 
   /**
    * An array describing how the Field API can extract certain information from

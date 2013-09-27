@@ -63,7 +63,7 @@ class Permissions extends PrerenderList {
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, array $plugin_definition) {
-    return new static($configuration, $plugin_id, $plugin_definition, $container->get('module_handler'), $container->get('plugin.manager.entity'));
+    return new static($configuration, $plugin_id, $plugin_definition, $container->get('module_handler'), $container->get('entity.manager'));
   }
 
   /**
@@ -97,7 +97,7 @@ class Permissions extends PrerenderList {
     }
 
     if ($rids) {
-      $roles = $this->roleStorageController->load(array_keys($rids));
+      $roles = $this->roleStorageController->loadMultiple(array_keys($rids));
       foreach ($rids as $rid => $role_uids) {
         foreach ($roles[$rid]->getPermissions() as $permission) {
           foreach ($role_uids as $uid) {

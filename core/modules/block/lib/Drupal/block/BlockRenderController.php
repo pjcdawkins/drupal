@@ -40,7 +40,7 @@ class BlockRenderController implements EntityRenderControllerInterface {
       $plugin_id = $plugin->getPluginId();
 
       if ($content = $plugin->build()) {
-        $configuration = $plugin->getConfig();
+        $configuration = $plugin->getConfiguration();
         $build[$entity_id] = array(
           '#theme' => 'block',
           'content' => $content,
@@ -61,5 +61,10 @@ class BlockRenderController implements EntityRenderControllerInterface {
     }
     return $build;
   }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function resetCache(array $ids = NULL) { }
 
 }

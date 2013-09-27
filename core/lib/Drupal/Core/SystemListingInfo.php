@@ -29,7 +29,7 @@ class SystemListingInfo extends SystemListing {
     // distribution we need to include the profile of the parent site (in
     // which test runs are triggered).
     if (drupal_valid_test_ua() && !drupal_installation_attempted()) {
-      $testing_profile = config('simpletest.settings')->get('parent_profile');
+      $testing_profile = \Drupal::config('simpletest.settings')->get('parent_profile');
       if ($testing_profile && $testing_profile != $profile) {
         $searchdir[] = drupal_get_path('profile', $testing_profile) . '/' . $directory;
       }
@@ -61,7 +61,7 @@ class SystemListingInfo extends SystemListing {
         // If the module or theme is incompatible with Drupal core, remove it
         // from the array for the current search directory, so it is not
         // overwritten when merged with the $files array.
-        if (isset($info['core']) && $info['core'] != DRUPAL_CORE_COMPATIBILITY) {
+        if (isset($info['core']) && $info['core'] != \Drupal::CORE_COMPATIBILITY) {
           unset($files_to_add[$file_key]);
         }
       }

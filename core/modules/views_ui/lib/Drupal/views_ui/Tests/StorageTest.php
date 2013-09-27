@@ -44,7 +44,7 @@ class StorageTest extends UITestBase {
   public function testDetails() {
     $view_name = 'test_view';
 
-    $language = new Language(array('name' => 'French', 'langcode' => 'fr'));
+    $language = new Language(array('name' => 'French', 'id' => 'fr'));
     language_save($language);
 
     $edit = array(
@@ -54,8 +54,8 @@ class StorageTest extends UITestBase {
       'langcode' => 'fr',
     );
 
-    $this->drupalPost("admin/structure/views/nojs/edit-details/$view_name/default", $edit, t('Apply'));
-    $this->drupalPost(NULL, array(), t('Save'));
+    $this->drupalPostForm("admin/structure/views/nojs/edit-details/$view_name/default", $edit, t('Apply'));
+    $this->drupalPostForm(NULL, array(), t('Save'));
 
     $view = views_get_view($view_name);
 

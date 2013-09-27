@@ -7,7 +7,9 @@
 
 namespace Drupal\system\Tests\Entity;
 
+use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\Core\Language\Language;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Tests the basic Entity API.
@@ -56,13 +58,15 @@ class EntityQueryTest extends EntityUnitTestBase {
   function setUp() {
     parent::setUp();
     $this->installSchema('entity_test', array('entity_test_mulrev', 'entity_test_mulrev_property_data', 'entity_test_mulrev_property_revision'));
-    $this->installSchema('language', array('language'));
     $this->installSchema('system', array('variable'));
+    $this->installConfig(array('language'));
+
     $figures = drupal_strtolower($this->randomName());
     $greetings = drupal_strtolower($this->randomName());
     foreach (array($figures => 'shape', $greetings => 'text') as $field_name => $field_type) {
       $field = entity_create('field_entity', array(
-        'field_name' => $field_name,
+        'name' => $field_name,
+        'entity_type' => 'entity_test_mulrev',
         'type' => $field_type,
         'cardinality' => 2,
         'translatable' => TRUE,
@@ -80,7 +84,7 @@ class EntityQueryTest extends EntityUnitTestBase {
       entity_test_create_bundle($bundle);
       foreach ($fields as $field) {
         entity_create('field_instance', array(
-          'field_name' => $field->id(),
+          'field_name' => $field->name,
           'entity_type' => 'entity_test_mulrev',
           'bundle' => $bundle,
         ))->save();
@@ -108,17 +112,17 @@ class EntityQueryTest extends EntityUnitTestBase {
     ));
     // Make these languages available to the greetings field.
     $langcode = new Language(array(
-      'langcode' => 'en',
+      'id' => 'en',
       'name' => $this->randomString(),
     ));
     language_save($langcode);
     $langcode = new Language(array(
-      'langcode' => 'tr',
+      'id' => 'tr',
       'name' => $this->randomString(),
     ));
     language_save($langcode);
     $langcode = new Language(array(
-      'langcode' => 'pl',
+      'id' => 'pl',
       'name' => $this->randomString(),
     ));
     language_save($langcode);
@@ -248,7 +252,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $this->assertResult();
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->condition("$greetings.value", 'merhaba')
-      ->age(FIELD_LOAD_REVISION)
+      ->age(EntityStorageControllerInterface::FIELD_LOAD_REVISION)
       ->sort('revision_id')
       ->execute();
     // Bit 2 needs to be set.
@@ -278,7 +282,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $this->assertIdentical($results, array_slice($assert, 4, 8, TRUE));
     $results = $this->factory->get('entity_test_mulrev')
       ->condition("$greetings.value", 'a', 'ENDS_WITH')
-      ->age(FIELD_LOAD_REVISION)
+      ->age(EntityStorageControllerInterface::FIELD_LOAD_REVISION)
       ->sort('id')
       ->execute();
     // Now we get everything.
@@ -347,7 +351,11 @@ class EntityQueryTest extends EntityUnitTestBase {
 
     // Test the pager by setting element #1 to page 2 with a page size of 4.
     // Results will be #8-12 from above.
-    $_GET['page'] = '0,2';
+    $request = Request::createFromGlobals();
+    $request->query->replace(array(
+      'page' => '0,2',
+    ));
+    \Drupal::getContainer()->set('request', $request);
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->sort("$figures.color")
       ->sort("$greetings.format")
@@ -374,8 +382,13 @@ class EntityQueryTest extends EntityUnitTestBase {
     // While ordering on bundles do not give us a definite order, we can still
     // assert that all entities from one bundle are after the other as the
     // order dictates.
-    $_GET['sort'] = 'asc';
-    $_GET['order'] = 'Type';
+    $request = Request::createFromGlobals();
+    $request->query->replace(array(
+      'sort' => 'asc',
+      'order' => 'Type',
+    ));
+    \Drupal::getContainer()->set('request', $request);
+
     $header = array(
       'id' => array('data' => 'Id', 'specifier' => 'id'),
       'type' => array('data' => 'Type', 'specifier' => 'type'),
@@ -385,7 +398,12 @@ class EntityQueryTest extends EntityUnitTestBase {
       ->tableSort($header)
       ->execute());
     $this->assertBundleOrder('asc');
-    $_GET['sort'] = 'desc';
+
+    $request->query->add(array(
+      'sort' => 'desc',
+    ));
+    \Drupal::getContainer()->set('request', $request);
+
     $header = array(
       'id' => array('data' => 'Id', 'specifier' => 'id'),
       'type' => array('data' => 'Type', 'specifier' => 'type'),
@@ -394,8 +412,12 @@ class EntityQueryTest extends EntityUnitTestBase {
       ->tableSort($header)
       ->execute());
     $this->assertBundleOrder('desc');
+
     // Ordering on ID is definite, however.
-    $_GET['order'] = 'Id';
+    $request->query->add(array(
+      'order' => 'Id',
+    ));
+    \Drupal::getContainer()->set('request', $request);
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->tableSort($header)
       ->execute();
@@ -403,12 +425,19 @@ class EntityQueryTest extends EntityUnitTestBase {
   }
 
   /**
-   * Test entity count query.
+   * Test that count queries are separated across entity types.
    */
   protected function testCount() {
-    // Attach the existing 'figures' field to a second entity type so that we
-    // can test whether cross entity type fields produce the correct query.
+    // Create a field with the same name in a different entity type.
     $field_name = $this->figures;
+    $field = entity_create('field_entity', array(
+      'name' => $field_name,
+      'entity_type' => 'entity_test',
+      'type' => 'shape',
+      'cardinality' => 2,
+      'translatable' => TRUE,
+    ));
+    $field->save();
     $bundle = $this->randomName();
     entity_create('field_instance', array(
       'field_name' => $field_name,
@@ -423,6 +452,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $entity->enforceIsNew();
     $entity->setNewRevision();
     $entity->save();
+
     // As the single entity of this type we just saved does not have a value
     // in the color field, the result should be 0.
     $count = $this->factory->get('entity_test')

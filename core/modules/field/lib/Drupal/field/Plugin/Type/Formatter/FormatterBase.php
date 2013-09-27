@@ -7,8 +7,8 @@
 
 namespace Drupal\field\Plugin\Type\Formatter;
 
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Entity\Field\FieldInterface;
 use Drupal\field\FieldInstanceInterface;
 use Drupal\field\Plugin\PluginSettingsBase;
 
@@ -73,11 +73,12 @@ abstract class FormatterBase extends PluginSettingsBase implements FormatterInte
   /**
    * {@inheritdoc}
    */
-  public function view(EntityInterface $entity, $langcode, array $items) {
+  public function view(FieldInterface $items) {
     $addition = array();
 
-    $elements = $this->viewElements($entity, $langcode, $items);
+    $elements = $this->viewElements($items);
     if ($elements) {
+      $entity = $items->getEntity();
       $entity_type = $entity->entityType();
       $field_name = $this->fieldDefinition->getFieldName();
       $info = array(
@@ -86,16 +87,29 @@ abstract class FormatterBase extends PluginSettingsBase implements FormatterInte
         '#access' => $this->checkFieldAccess('view', $entity),
         '#label_display' => $this->label,
         '#view_mode' => $this->viewMode,
-        '#language' => $langcode,
+        '#language' => $items->getLangcode(),
         '#field_name' => $field_name,
         '#field_type' => $this->fieldDefinition->getFieldType(),
         '#field_translatable' => $this->fieldDefinition->isFieldTranslatable(),
         '#entity_type' => $entity_type,
         '#bundle' => $entity->bundle(),
         '#object' => $entity,
-        '#items' => $items,
+        '#items' => $items->getValue(TRUE),
         '#formatter' => $this->getPluginId(),
+        '#cache' => array('tags' => array())
       );
+
+      // Gather cache tags from reference fields.
+      foreach ($items as $item) {
+        if (isset($item->format)) {
+          $info['#cache']['tags']['filter_format'] = $item->format;
+        }
+
+        if (isset($item->entity)) {
+          $info['#cache']['tags'][$item->entity->entityType()][] = $item->entity->id();
+          $info['#cache']['tags'][$item->entity->entityType() . '_view'] = TRUE;
+        }
+      }
 
       $addition[$field_name] = array_merge($info, $elements);
     }
@@ -120,7 +134,7 @@ abstract class FormatterBase extends PluginSettingsBase implements FormatterInte
   /**
    * {@inheritdoc}
    */
-  public function prepareView(array $entities, $langcode, array &$items) { }
+  public function prepareView(array $entities_items) { }
 
   /**
    * Returns whether the currently logged in user has access to the field.

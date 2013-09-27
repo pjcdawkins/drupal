@@ -9,7 +9,7 @@ namespace Drupal\entity_reference\Plugin\field\formatter;
 
 use Drupal\field\Annotation\FieldFormatter;
 use Drupal\Core\Annotation\Translation;
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Field\FieldInterface;
 use Drupal\entity_reference\RecursiveRenderingException;
 use Drupal\entity_reference\Plugin\field\formatter\EntityReferenceFormatterBase;
 
@@ -18,14 +18,13 @@ use Drupal\entity_reference\Plugin\field\formatter\EntityReferenceFormatterBase;
  *
  * @FieldFormatter(
  *   id = "entity_reference_entity_view",
- *   module = "entity_reference",
  *   label = @Translation("Rendered entity"),
  *   description = @Translation("Display the referenced entities rendered by entity_view()."),
  *   field_types = {
  *     "entity_reference"
  *   },
  *   settings = {
- *     "view_mode" = "",
+ *     "view_mode" = "default",
  *     "link" = FALSE
  *   }
  * )
@@ -37,7 +36,7 @@ class EntityReferenceEntityFormatter extends EntityReferenceFormatterBase {
    */
   public function settingsForm(array $form, array &$form_state) {
     $view_modes = entity_get_view_modes($this->getFieldSetting('target_type'));
-    $options = array();
+    $options = array('default' => t('Default'));
     foreach ($view_modes as $view_mode => $view_mode_settings) {
       $options[$view_mode] = $view_mode_settings['label'];
     }
@@ -67,6 +66,9 @@ class EntityReferenceEntityFormatter extends EntityReferenceFormatterBase {
 
     $view_modes = entity_get_view_modes($this->getFieldSetting('target_type'));
     $view_mode = $this->getSetting('view_mode');
+    if ($view_mode == 'default') {
+      $view_mode = t('Default');
+    }
     $summary[] = t('Rendered as @mode', array('@mode' => isset($view_modes[$view_mode]['label']) ? $view_modes[$view_mode]['label'] : $view_mode));
     $summary[] = $this->getSetting('links') ? t('Display links') : t('Do not display links');
 
@@ -76,10 +78,7 @@ class EntityReferenceEntityFormatter extends EntityReferenceFormatterBase {
   /**
    * {@inheritdoc}
    */
-  public function viewElements(EntityInterface $entity, $langcode, array $items) {
-    // Remove un-accessible items.
-    parent::viewElements($entity, $langcode, $items);
-
+  public function viewElements(FieldInterface $items) {
     $view_mode = $this->getSetting('view_mode');
     $links = $this->getSetting('links');
 
@@ -88,30 +87,35 @@ class EntityReferenceEntityFormatter extends EntityReferenceFormatterBase {
     $elements = array();
 
     foreach ($items as $delta => $item) {
+      if (!$item->access) {
+        // User doesn't have access to the referenced entity.
+        continue;
+      }
       // Protect ourselves from recursive rendering.
       static $depth = 0;
       $depth++;
       if ($depth > 20) {
-        throw new RecursiveRenderingException(format_string('Recursive rendering detected when rendering entity @entity_type(@entity_id). Aborting rendering.', array('@entity_type' => $entity_type, '@entity_id' => $item['target_id'])));
+        throw new RecursiveRenderingException(format_string('Recursive rendering detected when rendering entity @entity_type(@entity_id). Aborting rendering.', array('@entity_type' => $item->entity->entityType(), '@entity_id' => $item->target_id)));
       }
 
-      if (!empty($item['target_id'])) {
-        $entity = clone $item['entity'];
+      if (!empty($item->target_id)) {
+        $entity = clone $item->entity;
         unset($entity->content);
-        $elements[$delta] = entity_view($entity, $view_mode, $langcode);
+        $elements[$delta] = entity_view($entity, $view_mode, $item->getLangcode());
 
-        if (empty($links) && isset($result[$delta][$target_type][$item['target_id']]['links'])) {
+        if (empty($links) && isset($result[$delta][$target_type][$item->target_id]['links'])) {
           // Hide the element links.
-          $elements[$delta][$target_type][$item['target_id']]['links']['#access'] = FALSE;
+          $elements[$delta][$target_type][$item->target_id]['links']['#access'] = FALSE;
         }
       }
       else {
         // This is an "auto_create" item.
-        $elements[$delta] = array('#markup' => $entity->label());
+        $elements[$delta] = array('#markup' => $item->entity->label());
       }
       $depth = 0;
     }
 
     return $elements;
   }
+
 }

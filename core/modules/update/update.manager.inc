@@ -62,6 +62,10 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
  * @see update_manager_update_form_submit()
  * @see update_menu()
  * @ingroup forms
+ *
+ * @deprecated Use \Drupal\update\Form\UpdateForm::reportUpdate(),
+ *   \Drupal\update\Form\UpdateForm::moduleUpdate(), or
+ *   \Drupal\update\Form\UpdateForm::moduleUpdate()
  */
 function update_manager_update_form($form, $form_state = array(), $context) {
   if (!_update_manager_check_backends($form, 'update')) {
@@ -162,6 +166,11 @@ function update_manager_update_form($form, $form_state = array(), $context) {
         continue 2;
     }
 
+    // Use the project title for the tableselect checkboxes.
+    $entry['title'] = array('data' => array(
+      '#title' => $entry['title'],
+      '#markup' => $entry['title'],
+    ));
     $entry['#attributes'] = array('class' => array('update-' . $type));
 
     // Drupal core needs to be upgraded manually.
@@ -258,7 +267,9 @@ function update_manager_update_form($form, $form_state = array(), $context) {
     $prefix = '<h2>' . t('Manual updates required') . '</h2>';
     $prefix .= '<p>' . t('Updates of Drupal core are not supported at this time.') . '</p>';
     $form['manual_updates'] = array(
-      '#markup' => theme('table', array('header' => $headers, 'rows' => $projects['manual'])),
+      '#theme' => 'table',
+      '#header' => $headers,
+      '#rows' => $projects['manual'],
       '#prefix' => $prefix,
       '#weight' => 120,
     );
@@ -278,8 +289,12 @@ function update_manager_update_form($form, $form_state = array(), $context) {
  */
 function theme_update_manager_update_form($variables) {
   $form = $variables['form'];
-  $last = Drupal::state()->get('update.last_check') ?: 0;
-  $output = theme('update_last_check', array('last' => $last));
+  $last = \Drupal::state()->get('update.last_check') ?: 0;
+  $update_last_check = array(
+    '#theme' => 'update_last_check',
+    '#last' => $last,
+  );
+  $output = drupal_render($update_last_check);
   $output .= drupal_render_children($form);
   return $output;
 }
@@ -347,11 +362,12 @@ function update_manager_update_form_submit($form, &$form_state) {
  */
 function update_manager_download_batch_finished($success, $results) {
   if (!empty($results['errors'])) {
-    $error_list = array(
-      'title' => t('Downloading updates failed:'),
-      'items' => $results['errors'],
+    $item_list = array(
+      '#theme' => 'item_list',
+      '#title' => t('Downloading updates failed:'),
+      '#items' => $results['errors'],
     );
-    drupal_set_message(theme('item_list', $error_list), 'error');
+    drupal_set_message(drupal_render($item_list), 'error');
   }
   elseif ($success) {
     drupal_set_message(t('Updates downloaded successfully.'));
@@ -423,9 +439,9 @@ function update_manager_update_ready_form($form, &$form_state) {
  */
 function update_manager_update_ready_form_submit($form, &$form_state) {
   // Store maintenance_mode setting so we can restore it when done.
-  $_SESSION['maintenance_mode'] = config('system.maintenance')->get('enabled');
+  $_SESSION['maintenance_mode'] = \Drupal::state()->get('system.maintenance_mode');
   if ($form_state['values']['maintenance_mode'] == TRUE) {
-    config('system.maintenance')->set('enabled', TRUE)->save();
+    \Drupal::state()->set('system.maintenance_mode', TRUE);
   }
 
   if (!empty($_SESSION['update_manager_update_projects'])) {
@@ -495,6 +511,10 @@ function update_manager_update_ready_form_submit($form, &$form_state) {
  * @see update_manager_install_form_submit()
  * @see update_menu()
  * @ingroup forms
+ *
+ * @deprecated Use \Drupal\update\Form\UpdateForm::reportInstall(),
+ *   \Drupal\update\Form\UpdateForm::moduleInstall(), or
+ *   \Drupal\update\Form\UpdateForm::moduleInstall()
  */
 function update_manager_install_form($form, &$form_state, $context) {
   if (!_update_manager_check_backends($form, 'install')) {
@@ -809,7 +829,7 @@ function update_manager_archive_extract($file, $directory) {
  *   are no errors, it will be an empty array.
  */
 function update_manager_archive_verify($project, $archive_file, $directory) {
-  return module_invoke_all('verify_update_archive', $project, $archive_file, $directory);
+  return \Drupal::moduleHandler()->invokeAll('verify_update_archive', array($project, $archive_file, $directory));
 }
 
 /**

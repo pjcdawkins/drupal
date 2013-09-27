@@ -35,7 +35,7 @@ class LanguageNegotiationInfoTest extends WebTestBase {
     require_once DRUPAL_ROOT .'/core/includes/language.inc';
     $admin_user = $this->drupalCreateUser(array('administer languages', 'access administration pages', 'view the administration theme'));
     $this->drupalLogin($admin_user);
-    $this->drupalPost('admin/config/regional/language/add', array('predefined_langcode' => 'it'), t('Add language'));
+    $this->drupalPostForm('admin/config/regional/language/add', array('predefined_langcode' => 'it'), t('Add language'));
   }
 
   /**
@@ -56,8 +56,8 @@ class LanguageNegotiationInfoTest extends WebTestBase {
     \Drupal::state()->set('language_test.content_language_type', TRUE);
     $this->languageNegotiationUpdate();
     $type = Language::TYPE_CONTENT;
-    $language_types = variable_get('language_types', language_types_get_default());
-    $this->assertTrue($language_types[$type], 'Content language type is configurable.');
+    $language_types = language_types_get_configurable();
+    $this->assertTrue(in_array($type, $language_types), 'Content language type is configurable.');
 
     // Enable some core and custom language negotiation methods. The test
     // language type is supposed to be configurable.
@@ -69,8 +69,9 @@ class LanguageNegotiationInfoTest extends WebTestBase {
       $form_field => TRUE,
       $type . '[enabled][' . $test_method_id . ']' => TRUE,
       $test_type . '[enabled][' . $test_method_id . ']' => TRUE,
+      $test_type . '[configurable]' => TRUE,
     );
-    $this->drupalPost('admin/config/regional/language/detection', $edit, t('Save settings'));
+    $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
 
     // Remove the interface language negotiation method by updating the language
     // negotiation settings with the proper flag enabled.
@@ -98,12 +99,12 @@ class LanguageNegotiationInfoTest extends WebTestBase {
     foreach (language_types_get_all() as $type) {
       $langcode = $last[$type];
       $value = $type == Language::TYPE_CONTENT || strpos($type, 'test') !== FALSE ? 'it' : 'en';
-      $this->assertEqual($langcode, $value, format_string('The negotiated language for %type is %language', array('%type' => $type, '%language' => $langcode)));
+      $this->assertEqual($langcode, $value, format_string('The negotiated language for %type is %language', array('%type' => $type, '%language' => $value)));
     }
 
-    // Disable language_test and check that everything is set back to the
+    // Uninstall language_test and check that everything is set back to the
     // original status.
-    $this->languageNegotiationUpdate('disable');
+    $this->languageNegotiationUpdate('uninstall');
 
     // Check that only the core language types are available.
     foreach (language_types_get_all() as $type) {
@@ -127,25 +128,24 @@ class LanguageNegotiationInfoTest extends WebTestBase {
   /**
    * Update language types/negotiation information.
    *
-   * Manually invoke language_modules_enabled()/language_modules_disabled()
-   * since they would not be invoked after enabling/disabling language_test the
-   * first time.
+   * Manually invoke language_modules_installed()/language_modules_uninstalled()
+   * since they would not be invoked after installing/uninstalling language_test
+   * the first time.
    */
-  protected function languageNegotiationUpdate($op = 'enable') {
+  protected function languageNegotiationUpdate($op = 'install') {
     static $last_op = NULL;
     $modules = array('language_test');
 
-    // Enable/disable language_test only if we did not already before.
+    // Install/uninstall language_test only if we did not already before.
     if ($last_op != $op) {
-      $function = "module_{$op}";
-      $function($modules);
+      call_user_func(array($this->container->get('module_handler'), $op), $modules);
       // Reset hook implementation cache.
       $this->container->get('module_handler')->resetImplementations();
     }
 
     drupal_static_reset('language_types_info');
     drupal_static_reset('language_negotiation_info');
-    $function = "language_modules_{$op}d";
+    $function = "language_modules_{$op}ed";
     if (function_exists($function)) {
       $function($modules);
     }
@@ -158,8 +158,9 @@ class LanguageNegotiationInfoTest extends WebTestBase {
    */
   protected function checkFixedLanguageTypes() {
     drupal_static_reset('language_types_info');
+    $configurable = language_types_get_configurable();
     foreach (language_types_info() as $type => $info) {
-      if (isset($info['fixed'])) {
+      if (!in_array($type, $configurable) && isset($info['fixed'])) {
         $negotiation = variable_get("language_negotiation_$type", array());
         $equal = count($info['fixed']) == count($negotiation);
         while ($equal && list($id) = each($negotiation)) {

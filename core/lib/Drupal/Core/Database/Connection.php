@@ -10,9 +10,6 @@ namespace Drupal\Core\Database;
 use Drupal\Core\Database\TransactionNoActiveException;
 use Drupal\Core\Database\TransactionOutOfOrderException;
 
-use PDO;
-use PDOException;
-
 /**
  * Base Database API class.
  *
@@ -145,13 +142,13 @@ abstract class Connection implements \Serializable {
   /**
    * Constructs a Connection object.
    */
-  public function __construct(PDO $connection, array $connection_options) {
+  public function __construct(\PDO $connection, array $connection_options) {
     // Initialize and prepare the connection prefix.
     $this->setPrefix(isset($connection_options['prefix']) ? $connection_options['prefix'] : '');
 
     // Set a Statement class, unless the driver opted out.
     if (!empty($this->statementClass)) {
-      $connection->setAttribute(PDO::ATTR_STATEMENT_CLASS, array($this->statementClass, array($this)));
+      $connection->setAttribute(\PDO::ATTR_STATEMENT_CLASS, array($this->statementClass, array($this)));
     }
 
     $this->connection = $connection;
@@ -181,7 +178,7 @@ abstract class Connection implements \Serializable {
     // Destroy all references to this connection by setting them to NULL.
     // The Statement class attribute only accepts a new value that presents a
     // proper callable, so we reset it to PDOStatement.
-    $this->connection->setAttribute(PDO::ATTR_STATEMENT_CLASS, array('PDOStatement', array()));
+    $this->connection->setAttribute(\PDO::ATTR_STATEMENT_CLASS, array('PDOStatement', array()));
     $this->schema = NULL;
   }
 
@@ -233,7 +230,7 @@ abstract class Connection implements \Serializable {
   protected function defaultOptions() {
     return array(
       'target' => 'default',
-      'fetch' => PDO::FETCH_OBJ,
+      'fetch' => \PDO::FETCH_OBJ,
       'return' => Database::RETURN_STATEMENT,
       'throw_exception' => TRUE,
     );
@@ -330,7 +327,7 @@ abstract class Connection implements \Serializable {
    *   The query string as SQL, with curly-braces surrounding the
    *   table names.
    *
-   * @return Drupal\Core\Database\StatementInterface
+   * @return \Drupal\Core\Database\StatementInterface
    *   A PDO prepared statement ready for its execute() method.
    */
   public function prepareQuery($query) {
@@ -402,7 +399,7 @@ abstract class Connection implements \Serializable {
   /**
    * Gets the current logging object for this connection.
    *
-   * @return DatabaseLog
+   * @return \Drupal\Core\Database\Log
    *   The current logging object for this connection. If there isn't one,
    *   NULL is returned.
    */
@@ -518,7 +515,7 @@ abstract class Connection implements \Serializable {
    *   this method will return NULL and may throw an exception if
    *   $options['throw_exception'] is TRUE.
    *
-   * @throws PDOException
+   * @throws \PDOException
    * @throws \Drupal\Core\Database\IntegrityConstraintViolationException
    */
   public function query($query, array $args = array(), $options = array()) {
@@ -553,10 +550,10 @@ abstract class Connection implements \Serializable {
         case Database::RETURN_NULL:
           return;
         default:
-          throw new PDOException('Invalid return directive: ' . $options['return']);
+          throw new \PDOException('Invalid return directive: ' . $options['return']);
       }
     }
-    catch (PDOException $e) {
+    catch (\PDOException $e) {
       if ($options['throw_exception']) {
         // Wrap the exception in another exception, because PHP does not allow
         // overriding Exception::getMessage(). Its message is the extra database
@@ -666,7 +663,7 @@ abstract class Connection implements \Serializable {
    *   it may be a driver-specific subclass of SelectQuery, depending on the
    *   driver.
    *
-   * @see Drupal\Core\Database\Query\Select
+   * @see \Drupal\Core\Database\Query\Select
    */
   public function select($table, $alias = NULL, array $options = array()) {
     $class = $this->getDriverClass('Select');
@@ -679,10 +676,10 @@ abstract class Connection implements \Serializable {
    * @param $options
    *   An array of options on the query.
    *
-   * @return Drupal\Core\Database\Query\Insert
+   * @return \Drupal\Core\Database\Query\Insert
    *   A new Insert query object.
    *
-   * @see Drupal\Core\Database\Query\Insert
+   * @see \Drupal\Core\Database\Query\Insert
    */
   public function insert($table, array $options = array()) {
     $class = $this->getDriverClass('Insert');
@@ -695,10 +692,10 @@ abstract class Connection implements \Serializable {
    * @param $options
    *   An array of options on the query.
    *
-   * @return Drupal\Core\Database\Query\Merge
+   * @return \Drupal\Core\Database\Query\Merge
    *   A new Merge query object.
    *
-   * @see Drupal\Core\Database\Query\Merge
+   * @see \Drupal\Core\Database\Query\Merge
    */
   public function merge($table, array $options = array()) {
     $class = $this->getDriverClass('Merge');
@@ -712,10 +709,10 @@ abstract class Connection implements \Serializable {
    * @param $options
    *   An array of options on the query.
    *
-   * @return Drupal\Core\Database\Query\Update
+   * @return \Drupal\Core\Database\Query\Update
    *   A new Update query object.
    *
-   * @see Drupal\Core\Database\Query\Update
+   * @see \Drupal\Core\Database\Query\Update
    */
   public function update($table, array $options = array()) {
     $class = $this->getDriverClass('Update');
@@ -728,10 +725,10 @@ abstract class Connection implements \Serializable {
    * @param $options
    *   An array of options on the query.
    *
-   * @return Drupal\Core\Database\Query\Delete
+   * @return \Drupal\Core\Database\Query\Delete
    *   A new Delete query object.
    *
-   * @see Drupal\Core\Database\Query\Delete
+   * @see \Drupal\Core\Database\Query\Delete
    */
   public function delete($table, array $options = array()) {
     $class = $this->getDriverClass('Delete');
@@ -744,10 +741,10 @@ abstract class Connection implements \Serializable {
    * @param $options
    *   An array of options on the query.
    *
-   * @return Drupal\Core\Database\Query\Truncate
+   * @return \Drupal\Core\Database\Query\Truncate
    *   A new Truncate query object.
    *
-   * @see Drupal\Core\Database\Query\Truncate
+   * @see \Drupal\Core\Database\Query\Truncate
    */
   public function truncate($table, array $options = array()) {
     $class = $this->getDriverClass('Truncate');
@@ -759,7 +756,7 @@ abstract class Connection implements \Serializable {
    *
    * This method will lazy-load the appropriate schema library file.
    *
-   * @return Drupal\Core\Database\Schema
+   * @return \Drupal\Core\Database\Schema
    *   The database Schema object for this connection.
    */
   public function schema() {
@@ -879,10 +876,10 @@ abstract class Connection implements \Serializable {
    * @param $name
    *   Optional name of the savepoint.
    *
-   * @return Drupal\Core\Database\Transaction
-   *   A DatabaseTransaction object.
+   * @return \Drupal\Core\Database\Transaction
+   *   A Transaction object.
    *
-   * @see Drupal\Core\Database\Transaction
+   * @see \Drupal\Core\Database\Transaction
    */
   public function startTransaction($name = '') {
     $class = $this->getDriverClass('Transaction');
@@ -898,9 +895,9 @@ abstract class Connection implements \Serializable {
    *   The name of the savepoint. The default, 'drupal_transaction', will roll
    *   the entire transaction back.
    *
-   * @throws Drupal\Core\Database\TransactionNoActiveException
+   * @throws \Drupal\Core\Database\TransactionNoActiveException
    *
-   * @see DatabaseTransaction::rollback()
+   * @see \Drupal\Core\Database\Transaction::rollback()
    */
   public function rollback($savepoint_name = 'drupal_transaction') {
     if (!$this->supportsTransactions()) {
@@ -949,9 +946,9 @@ abstract class Connection implements \Serializable {
    *
    * If no transaction is already active, we begin a new transaction.
    *
-   * @throws Drupal\Core\Database\TransactionNameNonUniqueException
+   * @throws \Drupal\Core\Database\TransactionNameNonUniqueException
    *
-   * @see Drupal\Core\Database\Transaction
+   * @see \Drupal\Core\Database\Transaction
    */
   public function pushTransaction($name) {
     if (!$this->supportsTransactions()) {
@@ -981,10 +978,10 @@ abstract class Connection implements \Serializable {
    * @param $name
    *   The name of the savepoint
    *
-   * @throws Drupal\Core\Database\TransactionNoActiveException
-   * @throws Drupal\Core\Database\TransactionCommitFailedException
+   * @throws \Drupal\Core\Database\TransactionNoActiveException
+   * @throws \Drupal\Core\Database\TransactionCommitFailedException
    *
-   * @see DatabaseTransaction
+   * @see \Drupal\Core\Database\Transaction
    */
   public function popTransaction($name) {
     if (!$this->supportsTransactions()) {
@@ -1046,7 +1043,7 @@ abstract class Connection implements \Serializable {
    * @param $options
    *   An array of options on the query.
    *
-   * @return Drupal\Core\Database\StatementInterface
+   * @return \Drupal\Core\Database\StatementInterface
    *   A database query result resource, or NULL if the query was not executed
    *   correctly.
    */
@@ -1101,7 +1098,7 @@ abstract class Connection implements \Serializable {
    * Returns the version of the database server.
    */
   public function version() {
-    return $this->connection->getAttribute(PDO::ATTR_SERVER_VERSION);
+    return $this->connection->getAttribute(\PDO::ATTR_SERVER_VERSION);
   }
 
   /**
@@ -1157,7 +1154,7 @@ abstract class Connection implements \Serializable {
    * @return
    *   The extra handling directives for the specified operator, or NULL.
    *
-   * @see Drupal\Core\Database\Query\Condition::compile()
+   * @see \Drupal\Core\Database\Query\Condition::compile()
    */
   abstract public function mapConditionOperator($operator);
 
@@ -1169,9 +1166,9 @@ abstract class Connection implements \Serializable {
    * A direct commit bypasses all of the safety checks we've built on top of
    * PDO's transaction routines.
    *
-   * @throws Drupal\Core\Database\TransactionExplicitCommitNotAllowedException
+   * @throws \Drupal\Core\Database\TransactionExplicitCommitNotAllowedException
    *
-   * @see Drupal\Core\Database\Transaction
+   * @see \Drupal\Core\Database\Transaction
    */
   public function commit() {
     throw new TransactionExplicitCommitNotAllowedException();
@@ -1268,7 +1265,7 @@ abstract class Connection implements \Serializable {
 
     // Re-set a Statement class if necessary.
     if (!empty($this->statementClass)) {
-      $this->connection->setAttribute(PDO::ATTR_STATEMENT_CLASS, array($this->statementClass, array($this)));
+      $this->connection->setAttribute(\PDO::ATTR_STATEMENT_CLASS, array($this->statementClass, array($this)));
     }
   }
 

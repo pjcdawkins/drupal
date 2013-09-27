@@ -13,7 +13,7 @@ use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\Core\Database\DatabaseExceptionWrapper;
 use Drupal\views\Plugin\views\join\JoinPluginBase;
 use Drupal\views\Plugin\views\HandlerBase;
-use Drupal\Component\Annotation\Plugin;
+use Drupal\views\Annotation\ViewsQuery;
 use Drupal\Core\Annotation\Translation;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Views;
@@ -21,7 +21,7 @@ use Drupal\views\Views;
 /**
  * @todo.
  *
- * @Plugin(
+ * @ViewsQuery(
  *   id = "views_query",
  *   title = @Translation("SQL Query"),
  *   help = @Translation("Query will be generated and run using the Drupal database API.")
@@ -1028,7 +1028,7 @@ class Sql extends QueryPluginBase {
 
       if (!empty($info['conditions'])) {
         $sub_group = $info['type'] == 'OR' ? db_or() : db_and();
-        foreach ($info['conditions'] as $key => $clause) {
+        foreach ($info['conditions'] as $clause) {
           // DBTNG doesn't support to add the same subquery twice to the main
           // query and the count query, so clone the subquery to have two instances
           // of the same object. - http://drupal.org/node/1112854
@@ -1227,9 +1227,6 @@ class Sql extends QueryPluginBase {
       $query->distinct();
     }
 
-    $joins = $where = $having = $orderby = $groupby = '';
-    $fields = $distinct = array();
-
     // Add all the tables to the query via joins. We assume all LEFT joins.
     foreach ($this->table_queue as $table) {
       if (is_object($table['join'])) {
@@ -1321,10 +1318,10 @@ class Sql extends QueryPluginBase {
    */
   public function getWhereArgs() {
     $args = array();
-    foreach ($this->where as $group => $where) {
+    foreach ($this->where as $where) {
       $args = array_merge($args, $where['args']);
     }
-    foreach ($this->having as $group => $having) {
+    foreach ($this->having as $having) {
       $args = array_merge($args, $having['args']);
     }
     return $args;
@@ -1366,7 +1363,6 @@ class Sql extends QueryPluginBase {
    * $view->current_page.
    */
   function execute(ViewExecutable $view) {
-    $external = FALSE; // Whether this query will run against an external database.
     $query = $view->build_info['query'];
     $count_query = $view->build_info['count_query'];
 
@@ -1382,7 +1378,6 @@ class Sql extends QueryPluginBase {
       }
     }
 
-    $items = array();
     if ($query) {
       $additional_arguments = \Drupal::moduleHandler()->invokeAll('views_query_substitutions', array($view));
 
@@ -1424,16 +1419,13 @@ class Sql extends QueryPluginBase {
         }
 
         $result = $query->execute();
+        $result->setFetchMode(\PDO::FETCH_CLASS, 'Drupal\views\ResultRow');
 
-        $view->result = array();
-        foreach ($result as $item) {
-          $view->result[] = $item;
-        }
+        $view->result = iterator_to_array($result);
 
         $view->pager->postExecute($view->result);
-        if ($view->pager->useCountQuery() || !empty($view->get_total_rows)) {
-          $view->total_rows = $view->pager->getTotalItems();
-        }
+        $view->pager->updatePageInfo();
+        $view->total_rows = $view->pager->getTotalItems();
 
         // Load all entities contained in the results.
         $this->loadEntities($view->result);
@@ -1520,12 +1512,6 @@ class Sql extends QueryPluginBase {
       return;
     }
 
-     // Initialize the entity placeholders in $results.
-    foreach ($results as $index => $result) {
-      $results[$index]->_entity = FALSE;
-      $results[$index]->_relationship_entities = array();
-    }
-
     // Assemble a list of entities to load.
     $ids_by_table = array();
     foreach ($entity_tables as $table_alias => $table) {
@@ -1551,7 +1537,7 @@ class Sql extends QueryPluginBase {
       // Drupal core currently has no way to load multiple revisions. Sad.
       if ($table['revision']) {
         $entities = array();
-        foreach ($ids as $index => $revision_id) {
+        foreach ($ids as $revision_id) {
           $entity = entity_revision_load($entity_type, $revision_id);
           if ($entity) {
             $entities[$revision_id] = $entity;
@@ -1563,7 +1549,12 @@ class Sql extends QueryPluginBase {
       }
 
       foreach ($ids as $index => $id) {
-        $entity = isset($entities[$id]) ? $entities[$id] : FALSE;
+        if (isset($entities[$id])) {
+          $entity = $entities[$id];
+        }
+        else {
+          $entity = NULL;
+        }
 
         if ($relationship_id == 'none') {
           $results[$index]->_entity = $entity;

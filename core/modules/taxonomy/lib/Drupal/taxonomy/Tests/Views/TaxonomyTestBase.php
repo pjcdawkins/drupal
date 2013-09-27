@@ -48,7 +48,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
     parent::setUp();
     $this->mockStandardInstall();
 
-    ViewTestData::importTestViews(get_class($this), array('taxonomy_test_views'));
+    ViewTestData::createTestViews(get_class($this), array('taxonomy_test_views'));
 
     $this->term1 = $this->createTerm();
     $this->term2 = $this->createTerm();
@@ -78,7 +78,8 @@ abstract class TaxonomyTestBase extends ViewTestBase {
     $this->vocabulary->save();
     $this->field_name = 'field_' . $this->vocabulary->id();
     entity_create('field_entity', array(
-      'field_name' => $this->field_name,
+      'name' => $this->field_name,
+      'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
       // Set cardinality to unlimited for tagging.
       'cardinality' => FIELD_CARDINALITY_UNLIMITED,

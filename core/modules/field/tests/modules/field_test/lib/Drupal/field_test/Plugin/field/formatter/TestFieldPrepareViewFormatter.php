@@ -10,14 +10,13 @@ namespace Drupal\field_test\Plugin\field\formatter;
 use Drupal\field\Annotation\FieldFormatter;
 use Drupal\Core\Annotation\Translation;
 use Drupal\field\Plugin\Type\Formatter\FormatterBase;
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Field\FieldInterface;
 
 /**
  * Plugin implementation of the 'field_test_with_prepare_view' formatter.
  *
  * @FieldFormatter(
  *   id = "field_test_with_prepare_view",
- *   module = "field_test",
  *   label = @Translation("With prepare step"),
  *   description = @Translation("Tests prepareView() method"),
  *   field_types = {
@@ -56,12 +55,12 @@ class TestFieldPrepareViewFormatter extends FormatterBase {
   /**
    * {@inheritdoc}
    */
-  public function prepareView(array $entities, $langcode, array &$items) {
-    foreach ($items as $id => $item) {
-      foreach ($item as $delta => $value) {
+  public function prepareView(array $entities_items) {
+    foreach ($entities_items as $items) {
+      foreach ($items as $item) {
         // Don't add anything on empty values.
-        if ($value) {
-          $items[$id][$delta]['additional_formatter_value'] = $value['value'] + 1;
+        if (!$item->isEmpty()) {
+          $item->additional_formatter_value = $item->value + 1;
         }
       }
     }
@@ -70,11 +69,11 @@ class TestFieldPrepareViewFormatter extends FormatterBase {
   /**
    * {@inheritdoc}
    */
-  public function viewElements(EntityInterface $entity, $langcode, array $items) {
+  public function viewElements(FieldInterface $items) {
     $elements = array();
 
     foreach ($items as $delta => $item) {
-      $elements[$delta] = array('#markup' => $this->getSetting('test_formatter_setting_additional') . '|' . $item['value'] . '|' . $item['additional_formatter_value']);
+      $elements[$delta] = array('#markup' => $this->getSetting('test_formatter_setting_additional') . '|' . $item->value . '|' . $item->additional_formatter_value);
     }
 
     return $elements;

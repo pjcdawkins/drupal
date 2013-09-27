@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\views_ui\ViewListController.
+ * Contains \Drupal\views_ui\ViewListController.
  */
 
 namespace Drupal\views_ui;
 
+use Drupal\Component\Utility\String;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Config\Entity\ConfigEntityListController;
@@ -33,7 +34,7 @@ class ViewListController extends ConfigEntityListController implements EntityCon
   public static function createInstance(ContainerInterface $container, $entity_type, array $entity_info) {
     return new static(
       $entity_type,
-      $container->get('plugin.manager.entity')->getStorageController($entity_type),
+      $container->get('entity.manager')->getStorageController($entity_type),
       $entity_info,
       $container->get('plugin.manager.views.display'),
       $container->get('module_handler')
@@ -61,7 +62,7 @@ class ViewListController extends ConfigEntityListController implements EntityCon
   }
 
   /**
-   * Overrides Drupal\Core\Entity\EntityListController::load();
+   * {@inheritdoc}
    */
   public function load() {
     $entities = array(
@@ -80,9 +81,10 @@ class ViewListController extends ConfigEntityListController implements EntityCon
   }
 
   /**
-   * Overrides Drupal\Core\Entity\EntityListController::buildRow();
+   * {@inheritdoc}
    */
   public function buildRow(EntityInterface $view) {
+    $row = parent::buildRow($view);
     return array(
       'data' => array(
         'view_name' => array(
@@ -92,20 +94,23 @@ class ViewListController extends ConfigEntityListController implements EntityCon
             '#displays' => $this->getDisplaysList($view)
           ),
         ),
-        'description' => $view->get('description'),
-        'tag' => $view->get('tag'),
-        'path' => implode(', ', $view->getPaths()),
-        'operations' => array(
-          'data' => $this->buildOperations($view),
+        'description' => array(
+          'data' => array(
+            '#markup' => String::checkPlain($view->get('description')),
+          ),
+          'class' => array('views-table-filter-text-source'),
         ),
+        'tag' => $view->get('tag'),
+        'path' => implode(', ', $this->getDisplayPaths($view)),
+        'operations' => $row['operations'],
       ),
-      'title' => t('Machine name: ') . $view->id(),
+      'title' => t('Machine name: @name', array('@name' => $view->id())),
       'class' => array($view->status() ? 'views-ui-list-enabled' : 'views-ui-list-disabled'),
     );
   }
 
   /**
-   * Overrides Drupal\Core\Entity\EntityListController::buildHeader();
+   * {@inheritdoc}
    */
   public function buildHeader() {
     return array(
@@ -150,6 +155,7 @@ class ViewListController extends ConfigEntityListController implements EntityCon
     foreach (array('enable', 'disable') as $op) {
       if (isset($operations[$op])) {
         $operations[$op]['ajax'] = TRUE;
+        $operations[$op]['query']['token'] = drupal_get_token($op);
       }
     }
 
@@ -157,7 +163,7 @@ class ViewListController extends ConfigEntityListController implements EntityCon
   }
 
   /**
-   * Overrides Drupal\Core\Entity\EntityListController::buildOperations();
+   * {@inheritdoc}
    */
   public function buildOperations(EntityInterface $entity) {
     $build = parent::buildOperations($entity);
@@ -173,14 +179,37 @@ class ViewListController extends ConfigEntityListController implements EntityCon
   }
 
   /**
-   * Overrides Drupal\Core\Entity\EntityListController::render();
+   * {@inheritdoc}
    */
   public function render() {
     $entities = $this->load();
     $list['#type'] = 'container';
+    $list['#attributes']['id'] = 'views-entity-list';
+
     $list['#attached']['css'] = ViewFormControllerBase::getAdminCSS();
     $list['#attached']['library'][] = array('system', 'drupal.ajax');
-    $list['#attributes']['id'] = 'views-entity-list';
+    $list['#attached']['library'][] = array('views_ui', 'views_ui.listing');
+
+    $form['filters'] = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        'class' => array('table-filter', 'js-show'),
+      ),
+    );
+
+    $list['filters']['text'] = array(
+      '#type' => 'search',
+      '#title' => $this->t('Search'),
+      '#size' => 30,
+      '#placeholder' => $this->t('Enter view name'),
+      '#attributes' => array(
+        'class' => array('views-filter-text'),
+        'data-table' => '.views-listing-table',
+        'autocomplete' => 'off',
+        'title' => $this->t('Enter a part of the view name or description to filter by.'),
+      ),
+    );
+
     $list['enabled']['heading']['#markup'] = '<h2>' . t('Enabled') . '</h2>';
     $list['disabled']['heading']['#markup'] = '<h2>' . t('Disabled') . '</h2>';
     foreach (array('enabled', 'disabled') as $status) {
@@ -188,6 +217,9 @@ class ViewListController extends ConfigEntityListController implements EntityCon
       $list[$status]['#attributes'] = array('class' => array('views-list-section', $status));
       $list[$status]['table'] = array(
         '#theme' => 'table',
+        '#attributes' => array(
+          'class' => array('views-listing-table'),
+        ),
         '#header' => $this->buildHeader(),
         '#rows' => array(),
       );
@@ -223,6 +255,33 @@ class ViewListController extends ConfigEntityListController implements EntityCon
 
     ksort($displays);
     return array_keys($displays);
+  }
+
+  /**
+   * Gets a list of paths assigned to the view.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $view
+   *   The view entity.
+   *
+   * @return array
+   *   An array of paths for this view.
+   */
+  protected function getDisplayPaths(EntityInterface $view) {
+    $all_paths = array();
+    $executable = $view->getExecutable();
+    $executable->initDisplay();
+    foreach ($executable->displayHandlers as $display) {
+      if ($display->hasPath()) {
+        $path = $display->getPath();
+        if ($view->status() && strpos($path, '%') === FALSE) {
+          $all_paths[] = l('/' . $path, $path);
+        }
+        else {
+          $all_paths[] = String::checkPlain('/' . $path);
+        }
+      }
+    }
+    return array_unique($all_paths);
   }
 
 }

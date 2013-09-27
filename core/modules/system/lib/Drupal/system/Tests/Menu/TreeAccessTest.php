@@ -7,7 +7,7 @@
 
 namespace Drupal\system\Tests\Menu;
 
-use Drupal\menu_link\Plugin\Core\Entity\MenuLink;
+use Drupal\menu_link\Entity\MenuLink;
 use Drupal\simpletest\DrupalUnitTestBase;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Routing\Route;
@@ -32,6 +32,13 @@ class TreeAccessTest extends DrupalUnitTestBase {
    * @var\ \Symfony\Component\Routing\RouteCollection
    */
   protected $routeCollection;
+
+  /**
+   * Modules to enable.
+   *
+   * @var array
+   */
+  public static $modules = array('menu_link');
 
   public static function getInfo() {
     return array(

@@ -73,7 +73,7 @@ class ImageFieldAttributesTest extends ImageFieldTestBase {
     // Save a node with the image.
     $nid = $this->uploadNodeImage($image, $this->fieldName, 'article');
     $this->node = node_load($nid);
-    $this->file = file_load($this->node->{$this->fieldName}[Language::LANGCODE_NOT_SPECIFIED][0]['target_id']);
+    $this->file = file_load($this->node->{$this->fieldName}->target_id);
   }
 
   /**
@@ -101,7 +101,7 @@ class ImageFieldAttributesTest extends ImageFieldTestBase {
 
     // Construct the node and image URIs for testing.
     $node_uri = url('node/' . $this->node->id(), array('absolute' => TRUE));
-    $image_uri = image_style_url('medium', $this->file->getFileUri());
+    $image_uri = entity_load('image_style', 'medium')->buildUrl($this->file->getFileUri());
 
     // Test relations from node to image.
     $expected_value = array(

@@ -46,6 +46,7 @@ class EntityResource extends ResourceBase {
    * @throws \Symfony\Component\HttpKernel\Exception\HttpException
    */
   public function get($entity) {
+    $id = $entity;
     if (is_scalar($entity)) {
       $definition = $this->getPluginDefinition();
       $entity = entity_load($definition['entity_type'], $entity);

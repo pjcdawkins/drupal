@@ -295,4 +295,19 @@ abstract class RESTTestBase extends WebTestBase {
         }
     }
   }
+
+  /**
+   * Returns the base URI path of an entity type.
+   *
+   * @param type $entity_type
+   * @return string
+   */
+  protected function entityBasePath($entity_type) {
+    switch ($entity_type) {
+      case 'entity_test':
+        return 'entity/entity_test';
+      case 'node':
+        return 'node';
+    }
+  }
 }

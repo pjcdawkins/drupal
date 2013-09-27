@@ -51,7 +51,7 @@ class ReadTest extends RESTTestBase {
       $entity = $this->entityCreate($entity_type);
       $entity->save();
       // Read it over the REST API.
-      $response = $this->httpRequest('entity/' . $entity_type . '/' . $entity->id(), 'GET', NULL, $this->defaultMimeType);
+      $response = $this->httpRequest($this->entityBasePath($entity_type) . '/' . $entity->id(), 'GET', NULL, $this->defaultMimeType);
       $this->assertResponse('200', 'HTTP response code is correct.');
       $this->assertHeader('content-type', $this->defaultMimeType);
       $data = drupal_json_decode($response);
@@ -60,11 +60,11 @@ class ReadTest extends RESTTestBase {
       $this->assertEqual($data['uuid'][0]['value'], $entity->uuid(), 'Entity UUID is correct');
 
       // Try to read the entity with an unsupported mime format.
-      $response = $this->httpRequest('entity/' . $entity_type . '/' . $entity->id(), 'GET', NULL, 'application/wrongformat');
+      $response = $this->httpRequest($this->entityBasePath($entity_type) . '/' . $entity->id(), 'GET', NULL, 'application/wrongformat');
       $this->assertResponse(406);
 
       // Try to read an entity that does not exist.
-      $response = $this->httpRequest('entity/' . $entity_type . '/9999', 'GET', NULL, $this->defaultMimeType);
+      $response = $this->httpRequest($this->entityBasePath($entity_type) . '/9999', 'GET', NULL, $this->defaultMimeType);
       $this->assertResponse(404);
       $decoded = drupal_json_decode($response);
       $this->assertEqual($decoded['error'], 'Entity with ID 9999 not found', 'Response message is correct.');
@@ -75,7 +75,7 @@ class ReadTest extends RESTTestBase {
       if ($entity_type == 'entity_test') {
         $entity->field_test_text->value = 'no access value';
         $entity->save();
-        $response = $this->httpRequest('entity/' . $entity_type . '/' . $entity->id(), 'GET', NULL, $this->defaultMimeType);
+        $response = $this->httpRequest($this->entityBasePath($entity_type) . '/' . $entity->id(), 'GET', NULL, $this->defaultMimeType);
         $this->assertResponse(200);
         $this->assertHeader('content-type', $this->defaultMimeType);
         $data = drupal_json_decode($response);
@@ -84,7 +84,7 @@ class ReadTest extends RESTTestBase {
 
       // Try to read an entity without proper permissions.
       $this->drupalLogout();
-      $response = $this->httpRequest('entity/' . $entity_type . '/' . $entity->id(), 'GET', NULL, $this->defaultMimeType);
+      $response = $this->httpRequest($this->entityBasePath($entity_type) . '/' . $entity->id(), 'GET', NULL, $this->defaultMimeType);
       $this->assertResponse(403);
       $this->assertNull(drupal_json_decode($response), 'No valid JSON found.');
     }

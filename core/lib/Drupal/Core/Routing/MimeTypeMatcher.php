@@ -7,16 +7,33 @@
 
 namespace Drupal\Core\Routing;
 
+use Drupal\Core\ContentNegotiation;
+use Symfony\Cmf\Component\Routing\NestedMatcher\RouteFilterInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 use Symfony\Component\Routing\RouteCollection;
-use Symfony\Cmf\Component\Routing\NestedMatcher\RouteFilterInterface;
 
 /**
  * This class filters routes based on the media type in HTTP Accept headers.
  */
 class MimeTypeMatcher implements RouteFilterInterface {
 
+  /**
+   * The content negotiation library.
+   *
+   * @var \Drupal\Core\ContentNegotiation
+   */
+  protected $contentNegotiation;
+
+  /**
+   * Constructs a new MimeTypeMatcher.
+   *
+   * @param \Drupal\Core\ContentNegotiation $cotent_negotiation
+   *   The content negotiation library.
+   */
+  public function __construct(ContentNegotiation $content_negotiation) {
+    $this->contentNegotiation = $content_negotiation;
+  }
 
   /**
    * Implements \Symfony\Cmf\Component\Routing\NestedMatcher\RouteFilterInterface::filter()
@@ -26,11 +43,7 @@ class MimeTypeMatcher implements RouteFilterInterface {
     // @todo replace by proper content negotiation library.
     $acceptable_mime_types = $request->getAcceptableContentTypes();
     $acceptable_formats = array_map(array($request, 'getFormat'), $acceptable_mime_types);
-    $negotiation = new \Drupal\Core\ContentNegotiation();
-    $primary_format = $negotiation->getContentType($request);
-
-    // @todo this does not work because the routing system only hands us 3 REST
-    // routes for /node/{node}. Where is the usual node route for the HTML page?
+    $primary_format = $this->contentNegotiation->getContentType($request);
 
     // Collect a list of routes that match the primary request content type.
     $primary_matches = new RouteCollection();

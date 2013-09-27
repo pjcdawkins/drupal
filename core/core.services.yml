@@ -302,6 +302,7 @@ services:
     arguments: [16]
   mime_type_matcher:
     class: Drupal\Core\Routing\MimeTypeMatcher
+    arguments: ['@content_negotiation']
     tags:
       - { name: route_filter }
   paramconverter_manager:

@@ -11,7 +11,6 @@ use Drupal\Component\Utility\String;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use Symfony\Component\Routing\RouteCollection;
-use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\Exception\ResourceNotFoundException;
 
 use \Drupal\Core\Database\Connection;
@@ -99,25 +98,6 @@ class RouteProvider implements RouteProviderInterface {
     }
 
     $collection = $this->getRoutesByPath($path);
-
-    // Add legacy route for MimeTypeMatcher.
-    $legacy_url_matcher = \Drupal::service('legacy_url_matcher');
-    // Add flag so legacy route won't be added once again. This is needed to avoid
-    // getting to nesting level error. Error happens because in menu_get_item() we
-    // call menu_item_route_access() that runs
-    // Drupal::service('router.dynamic')->matchRequest($request) that gets
-    // to this method again.
-    $flag = &drupal_static(__FUNCTION__);
-    if (empty($flag) && $router_item = $legacy_url_matcher->matchDrupalItem($request->attributes->get('system_path'))) {
-      $flag = TRUE;
-      $route = new Route($router_item['path'], array(
-        '_controller' => $router_item['page_callback'],
-      ), array(
-        '_format' => 'html',
-      ));
-
-      $collection->add('legacy.route', $route);
-    }
 
     if (!count($collection)) {
       throw new ResourceNotFoundException(String::format("The route for '@path' could not be found", array('@path' => $path)));

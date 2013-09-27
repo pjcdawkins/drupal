@@ -134,7 +134,7 @@ class LegacyUrlMatcher implements RequestMatcherInterface, RequestContextAwareIn
    * @param string $path
    *   The path being looked up by
    */
-  public function matchDrupalItem($path) {
+  protected function matchDrupalItem($path) {
     // For now we can just proxy our procedural method. At some point this will
     // become more complicated because we'll need to get back candidates for a
     // path and them resolve them based on things like method and scheme which
@@ -151,7 +151,7 @@ class LegacyUrlMatcher implements RequestMatcherInterface, RequestContextAwareIn
    * @return
    *   An array of parameters.
    */
-  public function convertDrupalItem($router_item) {
+  protected function convertDrupalItem($router_item) {
     $route = array(
       '_controller' => $router_item['page_callback']
     );

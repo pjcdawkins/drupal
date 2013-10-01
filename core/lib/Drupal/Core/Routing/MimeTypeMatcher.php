@@ -55,9 +55,13 @@ class MimeTypeMatcher implements RouteFilterInterface {
       // _format could be a |-delimited list of supported formats.
       $supported_formats = array_filter(explode('|', $route->getRequirement('_format')));
 
-      // HTML is the default format if the route does not specify it.
+      // HTML is the default format if the route does not specify it. We also
+      // need to add those other weird Drupal AJAX formats here, otherwise we
+      // would exclude the AJAX routes.
+      // @todo Figure out why adding "_format: drupal_ajax" to AJAX routes does
+      // not work.
       if (empty($supported_formats)) {
-        $supported_formats = array('html');
+        $supported_formats = array('html', 'drupal_ajax', 'drupal_modal', 'drupal_dialog');
       }
 
       if (in_array($primary_format, $supported_formats)) {

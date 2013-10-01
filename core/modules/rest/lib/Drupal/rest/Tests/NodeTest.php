@@ -55,7 +55,7 @@ class NodeTest extends RESTTestBase {
 
     $node = $this->entityCreate('node');
     $node->save();
-    $this->httpRequest('entity/node/' . $node->id(), 'GET', NULL, $this->defaultMimeType);
+    $this->httpRequest('node/' . $node->id(), 'GET', NULL, $this->defaultMimeType);
     $this->assertResponse(200);
 
     // Check that a simple PATCH update to the node title works as expected.
@@ -76,7 +76,7 @@ class NodeTest extends RESTTestBase {
       ),
     );
     $serialized = $this->container->get('serializer')->serialize($data, $this->defaultFormat);
-    $this->httpRequest('entity/node/' . $node->id(), 'PATCH', $serialized, $this->defaultMimeType);
+    $this->httpRequest('node/' . $node->id(), 'PATCH', $serialized, $this->defaultMimeType);
     $this->assertResponse(204);
 
     // Reload the node from the DB and check if the title was correctly updated.

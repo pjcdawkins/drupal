@@ -48,7 +48,7 @@ class AuthTest extends RESTTestBase {
     // Try to read the resource as an anonymous user, which should not work.
     $response = $this->httpRequest('entity/' . $entity_type . '/' . $entity->id(), 'GET', NULL, $this->defaultMimeType);
     $this->assertResponse('401', 'HTTP response code is 401 when the request is not authenticated and the user is anonymous.');
-    $this->assertText('A fatal error occurred: No authentication credentials provided.');
+    $this->assertText('An error occurred: No authentication credentials provided.');
 
     // Create a user account that has the required permissions to read
     // resources via the REST API, but the request is authenticated

@@ -9,7 +9,6 @@ namespace Drupal\Core\Entity;
 
 use Drupal\Core\TypedData\AccessibleInterface;
 use Drupal\Core\TypedData\ComplexDataInterface;
-use Drupal\Core\TypedData\IdentifiableInterface;
 use Drupal\Core\TypedData\TranslatableInterface;
 
 /**
@@ -19,16 +18,16 @@ use Drupal\Core\TypedData\TranslatableInterface;
  * API, while extending them with entity-specific additions. I.e., an entity
  * implements the ComplexDataInterface among others, thus is complex data
  * containing fields as its data properties. The contained fields have to
- * implement the \Drupal\Core\Entity\Field\FieldInterface, which builds upon
+ * implement the \Drupal\Core\Entity\Field\FieldItemListInterface, which builds upon
  * typed data interfaces as well.
  *
  * When implementing this interface which extends Traversable, make sure to list
  * IteratorAggregate or Iterator before this interface in the implements clause.
  *
  * @see \Drupal\Core\TypedData\TypedDataManager
- * @see \Drupal\Core\Field\FieldInterface
+ * @see \Drupal\Core\Field\FieldItemListInterface
  */
-interface EntityInterface extends IdentifiableInterface, ComplexDataInterface, AccessibleInterface, TranslatableInterface {
+interface EntityInterface extends ComplexDataInterface, AccessibleInterface, TranslatableInterface {
 
   /**
    * Returns the entity UUID (Universally Unique Identifier).
@@ -40,6 +39,15 @@ interface EntityInterface extends IdentifiableInterface, ComplexDataInterface, A
    *   The UUID of the entity, or NULL if the entity does not have one.
    */
   public function uuid();
+
+  /**
+   * Returns the identifier.
+   *
+   * @return string|int|null
+   *   The entity identifier, or NULL if the object does not yet have an
+   *   identifier.
+   */
+  public function id();
 
   /**
    * Returns whether the entity is new.

@@ -2,6 +2,7 @@
 
 use Drupal\Component\Utility\Crypt;
 
+use Drupal\Component\Utility\Settings;
 use Drupal\Core\Config\FileStorage;
 use Drupal\Core\DrupalKernel;
 use Drupal\Core\CoreServiceProvider;
@@ -291,9 +292,6 @@ function install_begin_request(&$install_state) {
   // A request object from the HTTPFoundation to tell us about the request.
   $request = Request::createFromGlobals();
 
-  // This must go after drupal_bootstrap(), which unsets globals!
-  global $conf;
-
   // If we have a language selected and it is not yet saved in the system
   // (eg. pre-database data screens we are unable to persistently store
   // the default language), we should set language_default so the proper
@@ -423,13 +421,32 @@ function install_begin_request(&$install_state) {
       ))
       ->addMethodCall('setUserAgent', array('Drupal (+http://drupal.org/)'));
 
+    $container->register('settings', 'Drupal\Component\Utility\Settings')
+      ->setFactoryClass('Drupal\Component\Utility\Settings')
+      ->setFactoryMethod('getSingleton');
+    $container->register('keyvalue', 'Drupal\Core\KeyValueStore\KeyValueFactory')
+      ->addArgument(new Reference('service_container'))
+      ->addArgument(new Reference('settings'));
     // Register the expirable key value store used by form cache.
     $container
       ->register('keyvalue.expirable', 'Drupal\Core\KeyValueStore\KeyValueExpirableFactory')
-      ->addArgument(new Reference('service_container'));
+      ->addArgument(new Reference('service_container'))
+      ->addArgument(new Reference('settings'));
+    $container->register('keyvalue.memory', 'Drupal\Core\KeyValueStore\KeyValueMemoryFactory');
     $container
       ->register('keyvalue.expirable.null', 'Drupal\Core\KeyValueStore\KeyValueNullExpirableFactory');
-    $conf['keyvalue_expirable_default'] = 'keyvalue.expirable.null';
+    $settings = Settings::getSingleton()->getAll();
+    $settings['settings_old'] = $settings;
+    $settings['keyvalue_expirable_default'] = 'keyvalue.expirable.null';
+    // Override the default keyvalue storage to use memory as the database is
+    // not available.
+    $settings['keyvalue_default'] = 'keyvalue.memory';
+    new Settings($settings);
+
+    $container->register('state', 'Drupal\Core\KeyValueStore\KeyValueStoreInterface')
+      ->setFactoryService(new Reference('keyvalue'))
+      ->setFactoryMethod('get')
+      ->addArgument('state');
 
     // Register Twig template engine for use during install.
     CoreServiceProvider::registerTwig($container);
@@ -440,8 +457,10 @@ function install_begin_request(&$install_state) {
     CoreServiceProvider::registerUuid($container);
 
     // Register the CSS and JavaScript asset collection renderers.
-    $container->register('asset.css.collection_renderer', 'Drupal\Core\Asset\CssCollectionRenderer');
-    $container->register('asset.js.collection_renderer', 'Drupal\Core\Asset\JsCollectionRenderer');
+    $container->register('asset.css.collection_renderer', 'Drupal\Core\Asset\CssCollectionRenderer')
+      ->addArgument(new Reference('state'));
+    $container->register('asset.js.collection_renderer', 'Drupal\Core\Asset\JsCollectionRenderer')
+      ->addArgument(new Reference('state'));
 
   }
   // Set the request in the kernel to the new created Request above
@@ -1205,7 +1224,7 @@ function install_database_errors($database, $settings_file) {
  * @see install_settings_form_validate()
  */
 function install_settings_form_submit($form, &$form_state) {
-  global $install_state;
+  global $install_state, $conf;
 
   // Update global settings array and save.
   $settings = array();
@@ -1250,6 +1269,11 @@ function install_settings_form_submit($form, &$form_state) {
 
   // Add the config directories to settings.php.
   drupal_install_config_directories();
+
+  // The container is about to be rebuilt so we need to unset the keyvalue
+  // storage override that the installer is using.
+  $settings = Settings::getSingleton()->getAll();
+  new Settings($settings['settings_old']);
 
   // Indicate that the settings file has been verified, and check the database
   // for the last completed task, now that we have a valid connection. This

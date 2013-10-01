@@ -6,6 +6,8 @@
  */
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Entity\Field\FieldItemListInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\entity\Entity\EntityFormDisplay;
 use Drupal\field\Entity\Field;
@@ -228,8 +230,10 @@ function entity_test_permission() {
  */
 function entity_test_menu() {
   $items = array();
+  $types = entity_test_entity_types();
+  $types[] = 'entity_test_render';
 
-  foreach(entity_test_entity_types() as $entity_type) {
+  foreach($types as $entity_type) {
     $items[$entity_type . '/add'] = array(
       'title' => 'Add an @type',
       'title arguments' => array('@type' => $entity_type),
@@ -321,6 +325,21 @@ function entity_test_load($id, $reset = FALSE) {
  * @param bool $reset
  *   A boolean indicating that the internal cache should be reset.
  *
+ * @return \Drupal\entity_test\Entity\EntityRenderTest
+ *   The loaded entity object, or NULL if the entity cannot be loaded.
+ */
+function entity_test_render_load($id, $reset = FALSE) {
+  return entity_load('entity_test_render', $id, $reset);
+}
+
+/**
+ * Loads a test entity.
+ *
+ * @param int $id
+ *   A test entity ID.
+ * @param bool $reset
+ *   A boolean indicating that the internal cache should be reset.
+ *
  * @return \Drupal\entity_test\Entity\EntityTestRev
  *   The loaded entity object, or NULL if the entity cannot be loaded.
  */
@@ -389,13 +408,15 @@ function entity_test_label_callback($entity_type, $entity, $langcode = NULL) {
  *
  * @see \Drupal\system\Tests\Entity\FieldAccessTest::testFieldAccess()
  */
-function entity_test_entity_field_access($operation, $field, $account) {
-  if ($field->getName() == 'field_test_text') {
-    if ($field->value == 'no access value') {
-      return FALSE;
-    }
-    elseif ($operation == 'delete' && $field->value == 'no delete access value') {
-      return FALSE;
+function entity_test_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, FieldItemListInterface $items = NULL) {
+  if ($field_definition->getFieldName() == 'field_test_text') {
+    if ($items) {
+      if ($items[0]->value == 'no access value') {
+        return FALSE;
+      }
+      elseif ($operation == 'delete' && $items[0]->value == 'no delete access value') {
+        return FALSE;
+      }
     }
   }
 }
@@ -406,8 +427,7 @@ function entity_test_entity_field_access($operation, $field, $account) {
  * @see \Drupal\system\Tests\Entity\FieldAccessTest::testFieldAccess()
  */
 function entity_test_entity_field_access_alter(array &$grants, array $context) {
-  $field = $context['field'];
-  if ($field->getName() == 'field_test_text' && $field->value == 'access alter value') {
+  if ($context['field_definition']->getFieldName() == 'field_test_text' && $context['items'][0]->value == 'access alter value') {
     $grants[':default'] = FALSE;
   }
 }

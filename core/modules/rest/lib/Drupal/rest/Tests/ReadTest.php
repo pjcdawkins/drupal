@@ -61,14 +61,28 @@ class ReadTest extends RESTTestBase {
 
       // Try to read the entity with an unsupported mime format.
       $response = $this->httpRequest($this->entityBasePath($entity_type) . '/' . $entity->id(), 'GET', NULL, 'application/wrongformat');
-      $this->assertResponse(200);
-      // @todo HTML is returned here for nodes.
+      if ($entity_type == 'entity_test') {
+        $this->assertResponse(406);
+        $this->assertEqual($response, 'An error occurred: No route found for the specified formats application/wrongformat.');
+      }
+      if ($entity_type == 'node') {
+        // Nodes are different because there is always as HTML route which will
+        // fire if no other format could be found.
+        $this->assertResponse(200);
+      }
 
       // Try to read an entity that does not exist.
       $response = $this->httpRequest($this->entityBasePath($entity_type) . '/9999', 'GET', NULL, $this->defaultMimeType);
       $this->assertResponse(404);
-      $decoded = drupal_json_decode($response);
-      $this->assertEqual($decoded['error'], 'An error occurred: Item "node" with ID 9999 not found', 'Response message is correct.');
+      if ($entity_type == 'entity_test') {
+        $decoded = drupal_json_decode($response);
+        $this->assertEqual($decoded['error'], 'Entity with ID 9999 not found');
+      }
+      if ($entity_type == 'node') {
+        // Nodes are different because they get upcasted by a route enhancer,
+        // which throws an exception if the node does not exist.
+        $this->assertEqual($response, 'Item "node" with ID 9999 not found');
+      }
 
       // Make sure that field level access works and that the according field is
       // not available in the response. Only applies to entity_test.
@@ -115,7 +129,7 @@ class ReadTest extends RESTTestBase {
     $entity->save();
 
     // Read it over the REST API.
-    $response = $this->httpRequest('entity/node/' . $entity->id(), 'GET', NULL, 'application/json');
+    $response = $this->httpRequest('node/' . $entity->id(), 'GET', NULL, 'application/json');
     $this->assertResponse('200', 'HTTP response code is correct.');
   }
 

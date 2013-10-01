@@ -79,7 +79,7 @@ class MimeTypeMatcher implements RouteFilterInterface {
       return $somehow_matches;
     }
 
-    throw new NotAcceptableHttpException();
+    throw new NotAcceptableHttpException(format_string('No route found for the specified formats @formats.', array('@formats' => implode(' ', $acceptable_mime_types))));
   }
 
 }

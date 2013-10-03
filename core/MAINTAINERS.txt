@@ -164,6 +164,7 @@ Routing system
 Theme system
 - Alex Bronstein 'effulgentsia' http://drupal.org/user/78040
 - John Albin Wilkins 'JohnAlbin' http://drupal.org/user/32095
+- Mark Carver 'Mark Carver' http://drupal.org/user/501638
 - Jen Lampton 'jenlampton' http://drupal.org/user/85586
 - Scott Reeves 'Cottser' http://drupal.org/user/1167326
 - Carl Wiedemann 'c4rl' http://drupal.org/user/235047
@@ -230,6 +231,7 @@ Color module
 Comment module
 - Dick Olsson 'dixon_' http://drupal.org/user/239911
 - Lee Rowlands 'larowlan' http://drupal.org/user/395439
+- Andrey Postnikov 'andypost' https://drupal.org/user/118908
 
 Configuration module
 - ?

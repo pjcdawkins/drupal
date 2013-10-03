@@ -100,9 +100,14 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
 
       switch ($method) {
         case 'POST':
-          // POST routes do not require an ID in the URL path.
           $route->setPattern($create_path);
-          $route->addDefaults(array('id' => NULL));
+          // Do not break here, fall through to PATCH additions which also apply
+          // to POST.
+
+        case 'PATCH':
+          // Restrict the incoming HTTP Content-type header to the known
+          // serialization formats.
+          $route->addRequirements(array('_content_type_format' => implode('|', $this->serializerFormats)));
           $collection->add("$route_name.$method", $route);
           break;
 
@@ -112,7 +117,6 @@ abstract class ResourceBase extends PluginBase implements ContainerFactoryPlugin
           // HTTP Accept headers.
           foreach ($this->serializerFormats as $format_name) {
             // Expose one route per available format.
-            //$format_route = new Route($route->getPath(), $route->getDefaults(), $route->getRequirements());
             $format_route = clone $route;
             $format_route->addRequirements(array('_format' => $format_name));
             $collection->add("$route_name.$method.$format_name", $format_route);

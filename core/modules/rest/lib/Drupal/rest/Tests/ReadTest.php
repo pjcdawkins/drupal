@@ -80,7 +80,7 @@ class ReadTest extends RESTTestBase {
       if ($entity_type == 'node') {
         // Nodes are different because they get upcasted by a route enhancer,
         // which throws an exception if the node does not exist.
-        $this->assertEqual($response, 'Item "node" with ID 9999 not found');
+        $this->assertEqual($response, 'An error occurred: Item "node" with ID 9999 not found');
       }
 
       // Make sure that field level access works and that the according field is

@@ -10,7 +10,7 @@ namespace Drupal\Core\Routing;
 use Drupal\Core\ContentNegotiation;
 use Symfony\Cmf\Component\Routing\NestedMatcher\RouteFilterInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
+use Symfony\Component\Routing\Exception\ResourceNotFoundException;
 use Symfony\Component\Routing\RouteCollection;
 
 /**
@@ -47,6 +47,20 @@ class MimeTypeMatcher implements RouteFilterInterface {
     return $this->filterContentTypeHeaders($collection, $request);
   }
 
+  /**
+   * Filters routes based on the HTTP Accept header.
+   *
+   * @param \Symfony\Component\Routing\RouteCollection $collection
+   *   The collection against which to match.
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request to match.
+   *
+   * @return \Symfony\Component\Routing\RouteCollection
+   *   A non-empty RouteCollection of matched routes.
+   *
+   * @throws \Symfony\Component\Routing\Exception\ResourceNotFoundException
+   *   If no routes could be matched against the Accept header.
+   */
   protected function filterAcceptHeaders(RouteCollection $collection, Request $request) {
     // Generates a list of Symfony formats matching the acceptable MIME types.
     // @todo replace by proper content negotiation library.
@@ -92,9 +106,23 @@ class MimeTypeMatcher implements RouteFilterInterface {
       return $somehow_matches;
     }
 
-    throw new NotAcceptableHttpException(format_string('No route found for the specified formats @formats.', array('@formats' => implode(' ', $acceptable_mime_types))));
+    throw new ResourceNotFoundException(format_string('No route found for the specified formats @formats.', array('@formats' => implode(' ', $acceptable_mime_types))));
   }
 
+  /**
+   * Filters routes based on the HTTP Content-type header.
+   *
+   * @param \Symfony\Component\Routing\RouteCollection $collection
+   *   The collection against which to match.
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request to match.
+   *
+   * @return \Symfony\Component\Routing\RouteCollection
+   *   A non-empty RouteCollection of matched routes.
+   *
+   * @throws \Symfony\Component\Routing\Exception\ResourceNotFoundException
+   *   If no routes could be matched against the Content-type header.
+   */
   protected function filterContentTypeHeaders(RouteCollection $collection, Request $request) {
     $format = $request->getContentType();
     if ($format === NULL) {
@@ -117,7 +145,7 @@ class MimeTypeMatcher implements RouteFilterInterface {
     if (count($collection)) {
       return $collection;
     }
-    throw new BadRequestHttpException('No route found that matches the Content-Type header.');
+    throw new ResourceNotFoundException('No route found that matches the Content-Type header.');
   }
 
 }

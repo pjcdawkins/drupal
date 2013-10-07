@@ -55,20 +55,21 @@ class AcceptHeaderMatcher implements RouteFilterInterface {
       // _format could be a |-delimited list of supported formats.
       $supported_formats = array_filter(explode('|', $route->getRequirement('_format')));
 
+      if (in_array($primary_format, $supported_formats)) {
+        $primary_matches->add($name, $route);
+        continue;
+      }
+
       // HTML is the default format if the route does not specify it. We also
       // add the other Drupal AJAX and JSON formats here to cover general use
       // cases.
       if (empty($supported_formats)) {
         $supported_formats = array('html', 'drupal_ajax', 'drupal_modal', 'drupal_dialog', 'json');
       }
-
-      if (in_array($primary_format, $supported_formats)) {
-        $primary_matches->add($name, $route);
-      }
       // The route partially matches if it doesn't care about format, if it
       // explicitly allows any format, or if one of its allowed formats is
       // in the request's list of acceptable formats.
-      elseif (in_array('*/*', $acceptable_mime_types) || array_intersect($acceptable_formats, $supported_formats)) {
+      if (in_array('*/*', $acceptable_mime_types) || array_intersect($acceptable_formats, $supported_formats)) {
         $somehow_matches->add($name, $route);
       }
     }

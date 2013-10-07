@@ -56,12 +56,10 @@ class AcceptHeaderMatcher implements RouteFilterInterface {
       $supported_formats = array_filter(explode('|', $route->getRequirement('_format')));
 
       // HTML is the default format if the route does not specify it. We also
-      // need to add those other weird Drupal AJAX formats here, otherwise we
-      // would exclude the AJAX routes.
-      // @todo Figure out why adding "_format: drupal_ajax" to AJAX routes does
-      // not work.
+      // add the other Drupal AJAX and JSON formats here to cover general use
+      // cases.
       if (empty($supported_formats)) {
-        $supported_formats = array('html', 'drupal_ajax', 'drupal_modal', 'drupal_dialog');
+        $supported_formats = array('html', 'drupal_ajax', 'drupal_modal', 'drupal_dialog', 'json');
       }
 
       if (in_array($primary_format, $supported_formats)) {

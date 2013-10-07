@@ -814,7 +814,7 @@ function drupal_find_base_themes($themes, $key, $used_keys = array()) {
  * (see hook_theme() for details). Default templates are implemented with the
  * Twig rendering engine and are named the same as the theme hook, with
  * underscores changed to hyphens, so for the 'taxonomy_term' theme hook, the
- * default template is 'taxonomy-term.tpl.php'.
+ * default template is 'taxonomy-term.html.twig'.
  *
  * @subsection sub_overriding_theme_hooks Overriding Theme Hooks
  * Themes may also register new theme hooks within a hook_theme()
@@ -1616,7 +1616,8 @@ function template_preprocess_status_messages(&$variables) {
  *     - href: The link URL. If omitted, the 'title' is shown as a plain text
  *       item in the links list.
  *     - html: (optional) Whether or not 'title' is HTML. If set, the title
- *       will not be passed through check_plain().
+ *       will not be passed through
+ *       \Drupal\Component\Utility\String::checkPlain().
  *     - attributes: (optional) Attributes for the anchor, or for the <span>
  *       tag used in its place if no 'href' is supplied. If element 'class' is
  *       included, it must be an array of one or more class names.
@@ -1666,7 +1667,7 @@ function theme_links($variables) {
       }
 
       $output .= '<' . $heading['level'] . new Attribute($heading['attributes']) . '>';
-      $output .= check_plain($heading['text']);
+      $output .= String::checkPlain($heading['text']);
       $output .= '</' . $heading['level'] . '>';
     }
 
@@ -1721,7 +1722,7 @@ function theme_links($variables) {
         $link += array(
           'html' => FALSE,
         );
-        $item = ($link['html'] ? $link['title'] : check_plain($link['title']));
+        $item = ($link['html'] ? $link['title'] : String::checkPlain($link['title']));
         if (isset($link['attributes'])) {
           $item = '<span' . new Attribute($link['attributes']) . '>' . $item . '</span>';
         }
@@ -2567,11 +2568,11 @@ function template_preprocess_html(&$variables) {
   elseif (drupal_get_title()) {
     $head_title = array(
       'title' => strip_tags(drupal_get_title()),
-      'name' => check_plain($site_config->get('name')),
+      'name' => String::checkPlain($site_config->get('name')),
     );
   }
   else {
-    $head_title = array('name' => check_plain($site_config->get('name')));
+    $head_title = array('name' => String::checkPlain($site_config->get('name')));
     if ($site_config->get('slogan')) {
       $head_title['slogan'] = strip_tags(filter_xss_admin($site_config->get('slogan')));
     }
@@ -2580,7 +2581,7 @@ function template_preprocess_html(&$variables) {
   $variables['head_title_array'] = $head_title;
   $variables['head_title'] = implode(' | ', $head_title);
 
-  // Display the html.tpl.php's default mobile metatags for responsive design.
+  // Display the html.html.twig's default mobile metatags for responsive design.
   $elements = array(
     'MobileOptimized' => array(
       '#tag' => 'meta',
@@ -2679,7 +2680,7 @@ function template_preprocess_page(&$variables) {
   $variables['main_menu']         = theme_get_setting('features.main_menu') ? menu_main_menu() : array();
   $variables['secondary_menu']    = theme_get_setting('features.secondary_menu') ? menu_secondary_menu() : array();
   $variables['action_links']      = menu_get_local_actions();
-  $variables['site_name']         = (theme_get_setting('features.name') ? check_plain($site_config->get('name')) : '');
+  $variables['site_name']         = (theme_get_setting('features.name') ? String::checkPlain($site_config->get('name')) : '');
   $variables['site_slogan']       = (theme_get_setting('features.slogan') ? filter_xss_admin($site_config->get('slogan')) : '');
   $variables['tabs']              = menu_local_tabs();
 
@@ -2873,7 +2874,7 @@ function template_preprocess_maintenance_page(&$variables) {
     );
   }
   else {
-    $head_title = array('name' => check_plain($site_name));
+    $head_title = array('name' => String::checkPlain($site_name));
     if ($site_slogan) {
       $head_title['slogan'] = strip_tags(filter_xss_admin($site_slogan));
     }
@@ -2907,7 +2908,7 @@ function template_preprocess_maintenance_page(&$variables) {
   $variables['messages']          = $variables['show_messages'] ? theme('status_messages') : '';
   $variables['main_menu']         = array();
   $variables['secondary_menu']    = array();
-  $variables['site_name']         = (theme_get_setting('features.name') ? check_plain($site_name) : '');
+  $variables['site_name']         = (theme_get_setting('features.name') ? String::checkPlain($site_name) : '');
   $variables['site_slogan']       = (theme_get_setting('features.slogan') ? filter_xss_admin($site_slogan) : '');
   $variables['tabs']              = '';
 
@@ -2973,13 +2974,17 @@ function template_preprocess_install_page(&$variables) {
 }
 
 /**
- * Preprocess variables for region.tpl.php
+ * Prepares variables for region templates.
+ *
+ * Default template: region.html.twig.
  *
  * Prepares the values passed to the theme_region function to be passed into a
  * pluggable template engine. Uses the region name to generate a template file
- * suggestions. If none are found, the default region.tpl.php is used.
+ * suggestions.
  *
- * @see region.tpl.php
+ * @param array $variables
+ *   An associative array containing:
+ *   - elements: An associative array containing properties of the region.
  */
 function template_preprocess_region(&$variables) {
   // Create the $content variable that templates expect.

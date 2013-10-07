@@ -10,6 +10,7 @@
 
 use Drupal\Component\Graph\Graph;
 use Drupal\Component\Utility\Settings;
+use Drupal\Component\Utility\String;
 use Drupal\Core\Config\FileStorage;
 use Drupal\Core\Config\ConfigException;
 use Drupal\Core\DrupalKernel;
@@ -813,7 +814,9 @@ function update_do_one($module, $number, $dependency_map, &$context) {
       require_once __DIR__ . '/errors.inc';
       $variables = _drupal_decode_exception($e);
       unset($variables['backtrace']);
-      // The exception message is run through check_plain() by _drupal_decode_exception().
+      // The exception message is run through
+      // \Drupal\Component\Utility\String::checkPlain() by
+      // _drupal_decode_exception().
       $ret['#abort'] = array('success' => FALSE, 'query' => t('%type: !message in %function (line %line of %file).', $variables));
     }
   }
@@ -841,7 +844,7 @@ function update_do_one($module, $number, $dependency_map, &$context) {
     drupal_set_installed_schema_version($module, $number);
   }
 
-  $context['message'] = 'Updating ' . check_plain($module) . ' module';
+  $context['message'] = 'Updating ' . String::checkPlain($module) . ' module';
 }
 
 /**
@@ -1054,7 +1057,7 @@ function update_get_update_list() {
  *   - 'module': The name of the module that this update function belongs to.
  *   - 'number': The number of this update function within that module.
  *
- * @see Drupal\Component\Graph\Graph::searchAndSort()
+ * @see \Drupal\Component\Graph\Graph::searchAndSort()
  */
 function update_resolve_dependencies($starting_updates) {
   // Obtain a dependency graph for the requested update functions.
@@ -1170,7 +1173,7 @@ function update_get_update_function_list($starting_updates) {
  *   - 'module': The name of the module that this update function belongs to.
  *   - 'number': The number of this update function within that module.
  *
- * @see Drupal\Component\Graph\Graph::searchAndSort()
+ * @see \Drupal\Component\Graph\Graph::searchAndSort()
  * @see update_resolve_dependencies()
  */
 function update_build_dependency_graph($update_functions) {

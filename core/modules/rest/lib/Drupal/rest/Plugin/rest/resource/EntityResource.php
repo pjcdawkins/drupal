@@ -185,17 +185,20 @@ class EntityResource extends ResourceBase {
   /**
    * Responds to entity DELETE requests.
    *
-   * @param mixed $id
-   *   The entity ID.
+   * @param mixed $entity
+   *   The entity ID or the already upcasted entity object.
    *
    * @return \Drupal\rest\ResourceResponse
    *   The HTTP response object.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\HttpException
    */
-  public function delete($id) {
-    $definition = $this->getPluginDefinition();
-    $entity = entity_load($definition['entity_type'], $id);
+  public function delete($entity) {
+    $id = $entity;
+    if (is_scalar($entity)) {
+      $definition = $this->getPluginDefinition();
+      $entity = entity_load($definition['entity_type'], $id);
+    }
     if ($entity) {
       if (!$entity->access('delete')) {
         throw new AccessDeniedHttpException();

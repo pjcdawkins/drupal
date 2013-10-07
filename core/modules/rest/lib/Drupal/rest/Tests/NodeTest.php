@@ -57,6 +57,13 @@ class NodeTest extends RESTTestBase {
     $node->save();
     $this->httpRequest('node/' . $node->id(), 'GET', NULL, $this->defaultMimeType);
     $this->assertResponse(200);
+    $this->assertHeader('Content-type', $this->defaultMimeType);
+
+    // Also check that JSON works and the routing system selects the correct
+    // REST route.
+    $this->httpRequest('node/' . $node->id(), 'GET', NULL, 'application/json');
+    $this->assertResponse(200);
+    $this->assertHeader('Content-type', 'application/json');
 
     // Check that a simple PATCH update to the node title works as expected.
     $this->enableNodeConfiguration('PATCH', 'update');

@@ -65,7 +65,7 @@ class ReadTest extends RESTTestBase {
         $this->assertEqual($response, 'An error occurred: No route found for the specified formats application/wrongformat.');
       }
       if ($entity_type == 'node') {
-        // Nodes are different because there is always as HTML route which will
+        // Nodes are different because there is always a HTML route which will
         // fire if no other format could be found.
         $this->assertResponse(200);
       }

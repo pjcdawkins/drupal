@@ -7,9 +7,9 @@
 
 namespace Drupal\system\Tests\Routing;
 
+use Drupal\Core\ContentNegotiation;
 use Drupal\Core\Routing\AcceptHeaderMatcher;
 use Drupal\simpletest\UnitTestBase;
-
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 
@@ -44,14 +44,14 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
    */
   public function testFilterRoutes() {
 
-    $matcher = new AcceptHeaderMatcher();
+    $matcher = new AcceptHeaderMatcher(new ContentNegotiation());
     $collection = $this->fixtures->sampleRouteCollection();
 
     // Tests basic JSON request.
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
+    $this->assertEqual(count($routes), 1, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
 
@@ -59,7 +59,7 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/x-json, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
+    $this->assertEqual(count($routes), 1, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
 
@@ -67,7 +67,7 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'text/html, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
+    $this->assertEqual(count($routes), 1, 'The correct number of routes was found.');
     $this->assertNull($routes->get('route_c'), 'The json route was not found.');
     $this->assertNotNull($routes->get('route_e'), 'The html route was found.');
   }
@@ -76,7 +76,7 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
    * Confirms that the AcceptHeaderMatcher matcher throws an exception for no-route.
    */
   public function testNoRouteFound() {
-    $matcher = new AcceptHeaderMatcher();
+    $matcher = new AcceptHeaderMatcher(new ContentNegotiation());
 
     // Remove the sample routes that would match any method.
     $routes = $this->fixtures->sampleRouteCollection();

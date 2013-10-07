@@ -68,8 +68,6 @@ class EntityResource extends ResourceBase {
   /**
    * Responds to entity POST requests and saves the new entity.
    *
-   * @param mixed $id
-   *   Ignored. A new entity is created with a new ID.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity.
    *
@@ -78,7 +76,7 @@ class EntityResource extends ResourceBase {
    *
    * @throws \Symfony\Component\HttpKernel\Exception\HttpException
    */
-  public function post($id, EntityInterface $entity = NULL) {
+  public function post(EntityInterface $entity = NULL) {
     if ($entity == NULL) {
       throw new BadRequestHttpException(t('No entity content received.'));
     }

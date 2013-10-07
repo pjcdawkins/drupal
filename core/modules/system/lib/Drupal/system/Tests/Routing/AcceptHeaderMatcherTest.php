@@ -2,21 +2,21 @@
 
 /**
  * @file
- * Contains Drupal\system\Tests\Routing\MimeTypeMatcherTest.
+ * Contains Drupal\system\Tests\Routing\AcceptHeaderMatcherTest.
  */
 
 namespace Drupal\system\Tests\Routing;
 
-use Drupal\Core\Routing\MimeTypeMatcher;
+use Drupal\Core\Routing\AcceptHeaderMatcher;
 use Drupal\simpletest\UnitTestBase;
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 
 /**
- * Basic tests for the MimeTypeMatcher class.
+ * Basic tests for the AcceptHeaderMatcher class.
  */
-class MimeTypeMatcherTest extends UnitTestBase {
+class AcceptHeaderMatcherTest extends UnitTestBase {
 
   /**
    * A collection of shared fixture data for tests.
@@ -44,7 +44,7 @@ class MimeTypeMatcherTest extends UnitTestBase {
    */
   public function testFilterRoutes() {
 
-    $matcher = new MimeTypeMatcher();
+    $matcher = new AcceptHeaderMatcher();
     $collection = $this->fixtures->sampleRouteCollection();
 
     // Tests basic JSON request.
@@ -73,10 +73,10 @@ class MimeTypeMatcherTest extends UnitTestBase {
   }
 
   /**
-   * Confirms that the MimeTypeMatcher matcher throws an exception for no-route.
+   * Confirms that the AcceptHeaderMatcher matcher throws an exception for no-route.
    */
   public function testNoRouteFound() {
-    $matcher = new MimeTypeMatcher();
+    $matcher = new AcceptHeaderMatcher();
 
     // Remove the sample routes that would match any method.
     $routes = $this->fixtures->sampleRouteCollection();

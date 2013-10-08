@@ -60,8 +60,16 @@ class ReadTest extends RESTTestBase {
 
       // Try to read the entity with an unsupported mime format.
       $response = $this->httpRequest($this->entityBasePath($entity_type) . '/' . $entity->id(), 'GET', NULL, 'application/wrongformat');
-      $this->assertResponse(406);
-      $this->assertEqual($response, 'An error occurred: No route found for the specified formats application/wrongformat.');
+      if ($entity_type == 'entity_test') {
+        $this->assertResponse(406);
+        $this->assertEqual($response, 'An error occurred: No route found for the specified formats application/wrongformat.');
+      }
+      if ($entity_type == 'node') {
+        // Nodes are special because there are HTML routes without format
+        // restrictions, so we are hitting the standard node view route here.
+        $this->assertResponse(200);
+        $this->assertHeader('Content-type', 'text/html; charset=UTF-8');
+      }
 
       // Try to read an entity that does not exist.
       $response = $this->httpRequest($this->entityBasePath($entity_type) . '/9999', 'GET', NULL, $this->defaultMimeType);

@@ -42,44 +42,40 @@ class AcceptHeaderMatcher implements RouteFilterInterface {
     // Generates a list of Symfony formats matching the acceptable MIME types.
     // @todo replace by proper content negotiation library.
     $acceptable_mime_types = $request->getAcceptableContentTypes();
-    $acceptable_formats = array_map(array($request, 'getFormat'), $acceptable_mime_types);
+    $acceptable_formats = array_filter(array_map(array($request, 'getFormat'), $acceptable_mime_types));
     $primary_format = $this->contentNegotiation->getContentType($request);
 
     // Collect a list of routes that match the primary request content type.
     $primary_matches = new RouteCollection();
     // List of routes that match any of multiple specified content types in the
-    // request.
+    // request, which should get a lower priority.
     $somehow_matches = new RouteCollection();
 
     foreach ($collection as $name => $route) {
       // _format could be a |-delimited list of supported formats.
       $supported_formats = array_filter(explode('|', $route->getRequirement('_format')));
 
-      if (in_array($primary_format, $supported_formats)) {
-        $primary_matches->add($name, $route);
-        continue;
-      }
-
-      // HTML is the default format if the route does not specify it. We also
-      // add the other Drupal AJAX and JSON formats here to cover general use
-      // cases.
       if (empty($supported_formats)) {
-        $supported_formats = array('html', 'drupal_ajax', 'drupal_modal', 'drupal_dialog', 'json');
+        // No format restriction on the route, so it always matches.
+        $somehow_matches->add($name, $route);
+      }
+      elseif (in_array($primary_format, $supported_formats)) {
+        // Perfect match, which will get a higher priority.
+        $primary_matches->add($name, $route);
       }
       // The route partially matches if it doesn't care about format, if it
       // explicitly allows any format, or if one of its allowed formats is
       // in the request's list of acceptable formats.
-      if (in_array('*/*', $acceptable_mime_types) || array_intersect($acceptable_formats, $supported_formats)) {
+      elseif (in_array('*/*', $acceptable_mime_types) || array_intersect($acceptable_formats, $supported_formats)) {
         $somehow_matches->add($name, $route);
       }
     }
+    // Append the generic routes to the end, which will give them a lower
+    // priority.
+    $primary_matches->addCollection($somehow_matches);
 
     if (count($primary_matches)) {
       return $primary_matches;
-    }
-
-    if (count($somehow_matches)) {
-      return $somehow_matches;
     }
 
     // We do not throw a

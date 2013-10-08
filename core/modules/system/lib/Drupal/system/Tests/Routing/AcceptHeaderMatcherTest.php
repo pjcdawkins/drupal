@@ -51,25 +51,37 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 1, 'The correct number of routes was found.');
+    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
+    foreach ($routes as $name => $route) {
+      $this->assertEqual($name, 'route_c', 'The json route is the first one in the collection.');
+      break;
+    }
 
     // Tests JSON request with alternative JSON MIME type Accept header.
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/x-json, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 1, 'The correct number of routes was found.');
+    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
+    foreach ($routes as $name => $route) {
+      $this->assertEqual($name, 'route_c', 'The json route is the first one in the collection.');
+      break;
+    }
 
     // Tests basic HTML request.
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'text/html, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 1, 'The correct number of routes was found.');
+    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNull($routes->get('route_c'), 'The json route was not found.');
     $this->assertNotNull($routes->get('route_e'), 'The html route was found.');
+    foreach ($routes as $name => $route) {
+      $this->assertEqual($name, 'route_e', 'The html route is the first one in the collection.');
+      break;
+    }
   }
 
   /**

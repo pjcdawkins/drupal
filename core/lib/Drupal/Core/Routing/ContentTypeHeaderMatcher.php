@@ -29,20 +29,16 @@ class ContentTypeHeaderMatcher implements RouteFilterInterface {
     }
 
     $format = $request->getContentType();
-    if ($format === NULL) {
-      // Even if the request has no Content-type header we initialize it here
-      // with a default so that we can filter out routes that require a
-      // different one later.
-      $format = 'html';
-    }
+
     foreach ($collection as $name => $route) {
       $supported_formats = array_filter(explode('|', $route->getRequirement('_content_type_format')));
       if (empty($supported_formats)) {
-        // The route has not specified any Content-Type restrictions, so we
-        // assume default restrictions.
-        $supported_formats = array('html', 'drupal_ajax', 'drupal_modal', 'drupal_dialog');
+        // No restriction on the route, so we move the route to the end of the
+        // collection by re-adding it. That way generic routes sink down in the
+        // list and exact matching routes stay on top.
+        $collection->add($name, $route);
       }
-      if (!in_array($format, $supported_formats)) {
+      elseif (!in_array($format, $supported_formats)) {
         $collection->remove($name);
       }
     }

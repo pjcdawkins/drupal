@@ -2,12 +2,13 @@
 
 /**
  * @file
- * Contains \Drupal\system\Plugin\ImageToolkitManager.
+ * Contains \Drupal\Core\ImageToolkit\ImageToolkitManager.
  */
 
-namespace Drupal\system\Plugin;
+namespace Drupal\Core\ImageToolkit;
 
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Language\LanguageManager;
 use Drupal\Core\Plugin\DefaultPluginManager;
 
@@ -15,6 +16,13 @@ use Drupal\Core\Plugin\DefaultPluginManager;
  * Manages toolkit plugins.
  */
 class ImageToolkitManager extends DefaultPluginManager {
+
+  /**
+   * The config factory.
+   *
+   * @var \Drupal\Core\Config\ConfigFactory
+   */
+  protected $configFactory;
 
   /**
    * Constructs the ImageToolkitManager object.
@@ -26,24 +34,24 @@ class ImageToolkitManager extends DefaultPluginManager {
    *   Cache backend instance to use.
    * @param \Drupal\Core\Language\LanguageManager $language_manager
    *   The language manager.
+   * @param \Drupal\Core\Config\ConfigFactory $config_factory
+   *   The config factory.
    */
-  public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, LanguageManager $language_manager) {
+  public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, LanguageManager $language_manager, ConfigFactory $config_factory) {
     parent::__construct('Plugin/ImageToolkit', $namespaces, 'Drupal\system\Annotation\ImageToolkit');
+
     $this->setCacheBackend($cache_backend, $language_manager, 'image_toolkit');
+    $this->configFactory = $config_factory;
   }
 
   /**
    * Gets the default image toolkit.
    *
-   * @param string $toolkit_id
-   *   (optional) String specifying toolkit to load. NULL will load the default
-   *   toolkit.
-   *
-   * @return \Drupal\system\Plugin\ImageToolkitInterface
+   * @return \Drupal\Core\ImageToolkit\ImageToolkitInterface
    *   Object of the default toolkit, or FALSE on error.
    */
   public function getDefaultToolkit() {
-    $toolkit_id = \Drupal::config('system.image')->get('toolkit');
+    $toolkit_id = $this->configFactory->get('system.image')->get('toolkit');
     $toolkits = $this->getAvailableToolkits();
 
     if (!isset($toolkits[$toolkit_id]) || !class_exists($toolkits[$toolkit_id]['class'])) {

@@ -7,6 +7,7 @@
 
 namespace Drupal\Core\Routing;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\ContentNegotiation;
 use Symfony\Cmf\Component\Routing\NestedMatcher\RouteFilterInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -81,7 +82,7 @@ class AcceptHeaderMatcher implements RouteFilterInterface {
     // We do not throw a
     // \Symfony\Component\Routing\Exception\ResourceNotFoundException here
     // because we don't want to return a 404 status code, but rather a 406.
-    throw new NotAcceptableHttpException(format_string('No route found for the specified formats @formats.', array('@formats' => implode(' ', $acceptable_mime_types))));
+    throw new NotAcceptableHttpException(String::format('No route found for the specified formats @formats.', array('@formats' => implode(' ', $acceptable_mime_types))));
   }
 
 }

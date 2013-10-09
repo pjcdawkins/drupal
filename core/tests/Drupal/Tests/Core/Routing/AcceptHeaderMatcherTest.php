@@ -2,21 +2,22 @@
 
 /**
  * @file
- * Contains Drupal\system\Tests\Routing\AcceptHeaderMatcherTest.
+ * Contains Drupal\Tests\Core\Routing\AcceptHeaderMatcherTest.
  */
 
-namespace Drupal\system\Tests\Routing;
+namespace Drupal\Tests\Core\Routing;
 
 use Drupal\Core\ContentNegotiation;
 use Drupal\Core\Routing\AcceptHeaderMatcher;
-use Drupal\simpletest\UnitTestBase;
+use Drupal\system\Tests\Routing\RoutingFixtures;
+use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 
 /**
  * Basic tests for the AcceptHeaderMatcher class.
  */
-class AcceptHeaderMatcherTest extends UnitTestBase {
+class AcceptHeaderMatcherTest extends UnitTestCase {
 
   /**
    * A collection of shared fixture data for tests.
@@ -33,8 +34,8 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     );
   }
 
-  function __construct($test_id = NULL) {
-    parent::__construct($test_id);
+  public function setUp() {
+    parent::setUp();
 
     $this->fixtures = new RoutingFixtures();
   }
@@ -51,11 +52,11 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
+    $this->assertEquals(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
     foreach ($routes as $name => $route) {
-      $this->assertEqual($name, 'route_c', 'The json route is the first one in the collection.');
+      $this->assertEquals($name, 'route_c', 'The json route is the first one in the collection.');
       break;
     }
 
@@ -63,11 +64,11 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/x-json, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
+    $this->assertEquals(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
     foreach ($routes as $name => $route) {
-      $this->assertEqual($name, 'route_c', 'The json route is the first one in the collection.');
+      $this->assertEquals($name, 'route_c', 'The json route is the first one in the collection.');
       break;
     }
 
@@ -75,11 +76,11 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'text/html, text/xml;q=0.9');
     $routes = $matcher->filter($collection, $request);
-    $this->assertEqual(count($routes), 4, 'The correct number of routes was found.');
+    $this->assertEquals(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNull($routes->get('route_c'), 'The json route was not found.');
     $this->assertNotNull($routes->get('route_e'), 'The html route was found.');
     foreach ($routes as $name => $route) {
-      $this->assertEqual($name, 'route_e', 'The html route is the first one in the collection.');
+      $this->assertEquals($name, 'route_e', 'The html route is the first one in the collection.');
       break;
     }
   }
@@ -100,11 +101,11 @@ class AcceptHeaderMatcherTest extends UnitTestBase {
     try {
       $request = Request::create('path/two', 'GET');
       $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
-      $routes = $matcher->filter($routes, $request);
-      $this->fail(t('No exception was thrown.'));
+      $matcher->filter($routes, $request);
+      $this->fail('No exception was thrown.');
     }
     catch (NotAcceptableHttpException $e) {
-      $this->pass('The correct exception was thrown.');
+      $this->assertEquals($e->getMessage(), 'No route found for the specified formats application/json text/xml.');
     }
   }
 

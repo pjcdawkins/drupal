@@ -12,7 +12,6 @@ use Drupal\Core\Routing\AcceptHeaderMatcher;
 use Drupal\system\Tests\Routing\RoutingFixtures;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 
 /**
  * Basic tests for the AcceptHeaderMatcher class.
@@ -26,6 +25,13 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
    */
   protected $fixtures;
 
+  /**
+   * The matcher object that is going to be tested.
+   *
+   * @var \Drupal\Core\Routing\AcceptHeaderMatcher
+   */
+  protected $matcher;
+
   public static function getInfo() {
     return array(
       'name' => 'Partial matcher MIME types tests',
@@ -38,20 +44,19 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
     parent::setUp();
 
     $this->fixtures = new RoutingFixtures();
+    $this->matcher = new AcceptHeaderMatcher(new ContentNegotiation());
   }
 
   /**
-   * Confirms that the MimeType matcher matches properly.
+   * Check that JSON routes get filtered and prioritized correctly.
    */
-  public function testFilterRoutes() {
-
-    $matcher = new AcceptHeaderMatcher(new ContentNegotiation());
+  public function testJsonFilterRoutes() {
     $collection = $this->fixtures->sampleRouteCollection();
 
     // Tests basic JSON request.
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
-    $routes = $matcher->filter($collection, $request);
+    $routes = $this->matcher->filter($collection, $request);
     $this->assertEquals(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
@@ -59,11 +64,17 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
       $this->assertEquals($name, 'route_c', 'The json route is the first one in the collection.');
       break;
     }
+  }
 
-    // Tests JSON request with alternative JSON MIME type Accept header.
+  /**
+   * Tests a JSON request with alternative JSON MIME type Accept header.
+   */
+  public function testAlternativeJson() {
+    $collection = $this->fixtures->sampleRouteCollection();
+
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/x-json, text/xml;q=0.9');
-    $routes = $matcher->filter($collection, $request);
+    $routes = $this->matcher->filter($collection, $request);
     $this->assertEquals(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_c'), 'The json route was found.');
     $this->assertNull($routes->get('route_e'), 'The html route was not found.');
@@ -71,11 +82,17 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
       $this->assertEquals($name, 'route_c', 'The json route is the first one in the collection.');
       break;
     }
+  }
 
-    // Tests basic HTML request.
+  /**
+   * Tests a standard HTML request.
+   */
+  public function teststandardHtml() {
+    $collection = $this->fixtures->sampleRouteCollection();
+
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'text/html, text/xml;q=0.9');
-    $routes = $matcher->filter($collection, $request);
+    $routes = $this->matcher->filter($collection, $request);
     $this->assertEquals(count($routes), 4, 'The correct number of routes was found.');
     $this->assertNull($routes->get('route_c'), 'The json route was not found.');
     $this->assertNotNull($routes->get('route_e'), 'The html route was found.');
@@ -92,8 +109,6 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
    * @expectedExceptionMessage No route found for the specified formats application/json text/xml.
    */
   public function testNoRouteFound() {
-    $matcher = new AcceptHeaderMatcher(new ContentNegotiation());
-
     // Remove the sample routes that would match any method.
     $routes = $this->fixtures->sampleRouteCollection();
     $routes->remove('route_a');
@@ -103,7 +118,7 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
 
     $request = Request::create('path/two', 'GET');
     $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
-    $matcher->filter($routes, $request);
+    $this->matcher->filter($routes, $request);
     $this->fail('No exception was thrown.');
   }
 

@@ -7,13 +7,14 @@
 
 namespace Drupal\Core\ParamConverter;
 
-use Symfony\Component\DependencyInjection\ContainerAware;
+use Drupal\Component\Utility\String;
 use Symfony\Cmf\Component\Routing\Enhancer\RouteEnhancerInterface;
 use Symfony\Cmf\Component\Routing\RouteObjectInterface;
+use Symfony\Component\DependencyInjection\ContainerAware;
 use Symfony\Component\HttpFoundation\ParameterBag;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\RouteCollection;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Manages converter services for converting request parameters to full objects.
@@ -186,7 +187,7 @@ class ParamConverterManager extends ContainerAware implements RouteEnhancerInter
       // converted in which case we throw a 404.
       $defaults[$name] = $this->getConverter($definition['converter'])->convert($defaults[$name], $definition, $name, $defaults, $request);
       if (!isset($defaults[$name])) {
-        throw new NotFoundHttpException(format_string('Item "@name" with ID @id not found', array(
+        throw new NotFoundHttpException(String::format('Item "@name" with ID @id not found', array(
           '@name' => $name,
           '@id' => $defaults['_raw_variables']->get($name),
         )));

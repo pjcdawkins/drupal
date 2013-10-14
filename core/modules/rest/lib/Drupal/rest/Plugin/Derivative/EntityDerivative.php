@@ -77,10 +77,10 @@ class EntityDerivative implements ContainerDerivativeInterface {
         // Use the entity links as REST URL patterns if available.
         $this->derivatives[$entity_type]['links']['drupal:create'] = isset($entity_info['links']['drupal:create']) ? $entity_info['links']['drupal:create'] : "/entity/$entity_type";
         // Replace the default cannonical link pattern with a version that
-        // directly uses the entity type, because we don't want to hand 2
-        // parameters to the entity resource plugin.
+        // directly uses the entity type, because we want only one parameter and
+        // automatic upcasting.
         if ($entity_info['links']['canonical'] == '/entity/{entityType}/{id}') {
-          $this->derivatives[$entity_type]['links']['canonical'] = "/entity/$entity_type/{id}";
+          $this->derivatives[$entity_type]['links']['canonical'] = "/entity/$entity_type/" . '{' . $entity_type . '}';
         }
         else {
           $this->derivatives[$entity_type]['links']['canonical'] = $entity_info['links']['canonical'];

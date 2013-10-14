@@ -37,32 +37,24 @@ class EntityResource extends ResourceBase {
   /**
    * Responds to entity GET requests.
    *
-   * @param mixed $entity
-   *   The entity ID or the already upcasted entity object.
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity object.
    *
    * @return \Drupal\rest\ResourceResponse
-   *   The response containing the loaded entity.
+   *   The response containing the entity with its accessible fields.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\HttpException
    */
-  public function get($entity) {
-    $id = $entity;
-    if (is_scalar($entity)) {
-      $definition = $this->getPluginDefinition();
-      $entity = entity_load($definition['entity_type'], $entity);
+  public function get(EntityInterface $entity) {
+    if (!$entity->access('view')) {
+      throw new AccessDeniedHttpException();
     }
-    if ($entity) {
-      if (!$entity->access('view')) {
-        throw new AccessDeniedHttpException();
+    foreach ($entity as $field_name => $field) {
+      if (!$field->access('view')) {
+        unset($entity->{$field_name});
       }
-      foreach ($entity as $field_name => $field) {
-        if (!$field->access('view')) {
-          unset($entity->{$field_name});
-        }
-      }
-      return new ResourceResponse($entity);
     }
-    throw new NotFoundHttpException(t('Entity with ID @id not found', array('@id' => $id)));
+    return new ResourceResponse($entity);
   }
 
   /**
@@ -183,36 +175,28 @@ class EntityResource extends ResourceBase {
   /**
    * Responds to entity DELETE requests.
    *
-   * @param mixed $entity
-   *   The entity ID or the already upcasted entity object.
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity object.
    *
    * @return \Drupal\rest\ResourceResponse
    *   The HTTP response object.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\HttpException
    */
-  public function delete($entity) {
-    $id = $entity;
-    if (is_scalar($entity)) {
-      $definition = $this->getPluginDefinition();
-      $entity = entity_load($definition['entity_type'], $id);
+  public function delete(EntityInterface $entity) {
+    if (!$entity->access('delete')) {
+      throw new AccessDeniedHttpException();
     }
-    if ($entity) {
-      if (!$entity->access('delete')) {
-        throw new AccessDeniedHttpException();
-      }
-      try {
-        $entity->delete();
-        watchdog('rest', 'Deleted entity %type with ID %id.', array('%type' => $entity->entityType(), '%id' => $entity->id()));
+    try {
+      $entity->delete();
+      watchdog('rest', 'Deleted entity %type with ID %id.', array('%type' => $entity->entityType(), '%id' => $entity->id()));
 
-        // Delete responses have an empty body.
-        return new ResourceResponse(NULL, 204);
-      }
-      catch (EntityStorageException $e) {
-        throw new HttpException(500, t('Internal Server Error'), $e);
-      }
+      // Delete responses have an empty body.
+      return new ResourceResponse(NULL, 204);
     }
-    throw new NotFoundHttpException(t('Entity with ID @id not found', array('@id' => $id)));
+    catch (EntityStorageException $e) {
+      throw new HttpException(500, t('Internal Server Error'), $e);
+    }
   }
 
   /**

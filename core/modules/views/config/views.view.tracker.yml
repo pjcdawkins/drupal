@@ -1,7 +1,7 @@
 base_field: nid
 base_table: node
 core: '8'
-description: 'Shows all new activity on the system.'
+description: 'New activity on the system.'
 status: false
 display:
   default:
@@ -569,4 +569,5 @@ label: Tracker
 module: node
 id: tracker
 tag: default
+uuid: 8bada3d5-50a4-469e-ae06-6dc98e11e5ec
 langcode: en

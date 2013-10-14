@@ -1,7 +1,7 @@
 base_field: nid
 base_table: node
 core: '8'
-description: 'Customize the default taxonomy/term display.'
+description: 'Content belonging to a certain taxonomy term.'
 status: false
 display:
   default:
@@ -227,4 +227,5 @@ label: 'Taxonomy term'
 module: taxonomy
 id: taxonomy_term
 tag: default
+uuid: e0dea92e-a4c9-4442-a518-2499bfe17d73
 langcode: en

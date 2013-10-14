@@ -1,7 +1,7 @@
 base_field: nid
 base_table: node
 core: '8'
-description: 'A list of months that link to content for that month.'
+description: 'All content, by month.'
 status: false
 display:
   default:
@@ -161,4 +161,5 @@ label: Archive
 module: node
 id: archive
 tag: default
+uuid: 39fb337d-c126-446c-8345-6908b45313ca
 langcode: en

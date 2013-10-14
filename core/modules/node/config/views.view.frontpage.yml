@@ -1,7 +1,7 @@
 base_field: nid
 base_table: node
 core: 8.x
-description: 'A list of nodes marked for display on the front page.'
+description: 'All content promoted to the front page.'
 status: true
 display:
   default:
@@ -229,4 +229,5 @@ label: Frontpage
 module: node
 id: frontpage
 tag: default
+uuid: 5c8da842-af9f-4a6e-bd00-af738b26ec3c
 langcode: en

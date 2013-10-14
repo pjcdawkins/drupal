@@ -33,8 +33,8 @@ use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
  *     },
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController",
  *     "list" = "Drupal\image\ImageStyleListController",
- *     "access" = "Drupal\image\ImageStyleAccessController"
  *   },
+ *   admin_permission = "administer image styles",
  *   config_prefix = "image.style",
  *   entity_keys = {
  *     "id" = "name",
@@ -206,7 +206,9 @@ class ImageStyle extends ConfigEntityBase implements ImageStyleInterface {
     // \Drupal\image\ImageStyleInterface::deliver()).
     $token_query = array();
     if (!\Drupal::config('image.settings')->get('suppress_itok_output')) {
-      $token_query = array(IMAGE_DERIVATIVE_TOKEN => $this->getPathToken(file_stream_wrapper_uri_normalize($path)));
+      // The passed $path variable can be either a relative path or a full URI.
+      $original_uri = file_uri_scheme($path) ? file_stream_wrapper_uri_normalize($path) : file_build_uri($path);
+      $token_query = array(IMAGE_DERIVATIVE_TOKEN => $this->getPathToken($original_uri));
     }
 
     if ($clean_urls === NULL) {

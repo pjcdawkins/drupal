@@ -354,7 +354,7 @@ class EntityManager extends PluginManagerBase {
         $this->controllers[$controller_type][$entity_type] = $class::createInstance($this->container, $entity_type, $this->getDefinition($entity_type));
       }
       else {
-        $this->controllers[$controller_type][$entity_type] = new $class($entity_type);
+        $this->controllers[$controller_type][$entity_type] = new $class($entity_type, $this->getDefinition($entity_type));
       }
     }
     return $this->controllers[$controller_type][$entity_type];
@@ -403,10 +403,6 @@ class EntityManager extends PluginManagerBase {
     $entity_info = $this->getDefinition($entity_type);
     // Check for an entity type's admin base path.
     if (isset($entity_info['route_base_path'])) {
-      // If the entity type has a bundle prefix, strip it out of the path.
-      if (isset($entity_info['bundle_prefix'])) {
-        $bundle = str_replace($entity_info['bundle_prefix'], '', $bundle);
-      }
       // Replace any dynamic 'bundle' portion of the path with the actual bundle.
       $admin_path = str_replace('{bundle}', $bundle, $entity_info['route_base_path']);
     }
@@ -430,9 +426,6 @@ class EntityManager extends PluginManagerBase {
    */
   public function getAdminRouteInfo($entity_type, $bundle) {
     $entity_info = $this->getDefinition($entity_type);
-    if (isset($entity_info['bundle_prefix'])) {
-      $bundle = str_replace($entity_info['bundle_prefix'], '', $bundle);
-    }
     return array(
       'route_name' => "field_ui.overview_$entity_type",
       'route_parameters' => array(

@@ -77,20 +77,18 @@ class ContentTypeHeaderMatcherTest extends UnitTestCase {
 
   /**
    * Confirms that the matcher throws an exception for no-route.
+   *
+   * @expectedException \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+   * @expectedExceptionMessage No route found that matches the Content-Type header.
    */
   public function testNoRouteFound() {
     $matcher = new ContentTypeHeaderMatcher();
 
     $routes = $this->fixtures->contentRouteCollection();
-    try {
-      $request = Request::create('path/two', 'POST');
-      $request->headers->set('Content-type', 'application/hal+json');
-      $matcher->filter($routes, $request);
-      $this->fail('No exception was thrown.');
-    }
-    catch (BadRequestHttpException $e) {
-      $this->assertEquals($e->getMessage(), 'No route found that matches the Content-Type header.');
-    }
+    $request = Request::create('path/two', 'POST');
+    $request->headers->set('Content-type', 'application/hal+json');
+    $matcher->filter($routes, $request);
+    $this->fail('No exception was thrown.');
   }
 
 }

@@ -11,7 +11,6 @@ use Drupal\Core\Routing\ContentTypeHeaderMatcher;
 use Drupal\system\Tests\Routing\RoutingFixtures;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
  * Basic tests for the ContentTypeHeaderMatcher class.
@@ -25,6 +24,13 @@ class ContentTypeHeaderMatcherTest extends UnitTestCase {
    */
   protected $fixtures;
 
+  /**
+   * The matcher object that is going to be tested.
+   *
+   * @var \Drupal\Core\Routing\ContentTypeHeaderMatcher
+   */
+  protected $matcher;
+
   public static function getInfo() {
     return array(
       'name' => 'Content Type header matcher test',
@@ -37,26 +43,31 @@ class ContentTypeHeaderMatcherTest extends UnitTestCase {
     parent::setUp();
 
     $this->fixtures = new RoutingFixtures();
+    $this->matcher = new ContentTypeHeaderMatcher();
   }
 
   /**
-   * Confirms that the Content type matcher matches properly.
+   * Tests that routes are not filtered on GET requests.
    */
-  public function testFilterRoutes() {
-
-    $matcher = new ContentTypeHeaderMatcher();
+  public function testGetRequestFilter() {
     $collection = $this->fixtures->sampleRouteCollection();
     $collection->addCollection($this->fixtures->contentRouteCollection());
 
-    // Tests that routes are not filtered on GET requests.
     $request = Request::create('path/two', 'GET');
-    $routes = $matcher->filter($collection, $request);
+    $routes = $this->matcher->filter($collection, $request);
     $this->assertEquals(count($routes), 7, 'The correct number of routes was found.');
+  }
 
-    // Test that XML-restricted routes get filtered out on JSON requests.
+  /**
+   * Tests that XML-restricted routes get filtered out on JSON requests.
+   */
+  public function testJsonRequest() {
+    $collection = $this->fixtures->sampleRouteCollection();
+    $collection->addCollection($this->fixtures->contentRouteCollection());
+
     $request = Request::create('path/two', 'POST');
     $request->headers->set('Content-type', 'application/json');
-    $routes = $matcher->filter($collection, $request);
+    $routes = $this->matcher->filter($collection, $request);
     $this->assertEquals(count($routes), 6, 'The correct number of routes was found.');
     $this->assertNotNull($routes->get('route_f'), 'The json route was found.');
     $this->assertNull($routes->get('route_g'), 'The xml route was not found.');
@@ -64,12 +75,20 @@ class ContentTypeHeaderMatcherTest extends UnitTestCase {
       $this->assertEquals($name, 'route_f', 'The json route is the first one in the collection.');
       break;
     }
+  }
 
-    // Test all XML and JSON restricted routes get filtered out on a POST form
-    // submission.
+  /**
+   * Tests route filtering on POST form submission requests.
+   */
+  public function testPostForm() {
+    $collection = $this->fixtures->sampleRouteCollection();
+    $collection->addCollection($this->fixtures->contentRouteCollection());
+
+    // Test that all XML and JSON restricted routes get filtered out on a POST
+    // form submission.
     $request = Request::create('path/two', 'POST');
     $request->headers->set('Content-type', 'application/www-form-urlencoded');
-    $routes = $matcher->filter($collection, $request);
+    $routes = $this->matcher->filter($collection, $request);
     $this->assertEquals(count($routes), 5, 'The correct number of routes was found.');
     $this->assertNull($routes->get('route_f'), 'The json route was found.');
     $this->assertNull($routes->get('route_g'), 'The xml route was not found.');

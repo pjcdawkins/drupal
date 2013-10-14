@@ -111,8 +111,8 @@ class EntityResource extends ResourceBase {
   /**
    * Responds to entity PATCH requests.
    *
-   * @param mixed $original_entity
-   *   The entity ID or the already upcasted original entity object.
+   * @param \Drupal\Core\Entity\EntityInterface $original_entity
+   *   The original entity object.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity.
    *
@@ -121,25 +121,13 @@ class EntityResource extends ResourceBase {
    *
    * @throws \Symfony\Component\HttpKernel\Exception\HttpException
    */
-  public function patch($original_entity, EntityInterface $entity = NULL) {
+  public function patch(EntityInterface $original_entity, EntityInterface $entity = NULL) {
     if ($entity == NULL) {
       throw new BadRequestHttpException(t('No entity content received.'));
-    }
-
-    if (empty($original_entity)) {
-      throw new NotFoundHttpException();
     }
     $definition = $this->getPluginDefinition();
     if ($entity->entityType() != $definition['entity_type']) {
       throw new BadRequestHttpException(t('Invalid entity type'));
-    }
-    if (is_scalar($original_entity)) {
-      $original_entity = entity_load($definition['entity_type'], $original_entity);
-    }
-    // We don't support creating entities with PATCH, so we throw an error if
-    // there is no existing entity.
-    if ($original_entity == FALSE) {
-      throw new NotFoundHttpException();
     }
     if (!$original_entity->access('update')) {
       throw new AccessDeniedHttpException();

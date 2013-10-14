@@ -86,7 +86,9 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
   }
 
   /**
-   * Confirms that the AcceptHeaderMatcher matcher throws an exception for no-route.
+   * Confirms that the AcceptHeaderMatcher throws an exception for no-route.
+   *
+   * @expectedException \Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException
    */
   public function testNoRouteFound() {
     $matcher = new AcceptHeaderMatcher(new ContentNegotiation());
@@ -98,15 +100,10 @@ class AcceptHeaderMatcherTest extends UnitTestCase {
     $routes->remove('route_c');
     $routes->remove('route_d');
 
-    try {
-      $request = Request::create('path/two', 'GET');
-      $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
-      $matcher->filter($routes, $request);
-      $this->fail('No exception was thrown.');
-    }
-    catch (NotAcceptableHttpException $e) {
-      $this->assertEquals($e->getMessage(), 'No route found for the specified formats application/json text/xml.');
-    }
+    $request = Request::create('path/two', 'GET');
+    $request->headers->set('Accept', 'application/json, text/xml;q=0.9');
+    $matcher->filter($routes, $request);
+    $this->fail('No exception was thrown.');
   }
 
 }

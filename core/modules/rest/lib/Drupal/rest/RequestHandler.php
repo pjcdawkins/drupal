@@ -74,7 +74,7 @@ class RequestHandler extends ContainerAware {
     $parameters = array();
     // Filter out all internal parameters starting with "_".
     foreach ($route_parameters as $key => $parameter) {
-      if (strpos($key, '_') !== 0) {
+      if ($key{0} !== '_') {
         $parameters[] = $parameter;
       }
     }

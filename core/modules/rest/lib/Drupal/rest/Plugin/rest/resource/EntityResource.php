@@ -28,7 +28,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *   derivative = "Drupal\rest\Plugin\Derivative\EntityDerivative",
  *   links = {
  *     "canonical" = "/entity/{entity_type}/{entity}",
- *     "drupal:create" = "/entity/{entity_type}"
+ *     "http://drupal.org/link-relations/create" = "/entity/{entity_type}"
  *   }
  * )
  */

@@ -2,39 +2,23 @@
 
 /**
  * @file
- * Contains \Drupal\entity_reference\Plugin\field\field_type\ConfigurableEntityReferenceItem.
+ * Contains \Drupal\entity_reference\ConfigurableEntityReferenceItem.
  */
 
-namespace Drupal\entity_reference\Plugin\field\field_type;
+namespace Drupal\entity_reference;
 
+use Drupal\field\FieldInterface;
 use Drupal\field\Plugin\Type\FieldType\ConfigEntityReferenceItemBase;
 use Drupal\field\Plugin\Type\FieldType\ConfigFieldItemInterface;
-use Drupal\field\FieldInterface;
 
 /**
- * Plugin implementation of the 'entity_reference' field type.
+ * Alternative plugin implementation of the 'entity_reference' field type.
  *
- * @FieldType(
- *   id = "entity_reference",
- *   label = @Translation("Entity Reference"),
- *   description = @Translation("This field references another entity."),
- *   settings = {
- *     "target_type" = "node"
- *   },
- *   instance_settings = {
- *     "handler" = "default",
- *     "handler_settings" = { }
- *   },
- *   default_widget = "entity_reference_autocomplete",
- *   default_formatter = "entity_reference_label",
- *   constraints = {"ValidReference" = TRUE}
- * )
+ * Replaces the Core 'entity_reference' entity field type implementation, this
+ * supports configurable fields, auto-creation of referenced entities and more.
  *
- * Extends the Core 'entity_reference' entity field item with properties for
- * revision ids, labels (for autocreate) and access.
+ * @see entity_reference_field_info_alter().
  *
- * Required settings (below the definition's 'settings' key) are:
- *  - target_type: The entity type to reference.
  */
 class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase implements ConfigFieldItemInterface {
 
@@ -42,8 +26,11 @@ class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase impl
    * {@inheritdoc}
    */
   public static function schema(FieldInterface $field) {
-    $schema = array(
-      'columns' => array(
+    $target_type = $field->getFieldSetting('target_type');
+    $target_type_info = \Drupal::entityManager()->getDefinition($target_type);
+
+    if (is_subclass_of($target_type_info['class'], '\Drupal\Core\Entity\ContentEntityInterface')) {
+      $columns = array(
         'target_id' => array(
           'description' => 'The ID of the target entity.',
           'type' => 'int',
@@ -56,23 +43,24 @@ class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase impl
           'unsigned' => TRUE,
           'not null' => FALSE,
         ),
-      ),
+      );
+    }
+    else {
+      $columns = array(
+        'target_id' => array(
+          'description' => 'The ID of the target entity.',
+          'type' => 'varchar',
+          'length' => '255',
+        ),
+      );
+    }
+
+    $schema = array(
+      'columns' => $columns,
       'indexes' => array(
         'target_id' => array('target_id'),
       ),
     );
-
-    // Create a foreign key to the target entity type base type.
-    $entity_manager = \Drupal::service('entity.manager');
-    $target_type = $field->getFieldSetting('target_type');
-    if (is_subclass_of($entity_manager->getControllerClass($target_type, 'storage'), 'Drupal\Core\Entity\FieldableDatabaseStorageController')) {
-      $entity_info = $entity_manager->getDefinition($target_type);
-      $base_table = $entity_info['base_table'];
-      $schema['foreign keys'][$base_table] = array(
-        'table' => $base_table,
-        'columns' => array('target_id' => $entity_info['entity_keys']['id']),
-      );
-    }
 
     return $schema;
   }
@@ -84,7 +72,7 @@ class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase impl
     $entity = $this->get('entity')->getValue();
     $target_id = $this->get('target_id')->getValue();
 
-    if (empty($target_id) && !empty($entity) && $entity->isNew()) {
+    if (!$target_id && !empty($entity) && $entity->isNew()) {
       $entity->save();
       $this->set('target_id', $entity->id());
     }
@@ -94,21 +82,10 @@ class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase impl
    * {@inheritdoc}
    */
   public function settingsForm(array $form, array &$form_state, $has_data) {
-    // Select the target entity type.
-    $entity_type_options = array();
-    foreach (\Drupal::entityManager()->getDefinitions() as $entity_type => $entity_info) {
-      // @todo As the database schema can currently only store numeric IDs of
-      // referenced entities and configuration entities have string IDs, prevent
-      // configuration entities from being referenced.
-      if (!is_subclass_of($entity_info['class'], '\Drupal\Core\Config\Entity\ConfigEntityInterface')) {
-        $entity_type_options[$entity_type] = $entity_info['label'];
-      }
-    }
-
     $element['target_type'] = array(
       '#type' => 'select',
       '#title' => t('Type of item to reference'),
-      '#options' => $entity_type_options,
+      '#options' => \Drupal::entityManager()->getEntityTypeLabels(),
       '#default_value' => $this->getFieldSetting('target_type'),
       '#required' => TRUE,
       '#disabled' => $has_data,

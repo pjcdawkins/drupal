@@ -54,7 +54,7 @@ class FieldInstanceEditForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'field_ui_field_instance_edit_form';
   }
 
@@ -202,7 +202,7 @@ class FieldInstanceEditForm extends FormBase {
       $destination = drupal_get_destination();
       $request->query->remove('destination');
     }
-    $form_state['redirect'] = array('admin/structure/types/manage/' . $this->instance['bundle'] . '/fields/' . $this->instance->id() . '/delete', array('query' => $destination));
+    $form_state['redirect'] = array('admin/structure/types/manage/' . $this->instance->bundle . '/fields/' . $this->instance->id() . '/delete', array('query' => $destination));
   }
 
   /**

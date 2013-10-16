@@ -103,7 +103,7 @@ function system_help($path, $arg) {
       return '<p>' . t('These options control the default display settings for your entire site, across all themes. Unless they have been overridden by a specific theme, these settings will be used.') . '</p>';
     case 'admin/modules':
       $output = '<p>' . t('Download additional <a href="@modules">contributed modules</a> to extend Drupal\'s functionality.', array('@modules' => 'http://drupal.org/project/modules')) . '</p>';
-      if (module_exists('update')) {
+      if (\Drupal::moduleHandler()->moduleExists('update')) {
         if (update_manager_access()) {
           $output .= '<p>' . t('Regularly review and install <a href="@updates">available updates</a> to maintain a secure and current site. Always run the <a href="@update-php">update script</a> each time a module is updated.', array('@update-php' => $base_url . '/core/update.php', '@updates' => url('admin/reports/updates'))) . '</p>';
         }
@@ -325,7 +325,7 @@ function system_element_info() {
     '#input' => TRUE,
     '#size' => 60,
     '#maxlength' => 128,
-    '#autocomplete_path' => FALSE,
+    '#autocomplete_route_name' => FALSE,
     '#process' => array('form_process_autocomplete', 'ajax_process_form', 'form_process_pattern'),
     '#pre_render' => array('form_pre_render_textfield'),
     '#theme' => 'input__textfield',
@@ -335,7 +335,7 @@ function system_element_info() {
     '#input' => TRUE,
     '#size' => 30,
     '#maxlength' => 128,
-    '#autocomplete_path' => FALSE,
+    '#autocomplete_route_name' => FALSE,
     '#process' => array('form_process_autocomplete', 'ajax_process_form', 'form_process_pattern'),
     '#pre_render' => array('form_pre_render_tel'),
     '#theme' => 'input__tel',
@@ -346,7 +346,7 @@ function system_element_info() {
     '#size' => 60,
     // user.module is not loaded in case of early bootstrap errors.
     '#maxlength' => defined('EMAIL_MAX_LENGTH') ? EMAIL_MAX_LENGTH : 255,
-    '#autocomplete_path' => FALSE,
+    '#autocomplete_route_name' => FALSE,
     '#process' => array('form_process_autocomplete', 'ajax_process_form', 'form_process_pattern'),
     '#element_validate' => array('form_validate_email'),
     '#pre_render' => array('form_pre_render_email'),
@@ -357,7 +357,7 @@ function system_element_info() {
     '#input' => TRUE,
     '#size' => 60,
     '#maxlength' => 255,
-    '#autocomplete_path' => FALSE,
+    '#autocomplete_route_name' => FALSE,
     '#process' => array('form_process_autocomplete', 'ajax_process_form', 'form_process_pattern'),
     '#element_validate' => array('form_validate_url'),
     '#pre_render' => array('form_pre_render_url'),
@@ -368,7 +368,7 @@ function system_element_info() {
     '#input' => TRUE,
     '#size' => 60,
     '#maxlength' => 128,
-    '#autocomplete_path' => FALSE,
+    '#autocomplete_route_name' => FALSE,
     '#process' => array('form_process_autocomplete', 'ajax_process_form'),
     '#pre_render' => array('form_pre_render_search'),
     '#theme' => 'input__search',
@@ -408,7 +408,7 @@ function system_element_info() {
     '#required' => TRUE,
     '#maxlength' => 64,
     '#size' => 60,
-    '#autocomplete_path' => FALSE,
+    '#autocomplete_route_name' => FALSE,
     '#process' => array('form_process_machine_name', 'form_process_autocomplete', 'ajax_process_form'),
     '#element_validate' => array('form_validate_machine_name'),
     '#pre_render' => array('form_pre_render_textfield'),
@@ -886,7 +886,7 @@ function system_menu() {
   );
 
   // Localize date formats.
-  if (module_exists('language')) {
+  if (\Drupal::moduleHandler()->moduleExists('language')) {
     $items['admin/config/regional/date-time/locale'] = array(
       'title' => 'Localize',
       'description' => 'Configure date formats for each locale',
@@ -2221,7 +2221,7 @@ function system_page_build(&$page) {
  */
 function system_custom_theme() {
   if (drupal_container()->isScopeActive('request')) {
-    $request = drupal_container()->get('request');
+    $request = \Drupal::request();
     $path = $request->attributes->get('_system_path');
     if (user_access('view the administration theme') && path_is_admin($path)) {
       return \Drupal::config('system.theme')->get('admin');

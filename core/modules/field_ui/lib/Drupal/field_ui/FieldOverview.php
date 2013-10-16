@@ -77,7 +77,7 @@ class FieldOverview extends OverviewBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'field_ui_field_overview_form';
   }
 
@@ -89,7 +89,7 @@ class FieldOverview extends OverviewBase {
 
     // Gather bundle information.
     $instances = field_info_instances($this->entity_type, $this->bundle);
-    $field_types = $this->fieldTypeManager->getDefinitions();
+    $field_types = $this->fieldTypeManager->getConfigurableDefinitions();
 
     // Field prefix.
     $field_prefix = \Drupal::config('field_ui.settings')->get('field_prefix');

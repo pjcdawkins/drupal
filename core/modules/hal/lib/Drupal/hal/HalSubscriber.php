@@ -34,8 +34,7 @@ class HalSubscriber implements EventSubscriberInterface {
    *   An array of event listener definitions.
    */
   static function getSubscribedEvents() {
-    // The format must be available before routing, so we make the priority big.
-    $events[KernelEvents::REQUEST][] = array('onKernelRequest', 4000);
+    $events[KernelEvents::REQUEST][] = array('onKernelRequest', 40);
     return $events;
   }
 

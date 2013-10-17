@@ -7,10 +7,9 @@
 
 namespace Drupal\Core\Routing;
 
-use Drupal\Core\ContentNegotiation;
 use Symfony\Cmf\Component\Routing\NestedMatcher\RouteFilterInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException;
 use Symfony\Component\Routing\RouteCollection;
 
 /**
@@ -47,8 +46,8 @@ class ContentTypeHeaderMatcher implements RouteFilterInterface {
     }
     // We do not throw a
     // \Symfony\Component\Routing\Exception\ResourceNotFoundException here
-    // because we don't want to return a 404 status code, but rather a 400.
-    throw new BadRequestHttpException('No route found that matches the Content-Type header.');
+    // because we don't want to return a 404 status code, but rather a 415.
+    throw new UnsupportedMediaTypeHttpException('No route found that matches the Content-Type header.');
   }
 
 }

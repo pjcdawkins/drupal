@@ -97,7 +97,7 @@ class ContentTypeHeaderMatcherTest extends UnitTestCase {
   /**
    * Confirms that the matcher throws an exception for no-route.
    *
-   * @expectedException \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+   * @expectedException \Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException
    * @expectedExceptionMessage No route found that matches the Content-Type header.
    */
   public function testNoRouteFound() {

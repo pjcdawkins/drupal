@@ -7,47 +7,37 @@
 
 namespace Drupal\content_translation\Routing;
 
-use Drupal\Core\Routing\RouteBuildEvent;
-use Drupal\Core\Routing\RoutingEvents;
-use Drupal\Core\Entity\EntityManager;
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Routing\RouteSubscriberBase;
 use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouteCollection;
 
 /**
  * Subscriber for entity translation routes.
  */
-class ContentTranslationRouteSubscriber implements EventSubscriberInterface {
+class ContentTranslationRouteSubscriber extends RouteSubscriberBase {
 
   /**
    * The entity type manager.
    *
-   * @var \Drupal\Core\Entity\EntityManager
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
   protected $entityManager;
 
   /**
    * Constructs a ContentTranslationRouteSubscriber object.
    *
-   * @param \Drupal\Core\Entity\EntityManager $entityManager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entityManager
    *   The entity type manager.
    */
-  public function __construct(EntityManager $entityManager) {
+  public function __construct(EntityManagerInterface $entityManager) {
     $this->entityManager = $entityManager;
   }
 
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
-    $events[RoutingEvents::DYNAMIC] = 'routes';
-    return $events;
-  }
-
-  /**
-   * Adds routes for entity translations.
-   */
-  public function routes(RouteBuildEvent $event) {
-    $collection = $event->getRouteCollection();
+  protected function routes(RouteCollection $collection) {
     foreach ($this->entityManager->getDefinitions() as $entity_type => $entity_info) {
       if ($entity_info['translatable'] && isset($entity_info['translation'])) {
         $path = '/' . str_replace($entity_info['menu_path_wildcard'], '{' . $entity_type . '}', $entity_info['menu_base_path']) . '/translations';

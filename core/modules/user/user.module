@@ -116,16 +116,25 @@ function user_theme() {
 function user_page_build(&$page) {
   $path = drupal_get_path('module', 'user');
   $page['#attached']['css'][$path . '/css/user.module.css'] = array('every_page' => TRUE);
+}
+
+/**
+ * Implements hook_js_alter().
+ */
+function user_js_alter(&$javascript) {
+  // If >=1 JavaScript asset has declared a dependency on drupalSettings, the
+  // 'settings' key will exist. Thus when that key does not exist, return early.
+  if (!isset($javascript['settings'])) {
+    return;
+  }
 
   // Provide the user ID in drupalSettings to allow JavaScript code to customize
   // the experience for the end user, rather than the server side, which would
   // break the render cache.
-  global $user;
-  $page['#attached']['js'][] = array(
-    'type' => 'setting',
-    'data' => array('user' => array(
-      'uid' => $user->id(),
-    )),
+  $javascript['settings']['data'][] = array(
+    'user' => array(
+      'uid' => \Drupal::currentUser()->id(),
+    ),
   );
 }
 
@@ -169,7 +178,7 @@ function user_label($entity_type, $entity) {
 /**
  * Populates $entity->account for each prepared entity.
  *
- * Called by Drupal\Core\Entity\EntityRenderControllerInterface::buildContent()
+ * Called by Drupal\Core\Entity\EntityViewBuilderInterface::buildContent()
  * implementations.
  *
  * @param array $entities
@@ -537,7 +546,7 @@ function user_validate_current_pass(&$form, &$form_state) {
     // This validation only works for required textfields (like mail) or
     // form values like password_confirm that have their own validation
     // that prevent them from being empty if they are changed.
-    $current_value = $account->getPropertyDefinition($key) ? $account->get($key)->value : $account->$key;
+    $current_value = $account->hasField($key) ? $account->get($key)->value : $account->$key;
     if ((strlen(trim($form_state['values'][$key])) > 0) && ($form_state['values'][$key] != $current_value)) {
       $current_pass_failed = empty($form_state['values']['current_pass']) || !\Drupal::service('password')->check($form_state['values']['current_pass'], $account);
       if ($current_pass_failed) {
@@ -738,27 +747,6 @@ function user_menu() {
     'menu_name' => 'account',
   );
 
-  $items['user/login'] = array(
-    'title' => 'Log in',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
-  // Other authentication methods may add pages below user/login/.
-  $items['user/login/default'] = array(
-    'title' => 'Username and password',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
-
-  $items['user/register'] = array(
-    'title' => 'Create new account',
-    'type' => MENU_LOCAL_TASK,
-    'route_name' => 'user.register',
-  );
-
-  $items['user/password'] = array(
-    'title' => 'Request new password',
-    'route_name' => 'user.pass',
-    'type' => MENU_LOCAL_TASK,
-  );
   // Since menu_get_ancestors() does not support multiple placeholders in a row,
   // this MENU_CALLBACK cannot be removed yet.
   $items['user/reset/%/%/%'] = array(
@@ -836,21 +824,12 @@ function user_menu() {
     'title arguments' => array(1),
     'route_name' => 'user.view',
   );
-  $items['user/%user/view'] = array(
-    'title' => 'View',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
   $items['user/%user/cancel'] = array(
     'route_name' => 'user.cancel',
   );
   $items['user/%user/cancel/confirm/%/%'] = array(
     'title' => 'Confirm account cancellation',
     'route_name' => 'user.cancel_confirm',
-  );
-  $items['user/%user/edit'] = array(
-    'title' => 'Edit',
-    'route_name' => 'user.edit',
-    'type' => MENU_LOCAL_TASK,
   );
   return $items;
 }
@@ -1693,7 +1672,7 @@ function theme_user_signature($variables) {
 
   if ($signature) {
     $output .= '<div class="clear">';
-    $output .= '<div>—</div>';
+    $output .= '<div>&mdash;</div>';
     $output .= $signature;
     $output .= '</div>';
   }
@@ -1816,7 +1795,7 @@ function user_form_process_password_confirm($element) {
  * Implements hook_node_load().
  *
  * @todo Deprecated by $node->author, attached in
- *   \Drupal\node\NodeRenderController::buildContent(). Update code that
+ *   \Drupal\node\NodeViewBuilder::buildContent(). Update code that
  *   depends on these properties.
  */
 function user_node_load($nodes, $types) {

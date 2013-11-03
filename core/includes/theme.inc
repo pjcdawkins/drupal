@@ -1503,6 +1503,7 @@ function theme_enable($theme_list) {
 
   \Drupal::service('router.builder')->rebuild();
   menu_router_rebuild();
+  \Drupal::cache('cache')->deleteTags(array('local_task' => 1));
   drupal_theme_rebuild();
 
   // Invoke hook_themes_enabled() after the themes have been enabled.
@@ -1539,6 +1540,7 @@ function theme_disable($theme_list) {
   list_themes(TRUE);
   \Drupal::service('router.builder')->rebuild();
   menu_router_rebuild();
+  \Drupal::cache('cache')->deleteTags(array('local_task' => 1));
   drupal_theme_rebuild();
 
   // Invoke hook_themes_disabled after the themes have been disabled.
@@ -2242,6 +2244,8 @@ function template_preprocess_item_list(&$variables) {
  *   - title: The title of the list.
  *   - list_type: The type of HTML list (e.g. "ul", "ol").
  *   - attributes: The attributes applied to the list element.
+ *   - empty: A message to display when there are no items. Allowed value is a
+ *     string or render array.
  */
 function theme_item_list($variables) {
   $items = $variables['items'];
@@ -2274,6 +2278,9 @@ function theme_item_list($variables) {
       $output .= '<li' . new Attribute($attributes) . '>' . $item . '</li>';
     }
     $output .= "</$list_type>";
+  }
+  elseif (!empty($variables['empty'])) {
+    $output .= render($variables['empty']);
   }
 
   // Only output the list container and title, if there are any list items.
@@ -2511,22 +2518,6 @@ function template_preprocess_html(&$variables) {
   // Add a class that tells us whether the page is viewed by an authenticated user or not.
   $variables['attributes']['class'][] = $variables['logged_in'] ? 'logged-in' : 'not-logged-in';
 
-  // Add information about the number of sidebars.
-  if (!empty($variables['page']['sidebar_first']) && !empty($variables['page']['sidebar_second'])) {
-    $variables['attributes']['class'][] = 'two-sidebars';
-  }
-  elseif (!empty($variables['page']['sidebar_first'])) {
-    $variables['attributes']['class'][] = 'one-sidebar';
-    $variables['attributes']['class'][] = 'sidebar-first';
-  }
-  elseif (!empty($variables['page']['sidebar_second'])) {
-    $variables['attributes']['class'][] = 'one-sidebar';
-    $variables['attributes']['class'][] = 'sidebar-second';
-  }
-  else {
-    $variables['attributes']['class'][] = 'no-sidebars';
-  }
-
   // Populate the body classes.
   if ($suggestions = theme_get_suggestions(arg(), 'page', '-')) {
     foreach ($suggestions as $suggestion) {
@@ -2537,11 +2528,6 @@ function template_preprocess_html(&$variables) {
         $variables['attributes']['class'][] = drupal_html_class($suggestion);
       }
     }
-  }
-
-  // If on an individual node page, add the node type to body classes.
-  if ($node = menu_get_object()) {
-    $variables['attributes']['class'][] = drupal_html_class('node-type-' . $node->getType());
   }
 
   // Initializes attributes which are specific to the html and body elements.
@@ -3059,7 +3045,7 @@ function drupal_common_theme() {
       'variables' => array('status' => MARK_NEW),
     ),
     'item_list' => array(
-      'variables' => array('items' => array(), 'title' => '', 'list_type' => 'ul', 'attributes' => array()),
+      'variables' => array('items' => array(), 'title' => '', 'list_type' => 'ul', 'attributes' => array(), 'empty' => NULL),
     ),
     'feed_icon' => array(
       'variables' => array('url' => NULL, 'title' => NULL),

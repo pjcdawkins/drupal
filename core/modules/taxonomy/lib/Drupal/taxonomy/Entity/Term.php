@@ -21,7 +21,6 @@ use Drupal\taxonomy\TermInterface;
  *   id = "taxonomy_term",
  *   label = @Translation("Taxonomy term"),
  *   bundle_label = @Translation("Vocabulary"),
- *   module = "taxonomy",
  *   controllers = {
  *     "storage" = "Drupal\taxonomy\TermStorageController",
  *     "view_builder" = "Drupal\taxonomy\TermViewBuilder",
@@ -49,7 +48,6 @@ use Drupal\taxonomy\TermInterface;
  *     "canonical" = "/taxonomy/term/{taxonomy_term}",
  *     "edit-form" = "/taxonomy/term/{taxonomy_term}/edit"
  *   },
- *   menu_base_path = "taxonomy/term/%taxonomy_term",
  *   route_base_path = "admin/structure/taxonomy/manage/{bundle}",
  *   permission_granularity = "bundle"
  * )

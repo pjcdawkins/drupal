@@ -76,15 +76,14 @@ class EditLoadingTest extends WebTestBase {
     $this->drupalLogin($this->author_user);
     $this->drupalGet('node/1');
 
-    // Settings, library and in-place editors.
+    // Library and in-place editors.
     $settings = $this->drupalGetSettings();
-    $this->assertFalse(isset($settings['edit']), 'Edit settings do not exist.');
     $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/edit.js']), 'Edit library not loaded.');
     $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/createjs/editingWidgets/formwidget.js']), "'form' in-place editor not loaded.");
 
     // HTML annotation must always exist (to not break the render cache).
-    $this->assertRaw('data-edit-entity="node/1"');
-    $this->assertRaw('data-edit-id="node/1/body/und/full"');
+    $this->assertRaw('data-edit-entity-id="node/1"');
+    $this->assertRaw('data-edit-field-id="node/1/body/und/full"');
 
     // Retrieving the metadata should result in an empty 403 response.
     $post = array('fields[0]' => 'node/1/body/und/full');
@@ -133,15 +132,14 @@ class EditLoadingTest extends WebTestBase {
     $this->drupalLogin($this->editor_user);
     $this->drupalGet('node/1');
 
-    // Settings, library and in-place editors.
+    // Library and in-place editors.
     $settings = $this->drupalGetSettings();
-    $this->assertTrue(isset($settings['edit']), 'Edit settings exist.');
     $this->assertTrue(isset($settings['ajaxPageState']['js']['core/modules/edit/js/edit.js']), 'Edit library loaded.');
     $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/createjs/editingWidgets/formwidget.js']), "'form' in-place editor not loaded.");
 
     // HTML annotation must always exist (to not break the render cache).
-    $this->assertRaw('data-edit-entity="node/1"');
-    $this->assertRaw('data-edit-id="node/1/body/und/full"');
+    $this->assertRaw('data-edit-entity-id="node/1"');
+    $this->assertRaw('data-edit-field-id="node/1/body/und/full"');
 
     // There should be only one revision so far.
     $revisions = node_revision_list(node_load(1));
@@ -301,7 +299,7 @@ class EditLoadingTest extends WebTestBase {
     $this->drupalGet('node/1');
 
     // Check that the data- attribute is not added.
-    $this->assertNoRaw('data-edit-id="node/1/edit_test_pseudo_field/und/default"');
+    $this->assertNoRaw('data-edit-field-id="node/1/edit_test_pseudo_field/und/default"');
   }
 
   /**

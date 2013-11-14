@@ -17,13 +17,6 @@ use Drupal\Component\Annotation\Plugin;
 class EntityType extends Plugin {
 
   /**
-   * The name of the module providing the type.
-   *
-   * @var string
-   */
-  public $module;
-
-  /**
    * The name of the entity type class.
    *
    * This is not provided manually, it will be added by the discovery mechanism.
@@ -242,37 +235,6 @@ class EntityType extends Plugin {
    * @var string (optional)
    */
   public $route_base_path;
-
-  /**
-   * The base menu router path to which the entity admin user interface responds.
-   *
-   * It can be used to generate UI links and to attach additional router items
-   * to the entity UI in a generic fashion.
-   *
-   * @var string (optional)
-   */
-  public $menu_base_path;
-
-  /**
-   * The menu router path to be used to view the entity.
-   *
-   * @var string (optional)
-   */
-  public $menu_view_path;
-
-  /**
-   * The menu router path to be used to edit the entity.
-   *
-   * @var string (optional)
-   */
-  public $menu_edit_path;
-
-  /**
-   * A string identifying the menu loader in the router path.
-   *
-   * @var string (optional)
-   */
-  public $menu_path_wildcard;
 
   /**
    * Link templates using the URI template syntax.

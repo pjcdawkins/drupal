@@ -264,6 +264,9 @@ class BlockFormController extends EntityFormController {
       '#prefix' => '<div id="edit-block-region-wrapper">',
       '#suffix' => '</div>',
     );
+    $form['#attached']['css'] = array(
+      drupal_get_path('module', 'block') . '/css/block.admin.css',
+    );
     return $form;
   }
 
@@ -323,9 +326,15 @@ class BlockFormController extends EntityFormController {
     // Invalidate the content cache and redirect to the block listing,
     // because we need to remove cached block contents for each cache backend.
     Cache::invalidateTags(array('content' => TRUE));
-    $form_state['redirect'] = array('admin/structure/block/list/' . $form_state['values']['theme'], array(
-      'query' => array('block-placement' => drupal_html_class($this->entity->id())),
-    ));
+    $form_state['redirect_route'] = array(
+      'route_name' => 'block.admin_display_theme',
+      'route_parameters' => array(
+        'theme' => $form_state['values']['theme'],
+      ),
+      'options' => array(
+        'query' => array('block-placement' => drupal_html_class($this->entity->id()))
+      ),
+    );
   }
 
   /**
@@ -333,7 +342,12 @@ class BlockFormController extends EntityFormController {
    */
   public function delete(array $form, array &$form_state) {
     parent::delete($form, $form_state);
-    $form_state['redirect'] = 'admin/structure/block/manage/' . $this->entity->id() . '/delete';
+    $form_state['redirect_route'] = array(
+      'route_name' => 'block.admin_block_delete',
+      'route_parameters' => array(
+        'block' => $this->entity->id(),
+      ),
+    );
   }
 
   /**

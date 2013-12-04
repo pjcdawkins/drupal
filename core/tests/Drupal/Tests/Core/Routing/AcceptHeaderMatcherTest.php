@@ -9,7 +9,7 @@ namespace Drupal\Tests\Core\Routing;
 
 use Drupal\Core\ContentNegotiation;
 use Drupal\Core\Routing\AcceptHeaderMatcher;
-use Drupal\system\Tests\Routing\RoutingFixtures;
+use Drupal\Tests\Core\Routing\RoutingFixtures;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
 

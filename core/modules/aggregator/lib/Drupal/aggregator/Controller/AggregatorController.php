@@ -7,6 +7,7 @@
 
 namespace Drupal\aggregator\Controller;
 
+use Drupal\Component\Utility\Xss;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\aggregator\CategoryStorageControllerInterface;
@@ -15,6 +16,7 @@ use Drupal\aggregator\ItemInterface;
 use Drupal\Core\Database\Connection;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -91,7 +93,6 @@ class AggregatorController extends ControllerBase implements ContainerInjectionI
     $items = $entity_manager->getStorageController('aggregator_item')->loadByFeed($aggregator_feed->id());
     // Print the feed items.
     $build = $this->buildPageList($items, $feed_source);
-    $build['#title'] = $aggregator_feed->label();
     return $build;
   }
 
@@ -105,10 +106,8 @@ class AggregatorController extends ControllerBase implements ContainerInjectionI
    *   The render array with list of items for the feed.
    */
   public function viewCategory($cid) {
-    $category = $this->categoryStorage->load($cid);
     $items = $this->entityManager()->getStorageController('aggregator_item')->loadByCategory($cid);
     $build = $this->buildPageList($items);
-    $build['#title'] = $category->title;
     return $build;
   }
 
@@ -143,8 +142,6 @@ class AggregatorController extends ControllerBase implements ContainerInjectionI
    *
    * @param \Drupal\aggregator\FeedInterface $aggregator_feed
    *   An object describing the feed to be refreshed.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The current request object containing the search string.
    *
    * @return \Symfony\Component\HttpFoundation\RedirectResponse
    *   A redirection to the admin overview page.
@@ -152,15 +149,7 @@ class AggregatorController extends ControllerBase implements ContainerInjectionI
    * @throws \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException
    *   If the query token is missing or invalid.
    */
-  public function feedRefresh(FeedInterface $aggregator_feed, Request $request) {
-    // @todo CSRF tokens are validated in page callbacks rather than access
-    //   callbacks, because access callbacks are also invoked during menu link
-    //   generation. Add token support to routing: http://drupal.org/node/755584.
-    $token = $request->query->get('token');
-    if (!isset($token) || !drupal_valid_token($token, 'aggregator/update/' . $aggregator_feed->id())) {
-      throw new AccessDeniedHttpException();
-    }
-
+  public function feedRefresh(FeedInterface $aggregator_feed) {
     // @todo after https://drupal.org/node/1972246 find a new place for it.
     aggregator_refresh($aggregator_feed);
     return $this->redirect('aggregator.admin_overview');
@@ -186,20 +175,23 @@ class AggregatorController extends ControllerBase implements ContainerInjectionI
       $links = array();
       $links['edit'] = array(
         'title' => $this->t('Edit'),
-        'href' => "admin/config/services/aggregator/edit/feed/$feed->fid",
+        'route_name' => 'aggregator.feed_edit',
+        'route_parameters' => array('aggregator_feed' => $feed->fid),
       );
       $links['delete'] = array(
         'title' => $this->t('Delete'),
-        'href' => "admin/config/services/aggregator/delete/feed/$feed->fid",
+        'route_name' => 'aggregator.feed_delete',
+        'route_parameters' => array('aggregator_feed' => $feed->fid),
       );
       $links['remove'] = array(
         'title' => $this->t('Remove items'),
-        'href' => "admin/config/services/aggregator/remove/$feed->fid",
+        'route_name' => 'aggregator.feed_items_delete',
+        'route_parameters' => array('aggregator_feed' => $feed->fid),
       );
       $links['update'] = array(
         'title' => $this->t('Update items'),
-        'href' => "admin/config/services/aggregator/update/$feed->fid",
-        'query' => array('token' => drupal_get_token("aggregator/update/$feed->fid")),
+        'route_name' => 'aggregator.feed_refresh',
+        'route_parameters' => array('aggregator_feed' => $feed->fid),
       );
       $row[] = array(
         'data' => array(
@@ -228,11 +220,13 @@ class AggregatorController extends ControllerBase implements ContainerInjectionI
       $links = array();
       $links['edit'] = array(
         'title' => $this->t('Edit'),
-        'href' => "admin/config/services/aggregator/edit/category/$category->cid",
+        'route_name' => 'aggregator.category_admin_edit',
+        'route_parameters' => array('cid' => $category->cid),
       );
       $links['delete'] = array(
         'title' => $this->t('Delete'),
-        'href' => "admin/config/services/aggregator/delete/category/$category->cid",
+        'route_name' => 'aggregator.category_delete',
+        'route_parameters' => array('cid' => $category->cid),
       );
       $row[] = array(
         'data' => array(
@@ -346,11 +340,62 @@ class AggregatorController extends ControllerBase implements ContainerInjectionI
   }
 
   /**
-   * @todo Remove aggregator_opml().
+   * Generates an OPML representation of all feeds or feeds by category.
+   *
+   * @param int $cid
+   *   (optional) If set, feeds are exported only from a category with this ID.
+   *   Otherwise, all feeds are exported. Defaults to NULL.
+   *
+   * @return \Symfony\Component\HttpFoundation\Response
+   *   The response containing the OPML.
    */
   public function opmlPage($cid = NULL) {
-    module_load_include('pages.inc', 'aggregator');
-    return aggregator_page_opml($cid);
+    if ($cid) {
+      $result = $this->database->query('SELECT f.title, f.url FROM {aggregator_feed} f LEFT JOIN {aggregator_category_feed} c on f.fid = c.fid WHERE c.cid = :cid ORDER BY title', array(':cid' => $cid));
+    }
+    else {
+      $result = $this->database->query('SELECT * FROM {aggregator_feed} ORDER BY title');
+    }
+
+    $feeds = $result->fetchAll();
+    $aggregator_page_opml = array(
+      '#theme' => 'aggregator_page_opml',
+      '#feeds' => $feeds,
+    );
+    $output = drupal_render($aggregator_page_opml);
+
+    $response = new Response();
+    $response->headers->set('Content-Type', 'text/xml; charset=utf-8');
+    $response->setContent($output);
+
+    return $response;
+  }
+
+  /**
+   * Route title callback.
+   *
+   * @param \Drupal\aggregator\FeedInterface $aggregator_feed
+   *   The aggregator feed.
+   *
+   * @return string
+   *   The feed label.
+   */
+  public function feedTitle(FeedInterface $aggregator_feed) {
+    return Xss::filter($aggregator_feed->label());
+  }
+
+  /**
+   * Route title callback.
+   *
+   * @param int $cid
+   *   The category ID.
+   *
+   * @return string
+   *   The category label.
+   */
+  public function categoryTitle($cid) {
+    $category = $this->categoryStorage->load($cid);
+    return Xss::filter($category->title);
   }
 
 }

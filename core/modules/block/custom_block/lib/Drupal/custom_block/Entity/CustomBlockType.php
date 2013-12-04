@@ -38,7 +38,7 @@ use Drupal\custom_block\CustomBlockTypeInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/structure/block/custom-blocks/manage/{custom_block_type}"
+ *     "edit-form" = "custom_block.type_edit"
  *   }
  * )
  */
@@ -87,7 +87,9 @@ class CustomBlockType extends ConfigEntityBase implements CustomBlockTypeInterfa
 
     if (!$update) {
       entity_invoke_bundle_hook('create', 'custom_block', $this->id());
-      custom_block_add_body_field($this->id);
+      if (!$this->isSyncing()) {
+        custom_block_add_body_field($this->id);
+      }
     }
     elseif ($this->getOriginalId() != $this->id) {
       entity_invoke_bundle_hook('rename', 'custom_block', $this->getOriginalId(), $this->id);

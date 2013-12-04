@@ -25,12 +25,6 @@ function views_ui_menu() {
     'route_name' => 'views_ui.list',
   );
 
-  // The primary Edit View page. Secondary tabs for each Display are added in
-  // views_ui_menu_local_tasks_alter().
-  $items['admin/structure/views/view/%'] = array(
-    'route_name' => 'views_ui.edit',
-  );
-
   // A page in the Reports section to show usage of plugins in all views.
   $items['admin/reports/views-plugins'] = array(
     'title' => 'Views plugins',
@@ -56,6 +50,7 @@ function views_ui_entity_info(&$entity_info) {
       'break_lock' => 'Drupal\views_ui\Form\BreakLockForm',
     ),
   );
+  $entity_info['view']['links']['edit-form'] = 'views_ui.edit';
 }
 
 /**
@@ -253,7 +248,6 @@ function views_ui_view_preview_section_display_category_links(ViewExecutable $vi
  * Returns all contextual links for the main content part of the view.
  */
 function views_ui_view_preview_section_rows_links(ViewExecutable $view) {
-  $display = $view->display_handler->display;
   $links = array();
   $links = array_merge($links, views_ui_view_preview_section_handler_links($view, 'filter', TRUE));
   $links = array_merge($links, views_ui_view_preview_section_handler_links($view, 'field', TRUE));

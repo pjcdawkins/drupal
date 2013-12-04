@@ -38,7 +38,7 @@ use Drupal\shortcut\ShortcutSetInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/config/user-interface/shortcut/manage/{shortcut_set}"
+ *     "edit-form" = "shortcut.set_customize"
  *   }
  * )
  */
@@ -79,7 +79,7 @@ class ShortcutSet extends ConfigEntityBase implements ShortcutSetInterface {
     parent::postCreate($storage_controller);
 
     // Generate menu-compatible set name.
-    if (!$this->getOriginalID()) {
+    if (!$this->getOriginalId()) {
       // Save a new shortcut set with links copied from the user's default set.
       $default_set = shortcut_default_set();
       // Generate a name to have no collisions with menu.

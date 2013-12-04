@@ -63,7 +63,8 @@ class BanAdmin extends FormBase {
       $links = array();
       $links['delete'] = array(
         'title' => $this->t('delete'),
-        'href' => "admin/config/people/ban/delete/$ip->iid",
+        'route_name' => 'ban.delete',
+        'route_parameters' => array('ban_id' => $ip->iid),
       );
       $row[] = array(
         'data' => array(
@@ -104,13 +105,13 @@ class BanAdmin extends FormBase {
   public function validateForm(array &$form, array &$form_state) {
     $ip = trim($form_state['values']['ip']);
     if ($this->ipManager->isBanned($ip)) {
-      form_set_error('ip', $this->t('This IP address is already banned.'));
+      form_set_error('ip', $form_state, $this->t('This IP address is already banned.'));
     }
     elseif ($ip == $this->getRequest()->getClientIP()) {
-      form_set_error('ip', $this->t('You may not ban your own IP address.'));
+      form_set_error('ip', $form_state, $this->t('You may not ban your own IP address.'));
     }
     elseif (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) == FALSE) {
-      form_set_error('ip', $this->t('Enter a valid IP address.'));
+      form_set_error('ip', $form_state, $this->t('Enter a valid IP address.'));
     }
   }
 

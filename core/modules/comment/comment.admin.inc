@@ -154,14 +154,16 @@ function comment_admin_overview($form, &$form_state, $arg) {
     );
     $links = array();
     $links['edit'] = array(
-      'title' => t('edit'),
-      'href' => 'comment/' . $comment->id() . '/edit',
+      'title' => t('Edit'),
+      'route_name' => 'comment.edit_page',
+      'route_parameters' => array('comment' => $comment->id()),
       'query' => $destination,
     );
     if (module_invoke('content_translation', 'translate_access', $comment)) {
       $links['translate'] = array(
-        'title' => t('translate'),
-        'href' => 'comment/' . $comment->id() . '/translations',
+        'title' => t('Translate'),
+        'route_name' => 'content_translation.translation_overview_comment',
+        'route_parameters' => array('comment' => $comment->id()),
         'query' => $destination,
       );
     }
@@ -192,7 +194,7 @@ function comment_admin_overview_validate($form, &$form_state) {
   $form_state['values']['comments'] = array_diff($form_state['values']['comments'], array(0));
   // We can't execute any 'Update options' if no comments were selected.
   if (count($form_state['values']['comments']) == 0) {
-    form_set_error('', t('Select one or more comments to perform the update on.'));
+    form_set_error('', $form_state, t('Select one or more comments to perform the update on.'));
   }
 }
 

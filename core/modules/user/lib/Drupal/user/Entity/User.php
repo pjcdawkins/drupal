@@ -21,6 +21,7 @@ use Drupal\user\UserInterface;
  *   controllers = {
  *     "storage" = "Drupal\user\UserStorageController",
  *     "access" = "Drupal\user\UserAccessController",
+ *     "list" = "Drupal\user\Controller\UserListController",
  *     "view_builder" = "Drupal\Core\Entity\EntityViewBuilder",
  *     "form" = {
  *       "default" = "Drupal\user\ProfileFormController",
@@ -32,7 +33,6 @@ use Drupal\user\UserInterface;
  *   admin_permission = "administer user",
  *   base_table = "users",
  *   uri_callback = "user_uri",
- *   route_base_path = "admin/config/people/accounts",
  *   label_callback = "user_label",
  *   fieldable = TRUE,
  *   translatable = TRUE,
@@ -41,8 +41,9 @@ use Drupal\user\UserInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "canonical" = "/user/{user}",
- *     "edit-form" = "/user/{user}/edit"
+ *     "canonical" = "user.view",
+ *     "edit-form" = "user.edit",
+ *     "admin-form" = "user.account_settings"
  *   }
  * )
  */
@@ -495,7 +496,7 @@ class User extends ContentEntityBase implements UserInterface {
       'label' => t('Signature format'),
       'description' => t('The signature format of this user'),
       // @todo Convert the type to filter_format once
-      // https://drupal.org/node/1758622 is comitted
+      // https://drupal.org/node/1758622 is committed
       'type' => 'string_field',
     );
     $properties['theme'] = array(

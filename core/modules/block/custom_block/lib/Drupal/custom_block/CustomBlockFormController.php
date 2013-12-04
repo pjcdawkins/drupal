@@ -43,8 +43,7 @@ class CustomBlockFormController extends ContentEntityFormController {
     $block = $this->entity;
 
     if ($this->operation == 'edit') {
-      // @todo Remove this once https://drupal.org/node/1981644 is in.
-      drupal_set_title(t('Edit custom block %label', array('%label' => $block->label())), PASS_THROUGH);
+      $form['#title'] = $this->t('Edit custom block %label', array('%label' => $block->label()));
     }
     // Override the default CSS class name, since the user-defined custom block
     // type name in 'TYPE-block-form' potentially clashes with third-party class
@@ -238,7 +237,7 @@ class CustomBlockFormController extends ContentEntityFormController {
       // @todo Inject this once https://drupal.org/node/2060865 is in.
       $exists = \Drupal::entityManager()->getStorageController('custom_block')->loadByProperties(array('info' => $form_state['values']['info']));
       if (!empty($exists)) {
-        form_set_error('info', t('A block with description %name already exists.', array(
+        form_set_error('info', $form_state, t('A block with description %name already exists.', array(
         '%name' => $form_state['values']['info']
       )));
       }

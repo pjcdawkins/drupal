@@ -87,6 +87,7 @@ class FieldEditForm extends FormBase {
    */
   public function buildForm(array $form, array &$form_state, FieldInstanceInterface $field_instance = NULL) {
     $this->instance = $form_state['instance'] = $field_instance;
+    $form['#title'] = $this->instance->label();
 
     $field = $this->instance->getField();
     $form['#field'] = $field;
@@ -145,7 +146,6 @@ class FieldEditForm extends FormBase {
     $form['field']['field_name'] = array('#type' => 'value', '#value' => $field->getFieldName());
     $form['field']['type'] = array('#type' => 'value', '#value' => $field->getFieldType());
     $form['field']['module'] = array('#type' => 'value', '#value' => $field->module);
-    $form['field']['active'] = array('#type' => 'value', '#value' => $field->active);
 
     // Add settings provided by the field module. The field module is
     // responsible for not returning settings that cannot be changed if
@@ -172,7 +172,7 @@ class FieldEditForm extends FormBase {
     $cardinality = $form_state['values']['field']['cardinality'];
     $cardinality_number = $form_state['values']['field']['cardinality_number'];
     if ($cardinality === 'number' && empty($cardinality_number)) {
-      form_error($form['field']['cardinality_container']['cardinality_number'], $this->t('Number of values is required.'));
+      form_error($form['field']['cardinality_container']['cardinality_number'], $form_state, $this->t('Number of values is required.'));
     }
   }
 
@@ -206,12 +206,7 @@ class FieldEditForm extends FormBase {
         $form_state['redirect'] = $next_destination;
       }
       else {
-        $form_state['redirect_route'] = array(
-          'route_name' => 'field_ui.overview_' . $this->instance->entity_type,
-          'route_parameters' => array(
-            'bundle' => $this->instance->bundle,
-          )
-        );
+        $form_state['redirect_route'] = $this->entityManager->getAdminRouteInfo($this->instance->entity_type, $this->instance->bundle);
       }
     }
     catch (\Exception $e) {

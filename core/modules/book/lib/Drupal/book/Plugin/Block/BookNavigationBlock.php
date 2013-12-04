@@ -81,7 +81,7 @@ class BookNavigationBlock extends BlockBase {
           $book['in_active_trail'] = FALSE;
           // Check whether user can access the book link.
           $book_node = node_load($book['nid']);
-          $book['access'] = node_access('view', $book_node);
+          $book['access'] = $book_node->access('view');
           $pseudo_tree[0]['link'] = $book;
           $book_menus[$book_id] = menu_tree_output($pseudo_tree);
         }
@@ -89,8 +89,7 @@ class BookNavigationBlock extends BlockBase {
       if ($book_menus) {
         return array(
           '#theme' => 'book_all_books_block',
-          $book_menus
-        );
+        ) + $book_menus;
       }
     }
     elseif ($current_bid) {

@@ -125,15 +125,6 @@ class EntityFormController extends FormBase implements EntityFormControllerInter
     $this->prepareEntity();
 
     $form_display = entity_get_render_form_display($this->entity, $this->getOperation());
-
-    // Let modules alter the form display.
-    $form_display_context = array(
-      'entity_type' => $this->entity->entityType(),
-      'bundle' => $this->entity->bundle(),
-      'form_mode' => $this->getOperation(),
-    );
-    $this->moduleHandler->alter('entity_form_display', $form_display, $form_display_context);
-
     $this->setFormDisplay($form_display, $form_state);
 
     // Invoke the prepare form hooks.
@@ -176,6 +167,10 @@ class EntityFormController extends FormBase implements EntityFormControllerInter
    * @see \Drupal\Core\Entity\EntityFormController::form()
    */
   public function processForm($element, $form_state, $form) {
+    // If the form is cached, process callbacks may not have a valid reference
+    // to the entity object, hence we must restore it.
+    $this->entity = $form_state['controller']->getEntity();
+
     // Assign the weights configured in the form display.
     foreach ($this->getFormDisplay($form_state)->getComponents() as $name => $options) {
       if (isset($element[$name])) {

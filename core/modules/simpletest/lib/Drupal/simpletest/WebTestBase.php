@@ -277,7 +277,7 @@ abstract class WebTestBase extends TestBase {
         $settings['uid'] = $this->loggedInUser->id();
       }
       else {
-        global $user;
+        $user = \Drupal::currentUser() ?: $GLOBALS['user'];
         $settings['uid'] = $user->id();
       }
     }
@@ -714,7 +714,7 @@ abstract class WebTestBase extends TestBase {
    * @see \Drupal\simpletest\WebTestBase::prepareEnvironment()
    */
   protected function setUp() {
-    global $user, $conf;
+    global $conf;
 
     // When running tests through the Simpletest UI (vs. on the command line),
     // Simpletest's batch conflicts with the installer's batch. Batch API does
@@ -1132,14 +1132,30 @@ abstract class WebTestBase extends TestBase {
     if (!empty($this->curlCookies)) {
       $cookies = $this->curlCookies;
     }
-    // In order to debug webtests you need to either set a cookie or have the
-    // xdebug session in the URL. If the developer listens to connection on the
-    // parent site, by default the cookie is not forwarded to the client side,
-    // so you can't debug actual running code. In order to make debuggers work
+    // In order to debug web tests you need to either set a cookie, have the
+    // Xdebug session in the URL or set an environment variable in case of CLI
+    // requests. If the developer listens to connection on the parent site, by
+    // default the cookie is not forwarded to the client side, so you cannot
+    // debug the code running on the child site. In order to make debuggers work
     // this bit of information is forwarded. Make sure that the debugger listens
     // to at least three external connections.
-    if (isset($_COOKIE['XDEBUG_SESSION'])) {
-      $cookies[] = 'XDEBUG_SESSION=' . $_COOKIE['XDEBUG_SESSION'];
+    $request = \Drupal::request();
+    $cookie_params = $request->cookies;
+    if ($cookie_params->has('XDEBUG_SESSION')) {
+      $cookies[] = 'XDEBUG_SESSION=' . $cookie_params->get('XDEBUG_SESSION');
+    }
+    // For CLI requests, the information is stored in $_SERVER.
+    $server = $request->server;
+    if ($server->has('XDEBUG_CONFIG')) {
+      // $_SERVER['XDEBUG_CONFIG'] has the form "key1=value1 key2=value2 ...".
+      $pairs = explode(' ', $server->get('XDEBUG_CONFIG'));
+      foreach ($pairs as $pair) {
+        list($key, $value) = explode('=', $pair);
+        // Account for key-value pairs being separated by multiple spaces.
+        if (trim($key, ' ') == 'idekey') {
+          $cookies[] = 'XDEBUG_SESSION=' . trim($value, ' ');
+        }
+      }
     }
 
     // Merge additional cookies in.
@@ -2260,7 +2276,7 @@ abstract class WebTestBase extends TestBase {
    */
   protected function clickLink($label, $index = 0) {
     $url_before = $this->getUrl();
-    $urls = $this->xpath('//a[normalize-space(text())=:label]', array(':label' => $label));
+    $urls = $this->xpath('//a[normalize-space()=:label]', array(':label' => $label));
 
     if (isset($urls[$index])) {
       $url_target = $this->getAbsoluteUrl($urls[$index]['href']);

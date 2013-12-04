@@ -2,9 +2,7 @@
 
 /**
  * @file
- * Provide views data and handlers for taxonomy.module.
- *
- * @ingroup views_module_handlers
+ * Provide views data for taxonomy.module.
  */
 
 use Drupal\Core\Entity\FieldableDatabaseStorageController;
@@ -130,12 +128,12 @@ function taxonomy_views_data() {
   );
 
   // Term description
-  $data['taxonomy_term_data']['description'] = array(
+  $data['taxonomy_term_data']['description__value'] = array(
     'title' => t('Term description'),
     'help' => t('The description associated with a taxonomy term.'),
     'field' => array(
       'id' => 'markup',
-      'format' => array('field' => 'format'),
+      'format' => array('field' => 'description__format'),
       'click sortable' => FALSE,
     ),
     'filter' => array(
@@ -360,7 +358,7 @@ function taxonomy_views_data() {
 function taxonomy_views_data_alter(&$data) {
   $data['node']['term_node_tid'] = array(
     'title' => t('Taxonomy terms on node'),
-    'help' => t('Relate nodes to taxonomy terms, specifiying which vocabulary or vocabularies to use. This relationship will cause duplicated records if there are multiple terms.'),
+    'help' => t('Relate nodes to taxonomy terms, specifying which vocabulary or vocabularies to use. This relationship will cause duplicated records if there are multiple terms.'),
     'relationship' => array(
       'id' => 'node_term_data',
       'label' => t('term'),

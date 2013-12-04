@@ -104,25 +104,18 @@ class FormBuilder implements FormBuilderInterface {
   protected $forms;
 
   /**
-   * An array of form errors.
-   *
-   * @var array
-   */
-  protected $errors = array();
-
-  /**
-   * @todo.
-   *
-   * @var array
-   */
-  protected $errorSections;
-
-  /**
    * An array of validated forms.
    *
    * @var array
    */
   protected $validatedForms = array();
+
+  /**
+   * An array of options used for recursive flattening.
+   *
+   * @var array
+   */
+  protected $flattenedOptions = array();
 
   /**
    * Constructs a new FormBuilder.
@@ -310,6 +303,8 @@ class FormBuilder implements FormBuilderInterface {
       'method' => 'post',
       'groups' => array(),
       'buttons' => array(),
+      'errors' => array(),
+      'limit_validation_errors' => NULL,
     );
   }
 
@@ -434,6 +429,8 @@ class FormBuilder implements FormBuilderInterface {
       'executed',
       'validate_handlers',
       'values',
+      'errors',
+      'limit_validation_errors',
     );
   }
 
@@ -443,9 +440,9 @@ class FormBuilder implements FormBuilderInterface {
   public function submitForm($form_arg, &$form_state) {
     if (!isset($form_state['build_info']['args'])) {
       $args = func_get_args();
-      array_shift($args);
-      array_shift($args);
-      $form_state['build_info']['args'] = $args;
+      // Remove $form and $form_state from the arguments.
+      unset($args[0], $args[1]);
+      $form_state['build_info']['args'] = array_values($args);
     }
     // Merge in default values.
     $form_state += $this->getFormStateDefaults();
@@ -465,7 +462,7 @@ class FormBuilder implements FormBuilderInterface {
 
     // Reset form validation.
     $form_state['must_validate'] = TRUE;
-    $this->clearErrors();
+    $this->clearErrors($form_state);
 
     $this->prepareForm($form_id, $form, $form_state);
     $this->processForm($form_id, $form, $form_state);
@@ -477,21 +474,6 @@ class FormBuilder implements FormBuilderInterface {
   public function retrieveForm($form_id, &$form_state) {
     // Record the $form_id.
     $form_state['build_info']['form_id'] = $form_id;
-
-    // Record the filepath of the include file containing the original form, so
-    // the form builder callbacks can be loaded when the form is being rebuilt
-    // from cache on a different path (such as 'system/ajax'). See
-    // self::getCache(). Don't do this in maintenance mode as Drupal may not be
-    // fully bootstrapped (i.e. during installation) in which case
-    // menu_get_item() is not available.
-    if (!isset($form_state['build_info']['files']['menu']) && !defined('MAINTENANCE_MODE')) {
-      $item = $this->menuGetItem();
-      if (!empty($item['include_file'])) {
-        // Do not use form_load_include() here, as the file is already loaded.
-        // Anyway, self::getCache() is able to handle filepaths too.
-        $form_state['build_info']['files']['menu'] = $item['include_file'];
-      }
-    }
 
     // We save two copies of the incoming arguments: one for modules to use
     // when mapping form ids to constructor functions, and another to pass to
@@ -587,7 +569,7 @@ class FormBuilder implements FormBuilderInterface {
   public function processForm($form_id, &$form, &$form_state) {
     $form_state['values'] = array();
 
-    // With $_GET, these forms are always submitted if requested.
+    // With GET, these forms are always submitted if requested.
     if ($form_state['method'] == 'get' && !empty($form_state['always_process'])) {
       if (!isset($form_state['input']['form_build_id'])) {
         $form_state['input']['form_build_id'] = $form['#build_id'];
@@ -609,6 +591,11 @@ class FormBuilder implements FormBuilderInterface {
 
     // Only process the input if we have a correct form submission.
     if ($form_state['process_input']) {
+      // Form constructors may explicitly set #token to FALSE when cross site
+      // request forgery is irrelevant to the form, such as search forms.
+      if (isset($form['#token']) && $form['#token'] === FALSE) {
+        unset($form['#token']);
+      }
       $this->validateForm($form_id, $form, $form_state);
 
       // drupal_html_id() maintains a cache of element IDs it has seen, so it
@@ -616,12 +603,12 @@ class FormBuilder implements FormBuilderInterface {
       // form is processed, so scenarios that result in the form being built
       // behind the scenes and again for the browser don't increment all the
       // element IDs needlessly.
-      if (!$this->getErrors()) {
+      if (!$this->getAnyErrors()) {
         // In case of errors, do not break HTML IDs of other forms.
         $this->drupalStaticReset('drupal_html_id');
       }
 
-      if ($form_state['submitted'] && !$this->getErrors() && !$form_state['rebuild']) {
+      if ($form_state['submitted'] && !$this->getAnyErrors() && !$form_state['rebuild']) {
         // Execute form submit handlers.
         $this->executeHandlers('submit', $form, $form_state);
 
@@ -686,7 +673,7 @@ class FormBuilder implements FormBuilderInterface {
       //   along with element-level #submit properties, it makes no sense to
       //   have divergent form execution based on whether the triggering element
       //   has #executes_submit_callback set to TRUE.
-      if (($form_state['rebuild'] || !$form_state['executed']) && !$this->getErrors()) {
+      if (($form_state['rebuild'] || !$form_state['executed']) && !$this->getAnyErrors()) {
         // Form building functions (e.g., self::handleInputElement()) may use
         // $form_state['rebuild'] to determine if they are running in the
         // context of a rebuild, so ensure it is set.
@@ -860,11 +847,21 @@ class FormBuilder implements FormBuilderInterface {
         $url = $this->urlGenerator->generateFromPath($path, array('query' => $query));
 
         // Setting this error will cause the form to fail validation.
-        $this->setErrorByName('form_token', $this->t('The form has become outdated. Copy any unsaved work in the form below and then <a href="@link">reload this page</a>.', array('@link' => $url)));
+        $this->setErrorByName('form_token', $form_state, $this->t('The form has become outdated. Copy any unsaved work in the form below and then <a href="@link">reload this page</a>.', array('@link' => $url)));
+
+        // Stop here and don't run any further validation handlers, because they
+        // could invoke non-safe operations which opens the door for CSRF
+        // vulnerabilities.
+        $this->validatedForms[$form_id] = TRUE;
+        return;
       }
     }
 
+    // Recursively validate each form element.
     $this->doValidateForm($form, $form_state, $form_id);
+    // After validation, loop through and assign each element its errors.
+    $this->setElementErrorsFromFormState($form, $form_state);
+    // Mark this form as validated.
     $this->validatedForms[$form_id] = TRUE;
 
     // If validation errors are limited then remove any non validated form values,
@@ -1018,12 +1015,12 @@ class FormBuilder implements FormBuilderInterface {
       if (isset($elements['#needs_validation'])) {
         // Verify that the value is not longer than #maxlength.
         if (isset($elements['#maxlength']) && Unicode::strlen($elements['#value']) > $elements['#maxlength']) {
-          $this->setError($elements, $this->t('!name cannot be longer than %max characters but is currently %length characters long.', array('!name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title'], '%max' => $elements['#maxlength'], '%length' => Unicode::strlen($elements['#value']))));
+          $this->setError($elements, $form_state, $this->t('!name cannot be longer than %max characters but is currently %length characters long.', array('!name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title'], '%max' => $elements['#maxlength'], '%length' => Unicode::strlen($elements['#value']))));
         }
 
         if (isset($elements['#options']) && isset($elements['#value'])) {
           if ($elements['#type'] == 'select') {
-            $options = form_options_flatten($elements['#options']);
+            $options = $this->flattenOptions($elements['#options']);
           }
           else {
             $options = $elements['#options'];
@@ -1032,7 +1029,7 @@ class FormBuilder implements FormBuilderInterface {
             $value = in_array($elements['#type'], array('checkboxes', 'tableselect')) ? array_keys($elements['#value']) : $elements['#value'];
             foreach ($value as $v) {
               if (!isset($options[$v])) {
-                $this->setError($elements, $this->t('An illegal choice has been detected. Please contact the site administrator.'));
+                $this->setError($elements, $form_state, $this->t('An illegal choice has been detected. Please contact the site administrator.'));
                 $this->watchdog('form', 'Illegal choice %choice in !name element.', array('%choice' => $v, '!name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title']), WATCHDOG_ERROR);
               }
             }
@@ -1051,7 +1048,7 @@ class FormBuilder implements FormBuilderInterface {
             $this->setValue($elements, NULL, $form_state);
           }
           elseif (!isset($options[$elements['#value']])) {
-            $this->setError($elements, $this->t('An illegal choice has been detected. Please contact the site administrator.'));
+            $this->setError($elements, $form_state, $this->t('An illegal choice has been detected. Please contact the site administrator.'));
             $this->watchdog('form', 'Illegal choice %choice in %name element.', array('%choice' => $elements['#value'], '%name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title']), WATCHDOG_ERROR);
           }
         }
@@ -1069,7 +1066,7 @@ class FormBuilder implements FormBuilderInterface {
       // too large a security risk to have any invalid user input when executing
       // form-level submit handlers.
       if (isset($form_state['triggering_element']['#limit_validation_errors']) && ($form_state['triggering_element']['#limit_validation_errors'] !== FALSE) && !($form_state['submitted'] && !isset($form_state['triggering_element']['#submit']))) {
-        $this->setErrorByName(NULL, '', $form_state['triggering_element']['#limit_validation_errors']);
+        $form_state['limit_validation_errors'] = $form_state['triggering_element']['#limit_validation_errors'];
       }
       // If submit handlers won't run (due to the submission having been
       // triggered by an element whose #executes_submit_callback property isn't
@@ -1081,14 +1078,14 @@ class FormBuilder implements FormBuilderInterface {
       // system_element_info()), so that full validation is their default
       // behavior.
       elseif (isset($form_state['triggering_element']) && !isset($form_state['triggering_element']['#limit_validation_errors']) && !$form_state['submitted']) {
-        $this->setErrorByName(NULL, '', array());
+        $form_state['limit_validation_errors'] = array();
       }
       // As an extra security measure, explicitly turn off error suppression if
       // one of the above conditions wasn't met. Since this is also done at the
       // end of this function, doing it here is only to handle the rare edge
       // case where a validate handler invokes form processing of another form.
       else {
-        $this->errorSections = NULL;
+        $form_state['limit_validation_errors'] = NULL;
       }
 
       // Make sure a value is passed when the field is required.
@@ -1128,17 +1125,17 @@ class FormBuilder implements FormBuilderInterface {
       // variables are also known to be defined and we can test them again.
       if (isset($is_empty_value) && ($is_empty_multiple || $is_empty_string || $is_empty_value)) {
         if (isset($elements['#required_error'])) {
-          $this->setError($elements, $elements['#required_error']);
+          $this->setError($elements, $form_state, $elements['#required_error']);
         }
         // A #title is not mandatory for form elements, but without it we cannot
         // set a form error message. So when a visible title is undesirable,
         // form constructors are encouraged to set #title anyway, and then set
         // #title_display to 'invisible'. This improves accessibility.
         elseif (isset($elements['#title'])) {
-          $this->setError($elements, $this->t('!name field is required.', array('!name' => $elements['#title'])));
+          $this->setError($elements, $form_state, $this->t('!name field is required.', array('!name' => $elements['#title'])));
         }
         else {
-          $this->setError($elements);
+          $this->setError($elements, $form_state);
         }
       }
 
@@ -1148,7 +1145,30 @@ class FormBuilder implements FormBuilderInterface {
     // Done validating this element, so turn off error suppression.
     // self::doValidateForm() turns it on again when starting on the next
     // element, if it's still appropriate to do so.
-    $this->errorSections = NULL;
+    $form_state['limit_validation_errors'] = NULL;
+  }
+
+  /**
+   * Stores the errors of each element directly on the element.
+   *
+   * Because self::getError() and self::getErrors() require the $form_state,
+   * we must provide a way for non-form functions to check the errors for a
+   * specific element. The most common usage of this is a #pre_render callback.
+   *
+   * @param array $elements
+   *   An associative array containing the structure of a form element.
+   * @param array $form_state
+   *   An associative array containing the current state of the form.
+   */
+  protected function setElementErrorsFromFormState(array &$elements, array &$form_state) {
+    // Recurse through all children.
+    foreach ($this->elementChildren($elements) as $key) {
+      if (isset($elements[$key]) && $elements[$key]) {
+        $this->setElementErrorsFromFormState($elements[$key], $form_state);
+      }
+    }
+    // Store the errors for this element on the element directly.
+    $elements['#errors'] = $this->getError($elements, $form_state);
   }
 
   /**
@@ -1187,14 +1207,10 @@ class FormBuilder implements FormBuilderInterface {
   /**
    * {@inheritdoc}
    */
-  public function setErrorByName($name = NULL, $message = '', $limit_validation_errors = NULL) {
-    if (isset($limit_validation_errors)) {
-      $this->errorSections = $limit_validation_errors;
-    }
-
-    if (isset($name) && !isset($this->errors[$name])) {
+  public function setErrorByName($name, array &$form_state, $message = '') {
+    if (!isset($form_state['errors'][$name])) {
       $record = TRUE;
-      if (isset($this->errorSections)) {
+      if (isset($form_state['limit_validation_errors'])) {
         // #limit_validation_errors is an array of "sections" within which user
         // input must be valid. If the element is within one of these sections,
         // the error must be recorded. Otherwise, it can be suppressed.
@@ -1203,7 +1219,7 @@ class FormBuilder implements FormBuilderInterface {
         // its submit action to be triggered even if none of the submitted
         // values are valid.
         $record = FALSE;
-        foreach ($this->errorSections as $section) {
+        foreach ($form_state['limit_validation_errors'] as $section) {
           // Exploding by '][' reconstructs the element's #parents. If the
           // reconstructed #parents begin with the same keys as the specified
           // section, then the element's values are within the part of
@@ -1218,44 +1234,51 @@ class FormBuilder implements FormBuilderInterface {
         }
       }
       if ($record) {
-        $this->errors[$name] = $message;
+        $form_state['errors'][$name] = $message;
+        $this->request->attributes->set('_form_errors', TRUE);
         if ($message) {
           $this->drupalSetMessage($message, 'error');
         }
       }
     }
 
-    return $this->errors;
+    return $form_state['errors'];
   }
 
   /**
    * {@inheritdoc}
    */
-  public function clearErrors() {
-    $this->errors = array();
+  public function clearErrors(array &$form_state) {
+    $form_state['errors'] = array();
+    $this->request->attributes->set('_form_errors', FALSE);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getErrors() {
-    $form = $this->setErrorByName();
-    if (!empty($form)) {
-      return $form;
-    }
+  public function getErrors(array $form_state) {
+    return $form_state['errors'];
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getError($element) {
-    $form = $this->setErrorByName();
-    $parents = array();
-    foreach ($element['#parents'] as $parent) {
-      $parents[] = $parent;
-      $key = implode('][', $parents);
-      if (isset($form[$key])) {
-        return $form[$key];
+  public function getAnyErrors() {
+    return (bool) $this->request->attributes->get('_form_errors');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getError($element, array &$form_state) {
+    if ($errors = $this->getErrors($form_state)) {
+      $parents = array();
+      foreach ($element['#parents'] as $parent) {
+        $parents[] = $parent;
+        $key = implode('][', $parents);
+        if (isset($errors[$key])) {
+          return $errors[$key];
+        }
       }
     }
   }
@@ -1263,8 +1286,8 @@ class FormBuilder implements FormBuilderInterface {
   /**
    * {@inheritdoc}
    */
-  public function setError(&$element, $message = '') {
-    $this->setErrorByName(implode('][', $element['#parents']), $message);
+  public function setError(&$element, array &$form_state, $message = '') {
+    $this->setErrorByName(implode('][', $element['#parents']), $form_state, $message);
   }
 
   /**
@@ -1285,6 +1308,7 @@ class FormBuilder implements FormBuilderInterface {
       '#required' => FALSE,
       '#attributes' => array(),
       '#title_display' => 'before',
+      '#errors' => NULL,
     );
 
     // Special handling if we're on the top level form element.
@@ -1466,9 +1490,10 @@ class FormBuilder implements FormBuilderInterface {
       $name = array_shift($element['#parents']);
       $element['#name'] = $name;
       if ($element['#type'] == 'file') {
-        // To make it easier to handle $_FILES in file.inc, we place all
+        // To make it easier to handle files in file.inc, we place all
         // file fields in the 'files' array. Also, we do not support
         // nested file names.
+        // @todo Remove this files prefix now?
         $element['#name'] = 'files[' . $element['#name'] . ']';
       }
       elseif (count($element['#parents'])) {
@@ -1584,7 +1609,8 @@ class FormBuilder implements FormBuilderInterface {
       if (!empty($element['#is_button'])) {
         // All buttons in the form need to be tracked for
         // form_state_values_clean() and for the self::doBuildForm() code that
-        // handles a form submission containing no button information in $_POST.
+        // handles a form submission containing no button information in
+        // \Drupal::request()->request.
         $form_state['buttons'][] = $element;
         if ($this->buttonWasClicked($element, $form_state)) {
           $form_state['triggering_element'] = $element;
@@ -1644,15 +1670,15 @@ class FormBuilder implements FormBuilderInterface {
     // buttons on a form share the same name (usually 'op'), and the specific
     // return value is used to determine which was clicked. This ONLY works as
     // long as $form['#name'] puts the value at the top level of the tree of
-    // $_POST data.
+    // \Drupal::request()->request data.
     if (isset($form_state['input'][$element['#name']]) && $form_state['input'][$element['#name']] == $element['#value']) {
       return TRUE;
     }
     // When image buttons are clicked, browsers do NOT pass the form element
-    // value in $_POST. Instead they pass an integer representing the
-    // coordinates of the click on the button image. This means that image
-    // buttons MUST have unique $form['#name'] values, but the details of their
-    // $_POST data should be ignored.
+    // value in \Drupal::request()->Request. Instead they pass an integer
+    // representing the coordinates of the click on the button image. This means
+    // that image buttons MUST have unique $form['#name'] values, but the
+    // details of their \Drupal::request()->request data should be ignored.
     elseif (!empty($element['#has_garbage_value']) && isset($element['#value']) && $element['#value'] !== '') {
       return TRUE;
     }
@@ -1664,6 +1690,37 @@ class FormBuilder implements FormBuilderInterface {
    */
   public function setValue($element, $value, &$form_state) {
     NestedArray::setValue($form_state['values'], $element['#parents'], $value, TRUE);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function flattenOptions(array $array) {
+    $this->flattenedOptions = array();
+    $this->doFlattenOptions($array);
+    return $this->flattenedOptions;
+  }
+
+  /**
+   * Iterates over an array building a flat array with duplicate keys removed.
+   *
+   * This function also handles cases where objects are passed as array values.
+   *
+   * @param array $array
+   *   The form options array to process.
+   */
+  protected function doFlattenOptions(array $array) {
+    foreach ($array as $key => $value) {
+      if (is_object($value)) {
+        $this->doFlattenOptions($value->option);
+      }
+      elseif (is_array($value)) {
+        $this->doFlattenOptions($value);
+      }
+      else {
+        $this->flattenedOptions[$key] = 1;
+      }
+    }
   }
 
   /**
@@ -1699,15 +1756,6 @@ class FormBuilder implements FormBuilderInterface {
    */
   protected function drupalInstallationAttempted() {
     return drupal_installation_attempted();
-  }
-
-  /**
-   * Wraps menu_get_item().
-   *
-   * @return array|bool
-   */
-  protected function menuGetItem() {
-    return menu_get_item();
   }
 
   /**

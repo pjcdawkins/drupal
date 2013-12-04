@@ -599,6 +599,13 @@ function system_element_info() {
     '#theme' => 'table',
   );
 
+  // Other elements.
+  $types['render_cache_placeholder'] = array(
+    '#callback' => '',
+    '#context' => array(),
+    '#pre_render' => array('drupal_pre_render_render_cache_placeholder'),
+  );
+
   return $types;
 }
 
@@ -731,7 +738,7 @@ function system_menu() {
     'title' => 'Date and time formats',
     'description' => 'Configure display format strings for date and time.',
     'route_name' => 'system.date_format_list',
-    'weight' => -9,
+    'weight' => -5,
   );
   $items['admin/config/regional/date-time/formats/manage/%'] = array(
     'title' => 'Edit date format',
@@ -1089,13 +1096,15 @@ function system_library_info() {
     'dependencies' => array(
       array('system', 'jquery'),
       array('system', 'drupal'),
+      array('system', 'drupalSettings'),
       array('system', 'drupal.ajax'),
+      array('system', 'jquery.ui.autocomplete'),
     ),
   );
 
   // A utility that measures and reports viewport offset dimensions from
   // elements like the toolbar that can potentially displace the positioning of
-  // elements like the overlay.
+  // elements.
   $libraries['drupal.displace'] = array(
     'title' => 'Drupal displace',
     'version' => \Drupal::VERSION,
@@ -2246,13 +2255,13 @@ function system_check_directory($form_element) {
 
   if (!is_dir($directory) && !drupal_mkdir($directory, NULL, TRUE)) {
     // If the directory does not exists and cannot be created.
-    form_set_error($form_element['#parents'][0], t('The directory %directory does not exist and could not be created.', array('%directory' => $directory)));
+    form_set_error($form_element['#parents'][0], $form_state, t('The directory %directory does not exist and could not be created.', array('%directory' => $directory)));
     watchdog('file system', 'The directory %directory does not exist and could not be created.', array('%directory' => $directory), WATCHDOG_ERROR);
   }
 
   if (is_dir($directory) && !is_writable($directory) && !drupal_chmod($directory)) {
     // If the directory is not writable and cannot be made so.
-    form_set_error($form_element['#parents'][0], t('The directory %directory exists but is not writable and could not be made writable.', array('%directory' => $directory)));
+    form_set_error($form_element['#parents'][0], $form_state, t('The directory %directory exists but is not writable and could not be made writable.', array('%directory' => $directory)));
     watchdog('file system', 'The directory %directory exists but is not writable and could not be made writable.', array('%directory' => $directory), WATCHDOG_ERROR);
   }
   elseif (is_dir($directory)) {
@@ -2713,7 +2722,8 @@ function system_default_region($theme) {
  *
  * If the submit handler for a form that implements confirm_form() is invoked,
  * the user successfully confirmed the action. You should never directly
- * inspect $_POST to see if an action was confirmed.
+ * inspect $_POST or \Drupal::request()->request to see if an action was
+ * confirmed.
  *
  * Note - if the parameters $question, $description, $yes, or $no could contain
  * any user input (such as node titles or taxonomy terms), it is the
@@ -2764,7 +2774,7 @@ function confirm_form($form, $question, $path, $description = NULL, $yes = NULL,
     $options = array('path' => $path);
   }
 
-  drupal_set_title($question, PASS_THROUGH);
+  $form['#title'] = $question;
 
   $form['#attributes']['class'][] = 'confirmation';
   $form['description'] = array('#markup' => $description);
@@ -2808,7 +2818,7 @@ function confirm_form($form, $question, $path, $description = NULL, $yes = NULL,
 function system_admin_compact_mode() {
   // PHP converts dots into underscores in cookie names to avoid problems with
   // its parser, so we use a converted cookie name.
-  return isset($_COOKIE['Drupal_visitor_admin_compact_mode']) ? $_COOKIE['Drupal_visitor_admin_compact_mode'] : \Drupal::config('system.site')->get('admin_compact_mode');
+  return \Drupal::request()->cookies->get('Drupal_visitor_admin_compact_mode', \Drupal::config('system.site')->get('admin_compact_mode'));
 }
 
 /**
@@ -3107,40 +3117,6 @@ function theme_confirm_form($variables) {
  */
 function theme_system_config_form($variables) {
   return drupal_render_children($variables['form']);
-}
-
-/**
- * Returns HTML for an exposed filter form.
- *
- * @param $variables
- *   An associative array containing:
- *   - form: An associative array containing the structure of the form.
- *
- * @return
- *   A string containing an HTML-formatted form.
- *
- * @ingroup themeable
- */
-function theme_exposed_filters($variables) {
-  $form = $variables['form'];
-  $output = '';
-
-  if (isset($form['current'])) {
-    $items = array();
-    foreach (element_children($form['current']) as $key) {
-      $items[] = $form['current'][$key];
-    }
-    $item_list = array(
-      '#theme' => 'item_list',
-      '#items' => $items,
-      '#attributes' => array('class' => array('clearfix', 'current-filters')),
-    );
-    $output .= drupal_render($item_list);
-  }
-
-  $output .= drupal_render_children($form);
-
-  return '<div class="exposed-filters">' . $output . '</div>';
 }
 
 /**

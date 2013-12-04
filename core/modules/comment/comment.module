@@ -251,7 +251,7 @@ function comment_count_unpublished() {
  * Implements hook_ENTITY_TYPE_create() for 'field_instance'.
  */
 function comment_field_instance_create(FieldInstanceInterface $instance) {
-  if ($instance->getFieldType() == 'comment') {
+  if ($instance->getFieldType() == 'comment' && !$instance->isSyncing()) {
     \Drupal::service('comment.manager')->addBodyField($instance->entity_type, $instance->getFieldName());
     \Drupal::cache()->delete('comment_entity_info');
     // Assign default values for the field instance.
@@ -1175,9 +1175,7 @@ function comment_load($cid, $reset = FALSE) {
  *   The number of new comments or FALSE if the user is not logged in.
  */
 function comment_num_new($entity_id, $entity_type, $field_name = NULL, $timestamp = 0) {
-  global $user;
-
-  if ($user->isAuthenticated() && \Drupal::moduleHandler()->moduleExists('history')) {
+  if (\Drupal::currentUser()->isAuthenticated() && \Drupal::moduleHandler()->moduleExists('history')) {
     // Retrieve the timestamp at which the current user last viewed this entity.
     if (!$timestamp) {
       if ($entity_type == 'node') {
@@ -1287,12 +1285,12 @@ function comment_get_display_page($cid, $instance) {
  *
  * @param \Drupal\comment\CommentInterface $comment
  */
-function comment_preview(CommentInterface $comment) {
+function comment_preview(CommentInterface $comment, array &$form_state) {
   global $user;
   $preview_build = array();
   $entity = entity_load($comment->entity_type->value, $comment->entity_id->value);
 
-  if (!form_get_errors()) {
+  if (!form_get_errors($form_state)) {
     // Attach the user and time information.
     if (!empty($comment->name->value)) {
       $account = user_load_by_name($comment->name->value);

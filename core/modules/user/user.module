@@ -452,7 +452,7 @@ function user_access($string, AccountInterface $account = NULL) {
   if (!isset($account)) {
     // In the installer request session is not set, so we have to fall back
     // to the global $user. In all other cases the session key is preferred.
-    $account = \Drupal::request()->attributes->get('_account') ?: $user;
+    $account = \Drupal::currentUser() ?: $user;
   }
 
   return $account->hasPermission($string);
@@ -550,8 +550,8 @@ function user_validate_current_pass(&$form, &$form_state) {
     if ((strlen(trim($form_state['values'][$key])) > 0) && ($form_state['values'][$key] != $current_value)) {
       $current_pass_failed = empty($form_state['values']['current_pass']) || !\Drupal::service('password')->check($form_state['values']['current_pass'], $account);
       if ($current_pass_failed) {
-        form_set_error('current_pass', t("Your current password is missing or incorrect; it's required to change the %name.", array('%name' => $name)));
-        form_set_error($key);
+        form_set_error('current_pass', $form_state, t("Your current password is missing or incorrect; it's required to change the %name.", array('%name' => $name)));
+        form_set_error($key, $form_state);
       }
       // We only need to check the password once.
       break;
@@ -611,7 +611,7 @@ function user_template_preprocess_default_variables_alter(&$variables) {
   }
 
   $variables['user'] = clone $user;
-  // Remove password and session IDs, since themes should not need nor see them.
+  // Remove password and session IDs, $form_state, since themes should not need nor see them.
   unset($variables['user']->pass, $variables['user']->sid, $variables['user']->ssid);
 
   $variables['is_admin'] = user_access('access administration pages');
@@ -785,10 +785,6 @@ function user_menu() {
   $items['admin/people/roles/manage/%user_role'] = array(
     'title' => 'Edit role',
     'route_name' => 'user.role_edit',
-  );
-  $items['admin/people/roles/manage/%user_role/edit'] = array(
-    'title' => 'Edit',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
   );
 
   // Administration pages.
@@ -1265,7 +1261,7 @@ function user_cancel_methods() {
     'user_cancel_delete' => array(
       'title' => t('Delete the account and its content.'),
       'description' => t('Your account will be removed and all account information deleted. All of your content will also be deleted.'),
-      'access' => \Drupal::request()->attributes->get('_account')->hasPermission('administer users'),
+      'access' => \Drupal::currentUser()->hasPermission('administer users'),
     ),
   );
   // Allow modules to customize account cancellation methods.
@@ -1437,8 +1433,8 @@ function user_role_names($membersonly = FALSE, $permission = NULL) {
  * Implements hook_user_role_insert().
  */
 function user_user_role_insert(RoleInterface $role) {
-  // Ignore the authenticated and anonymous roles.
-  if (in_array($role->id(), array(DRUPAL_AUTHENTICATED_RID, DRUPAL_ANONYMOUS_RID))) {
+  // Ignore the authenticated and anonymous roles or the role is being synced.
+  if (in_array($role->id(), array(DRUPAL_AUTHENTICATED_RID, DRUPAL_ANONYMOUS_RID)) || $role->isSyncing()) {
     return;
   }
 
@@ -1474,8 +1470,8 @@ function user_user_role_insert(RoleInterface $role) {
  * Implements hook_user_role_delete().
  */
 function user_user_role_delete(RoleInterface $role) {
-  // Ignore the authenticated and anonymous roles.
-  if (in_array($role->id(), array(DRUPAL_AUTHENTICATED_RID, DRUPAL_ANONYMOUS_RID))) {
+  // Ignore the authenticated and anonymous roles or the role is being synced.
+  if (in_array($role->id(), array(DRUPAL_AUTHENTICATED_RID, DRUPAL_ANONYMOUS_RID)) || $role->isSyncing()) {
     return;
   }
 

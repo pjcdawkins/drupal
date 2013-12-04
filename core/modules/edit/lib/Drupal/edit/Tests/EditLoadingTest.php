@@ -32,7 +32,7 @@ class EditLoadingTest extends WebTestBase {
     );
   }
 
-  function setUp() {
+  public function setUp() {
     parent::setUp();
 
     // Create a text format.
@@ -300,6 +300,19 @@ class EditLoadingTest extends WebTestBase {
 
     // Check that the data- attribute is not added.
     $this->assertNoRaw('data-edit-field-id="node/1/edit_test_pseudo_field/und/default"');
+  }
+
+  /**
+   * Tests that Edit doesn't make fields rendered with display options editable.
+   */
+  public function testDisplayOptions() {
+    $node = entity_load('node', '1');
+    $display_settings = array(
+      'label' => 'inline',
+    );
+    $build = field_view_field($node, 'body', $display_settings);
+    $output = drupal_render($build);
+    $this->assertFalse(strpos($output, 'data-edit-field-id'), 'data-edit-field-id attribute not added when rendering field using dynamic display options.');
   }
 
   /**

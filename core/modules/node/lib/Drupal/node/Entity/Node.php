@@ -29,6 +29,7 @@ use Drupal\node\NodeInterface;
  *       "delete" = "Drupal\node\Form\NodeDeleteForm",
  *       "edit" = "Drupal\node\NodeFormController"
  *     },
+ *     "list" = "Drupal\node\NodeListController",
  *     "translation" = "Drupal\node\NodeTranslationController"
  *   },
  *   base_table = "node",
@@ -49,12 +50,13 @@ use Drupal\node\NodeInterface;
  *   bundle_keys = {
  *     "bundle" = "type"
  *   },
- *   route_base_path = "admin/structure/types/manage/{bundle}",
+ *   bundle_entity_type = "node_type",
  *   permission_granularity = "bundle",
  *   links = {
- *     "canonical" = "/node/{node}",
- *     "edit-form" = "/node/{node}/edit",
- *     "version-history" = "/node/{node}/revisions"
+ *     "canonical" = "node.view",
+ *     "edit-form" = "node.page_edit",
+ *     "version-history" = "node.revision_overview",
+ *     "admin-form" = "node.type_edit"
  *   }
  * )
  */
@@ -357,13 +359,13 @@ class Node extends ContentEntityBase implements NodeInterface {
     $properties['title'] = array(
       'label' => t('Title'),
       'description' => t('The title of this node, always treated as non-markup plain text.'),
-      'type' => 'string_field',
+      'type' => 'field_item:text',
+      'list_class' => '\Drupal\node\NodeTitleItemList',
       'required' => TRUE,
       'settings' => array(
         'default_value' => '',
-      ),
-      'property_constraints' => array(
-        'value' => array('Length' => array('max' => 255)),
+        'max_length' => 255,
+        'text_processing' => 0,
       ),
       'translatable' => TRUE,
     );

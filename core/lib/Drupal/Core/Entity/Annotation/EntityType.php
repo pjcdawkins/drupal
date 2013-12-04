@@ -225,16 +225,11 @@ class EntityType extends Plugin {
   public $bundle_keys;
 
   /**
-   * The base router path for the entity type's field administration page.
-   *
-   * If the entity type has a bundle, include {bundle} in the path.
-   *
-   * For example, the node entity type specifies
-   * "admin/structure/types/manage/{bundle}" as its base field admin path.
+   * The name of the entity type which provides bundles.
    *
    * @var string (optional)
    */
-  public $route_base_path;
+  public $bundle_entity_type = 'bundle';
 
   /**
    * Link templates using the URI template syntax.
@@ -267,9 +262,7 @@ class EntityType extends Plugin {
    *
    * @var array
    */
-  public $links = array(
-    'canonical' => '/entity/{entityType}/{id}',
-  );
+  public $links = array();
 
   /**
    * Specifies whether a module exposing permissions for the current entity type

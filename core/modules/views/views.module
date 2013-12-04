@@ -1099,7 +1099,7 @@ function views_exposed_form($form, &$form_state) {
 
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
-    // Prevent from showing up in $_GET.
+    // Prevent from showing up in \Drupal::request()->query.
     '#name' => '',
     '#type' => 'submit',
     '#value' => t('Apply'),
@@ -1217,7 +1217,7 @@ function views_query_views_alter(AlterableInterface $query) {
     }
   }
 
-  // Replaces substitions in filter criterias.
+  // Replaces substitions in filter criteria.
   _views_query_tag_alter_condition($query, $where, $substitutions);
 }
 
@@ -1235,7 +1235,7 @@ function _views_query_tag_alter_condition(AlterableInterface $query, &$condition
         _views_query_tag_alter_condition($query, $sub_conditions, $substitutions);
       }
       // $condition['value'] is a subquery so alter the subquery recursive.
-      // Therefore take sure to get the metadata of the main query.
+      // Therefore make sure to get the metadata of the main query.
       if (is_object($condition['value'])) {
         $subquery = $condition['value'];
         $subquery->addMetaData('views_substitutions', $query->getMetaData('views_substitutions'));
@@ -1350,57 +1350,8 @@ function views_element_validate_tags($element, &$form_state) {
   $values = array_map('trim', explode(',', $element['#value']));
   foreach ($values as $value) {
     if (preg_match("/[^a-z_]/", $value)) {
-      form_error($element, t('The query tags may only contain lower-case alphabetical characters and underscores.'));
+      form_error($element, $form_state, t('The query tags may only contain lower-case alphabetical characters and underscores.'));
       return;
     }
   }
 }
-
-/**
- * Set a cached item in the views cache.
- *
- * This is just a convenience wrapper around cache_set().
- *
- * @param $cid
- *   The cache ID of the data to store.
- * @param $data
- *   The data to store in the cache. Complex data types will be automatically serialized before insertion.
- *   Strings will be stored as plain text and not serialized.
- * @param $use_language
- *   If TRUE, the data will be cached specific to the currently active language.
- */
-function views_cache_set($cid, $data, $use_language = FALSE) {
-  if (\Drupal::config('views.settings')->get('skip_cache')) {
-    return;
-  }
-  if ($use_language) {
-    $cid .= ':' . language(Language::TYPE_INTERFACE)->id;
-  }
-
-  cache('views_info')->set($cid, $data);
-}
-
-/**
- * Return data from the persistent views cache.
- *
- * This is just a convenience wrapper around cache_get().
- *
- * @param int $cid
- *   The cache ID of the data to retrieve.
- * @param bool $use_language
- *   If TRUE, the data will be requested specific to the currently active language.
- *
- * @return stdClass|bool
- *   The cache or FALSE on failure.
- */
-function views_cache_get($cid, $use_language = FALSE) {
-  if (\Drupal::config('views.settings')->get('skip_cache')) {
-    return FALSE;
-  }
-  if ($use_language) {
-    $cid .= ':' . language(Language::TYPE_INTERFACE)->id;
-  }
-
-  return cache('views_info')->get($cid);
-}
-

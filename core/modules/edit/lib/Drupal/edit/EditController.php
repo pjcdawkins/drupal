@@ -145,7 +145,7 @@ class EditController extends ContainerAware implements ContainerInjectionInterfa
       }
 
       // Validate the field name and language.
-      if (!$field_name || !($instance = $this->fieldInfo->getInstance($entity->entityType(), $entity->bundle(), $field_name))) {
+      if (!$field_name || !$entity->hasField($field_name)) {
         throw new NotFoundHttpException();
       }
       if (!$langcode || (field_valid_language($langcode) !== $langcode)) {
@@ -158,7 +158,8 @@ class EditController extends ContainerAware implements ContainerInjectionInterfa
         $metadata[$entity_id] = $this->metadataGenerator->generateEntity($entity, $langcode);
       }
 
-      $metadata[$field] = $this->metadataGenerator->generateField($entity, $instance, $langcode, $view_mode);
+      $field_definition = $entity->get($field_name)->getFieldDefinition();
+      $metadata[$field] = $this->metadataGenerator->generateField($entity, $field_definition, $langcode, $view_mode);
     }
 
     return new JsonResponse($metadata);
@@ -256,7 +257,7 @@ class EditController extends ContainerAware implements ContainerInjectionInterfa
     else {
       $response->addCommand(new FieldFormCommand(drupal_render($form)));
 
-      $errors = form_get_errors();
+      $errors = form_get_errors($form_state);
       if (count($errors)) {
         $status_messages = array(
           '#theme' => 'status_messages'

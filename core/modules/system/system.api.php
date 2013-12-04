@@ -51,8 +51,7 @@ function hook_hook_info() {
  *
  * Modules may specify whether or not the routing paths they define are
  * to be considered administrative. Other modules may use this information to
- * display those pages differently (e.g. in a modal overlay, or in a different
- * theme).
+ * display those pages differently.
  *
  * To change the administrative status of menu items defined in another module's
  * routing paths, modules should implement hook_admin_paths_alter().
@@ -669,7 +668,7 @@ function hook_menu_local_actions_alter(&$local_actions) {
  * @see \Drupal\Core\Menu\LocalTaskInterface
  * @see \Drupal\Core\Menu\LocalTaskManager
  */
-function hook_local_task_alter(&$local_tasks) {
+function hook_local_tasks_alter(&$local_tasks) {
   // Remove a specified local task plugin.
   unset($local_tasks['example_plugin_id']);
 }
@@ -1362,7 +1361,7 @@ function hook_theme($existing, $type, $theme, $path) {
  *
  * The $theme_registry array is keyed by theme hook name, and contains the
  * information returned from hook_theme(), as well as additional properties
- * added by _theme_process_registry().
+ * added by \Drupal\Core\Theme\Registry::processExtension().
  *
  * For example:
  * @code
@@ -1385,7 +1384,7 @@ function hook_theme($existing, $type, $theme, $path) {
  *   The entire cache of theme registry information, post-processing.
  *
  * @see hook_theme()
- * @see _theme_process_registry()
+ * @see \Drupal\Core\Theme\Registry::processExtension()
  */
 function hook_theme_registry_alter(&$theme_registry) {
   // Kill the next/previous forum topic navigation links.
@@ -2986,16 +2985,6 @@ function hook_token_info_alter(&$data) {
  * @ingroup batch
  */
 function hook_batch_alter(&$batch) {
-  // If the current page request is inside the overlay, add ?render=overlay to
-  // the success callback URL, so that it appears correctly within the overlay.
-  if (overlay_get_mode() == 'child') {
-    if (isset($batch['url_options']['query'])) {
-      $batch['url_options']['query']['render'] = 'overlay';
-    }
-    else {
-      $batch['url_options']['query'] = array('render' => 'overlay');
-    }
-  }
 }
 
 /**
@@ -3324,8 +3313,7 @@ function hook_link_alter(&$variables) {
  * identified when you are looking at the Drupal source code by having
  * "@ Annotation" in their documentation blocks (without the space after @). To
  * find examples of annotation for a particular annotation class, such as
- * EntityType, look for class files that contain a PHP "use" declaration of the
- * annotation class, or files that have an @ annotation section using the
+ * EntityType, look for class files that have an @ annotation section using the
  * annotation class.
  * @}
  */

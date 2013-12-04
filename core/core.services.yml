@@ -170,11 +170,12 @@ services:
     arguments: [ '%container.namespaces%' ]
     tags:
       - { name: persist }
+  default_plugin_manager:
+    abstract: true
+    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
   entity.manager:
     class: Drupal\Core\Entity\EntityManager
     arguments: ['@container.namespaces', '@service_container', '@module_handler', '@cache.cache', '@language_manager', '@string_translation']
-  plugin.manager.entity:
-    alias: entity.manager
   plugin.manager.field.field_type:
     class: Drupal\Core\Field\FieldTypePluginManager
     arguments: ['@container.namespaces', '@cache.field', '@language_manager', '@module_handler']
@@ -186,7 +187,7 @@ services:
     arguments: ['@container.namespaces', '@cache.field', '@module_handler', '@language_manager', '@plugin.manager.field.field_type']
   plugin.manager.archiver:
     class: Drupal\Core\Archiver\ArchiverManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
   plugin.manager.action:
     class: Drupal\Core\Action\ActionManager
     arguments: ['@container.namespaces']
@@ -196,17 +197,12 @@ services:
   plugin.manager.menu.local_task:
     class: Drupal\Core\Menu\LocalTaskManager
     arguments: ['@controller_resolver', '@request', '@router.route_provider', '@module_handler', '@cache.cache', '@language_manager', '@access_manager', '@current_user']
-    scope: request
   plugin.manager.menu.contextual_link:
     class: Drupal\Core\Menu\ContextualLinkManager
     arguments: ['@controller_resolver', '@module_handler', '@cache.cache', '@language_manager', '@access_manager', '@current_user']
   request:
     class: Symfony\Component\HttpFoundation\Request
-    # @TODO the synthetic setting must be uncommented whenever drupal_session_initialize()
-    # is run after there is a request and the following two lines should be removed.
-    factory_class: Symfony\Component\HttpFoundation\Request
-    factory_method: createFromGlobals
-    #synthetic: true
+    synthetic: true
   event_dispatcher:
     class: Symfony\Component\EventDispatcher\ContainerAwareEventDispatcher
     arguments: ['@service_container']
@@ -236,12 +232,12 @@ services:
     arguments: [slave]
   typed_data:
     class: Drupal\Core\TypedData\TypedDataManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
     calls:
       - [setValidationConstraintManager, ['@validation.constraint']]
   validation.constraint:
     class: Drupal\Core\Validation\ConstraintManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
   lock:
     class: Drupal\Core\Lock\DatabaseLockBackend
     arguments: ['@database']
@@ -355,6 +351,10 @@ services:
     tags:
       - { name: event_subscriber }
     arguments: ['@settings']
+  ajax_response_subscriber:
+    class: Drupal\Core\EventSubscriber\AjaxResponseSubscriber
+    tags:
+      - { name: event_subscriber }
   route_enhancer.authentication:
     class: Drupal\Core\Routing\Enhancer\AuthenticationEnhancer
     calls:
@@ -416,7 +416,7 @@ services:
     class: Drupal\Core\Access\CsrfTokenGenerator
     arguments: ['@private_key']
     calls:
-      - [setRequest, ['@?request']]
+      - [setCurrentUser, ['@?current_user']]
   access_manager:
     class: Drupal\Core\Access\AccessManager
     arguments: ['@router.route_provider', '@url_generator', '@paramconverter_manager']
@@ -430,7 +430,6 @@ services:
       - [setCurrentUser, ['@?current_user']]
     tags:
       - { name: event_subscriber }
-    scope: request
   access_route_subscriber:
     class: Drupal\Core\EventSubscriber\AccessRouteSubscriber
     tags:
@@ -556,7 +555,7 @@ services:
     arguments: ['@config.factory']
   plugin.manager.condition:
     class: Drupal\Core\Condition\ConditionManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
   kernel_destruct_subscriber:
     class: Drupal\Core\EventSubscriber\KernelDestructionSubscriber
     tags:
@@ -595,7 +594,7 @@ services:
     arguments: ['@module_handler']
   date:
     class: Drupal\Core\Datetime\Date
-    arguments: ['@entity.manager', '@language_manager']
+    arguments: ['@entity.manager', '@language_manager', '@string_translation']
   feed.bridge.reader:
     class: Drupal\Component\Bridge\ZfExtensionManagerSfContainer
     calls:
@@ -650,6 +649,11 @@ services:
     class: Zend\Feed\Writer\Extension\Threading\Renderer\Entry
   feed.writer.wellformedwebrendererentry:
     class: Zend\Feed\Writer\Extension\WellFormedWeb\Renderer\Entry
+  theme.registry:
+    class: Drupal\Core\Theme\Registry
+    arguments: ['@cache.cache', '@lock', '@module_handler']
+    tags:
+      - { name: needs_destruction }
   authentication:
     class: Drupal\Core\Authentication\AuthenticationManager
   authentication.cookie:

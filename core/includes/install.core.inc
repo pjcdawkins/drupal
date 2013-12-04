@@ -253,9 +253,19 @@ function install_state_defaults() {
  *   modified with information gleaned from the beginning of the page request.
  */
 function install_begin_request(&$install_state) {
+  // A request object from the HTTPFoundation to tell us about the request.
+  $request = Request::createFromGlobals();
+
+  // Create a minimal container so that t() and $request will work. This
+  // container will be overriden but it's needed for the very early installation
+  // process when database tasks run.
+  $container = new ContainerBuilder();
+  $container->set('request', $request);
+  \Drupal::setContainer($container);
+
   // Add any installation parameters passed in via the URL.
   if ($install_state['interactive']) {
-    $install_state['parameters'] += $_GET;
+    $install_state['parameters'] += $request->query->all();
   }
 
   // Validate certain core settings that are used throughout the installation.
@@ -288,12 +298,9 @@ function install_begin_request(&$install_state) {
   // _drupal_load_test_overrides() sets the simpletest_conf_path in-memory
   // setting in this case.
   if ($install_state['interactive'] && drupal_valid_test_ua() && !settings()->get('simpletest_conf_path')) {
-    header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
+    header($request->server->get('SERVER_PROTOCOL') . ' 403 Forbidden');
     exit;
   }
-
-  // A request object from the HTTPFoundation to tell us about the request.
-  $request = Request::createFromGlobals();
 
   // If we have a language selected and it is not yet saved in the system
   // (eg. pre-database data screens we are unable to persistently store
@@ -324,10 +331,6 @@ function install_begin_request(&$install_state) {
   // Determine whether the configuration system is ready to operate.
   $install_state['config_verified'] = install_verify_config_directory(CONFIG_ACTIVE_DIRECTORY) && install_verify_config_directory(CONFIG_STAGING_DIRECTORY);
 
-  // Create a minimal container for t() to work.
-  // This container will be overriden but it needed for the very early
-  // installation process when database tasks run.
-  $container = new ContainerBuilder();
   // Register the translation services.
   install_register_translation_service($container);
   \Drupal::setContainer($container);
@@ -409,6 +412,13 @@ function install_begin_request(&$install_state) {
     // (as opposed to the cache backend) so we can afford having a null
     // implementation here.
     $container->register('lock', 'Drupal\Core\Lock\NullLockBackend');
+
+    $container
+      ->register('theme.registry', 'Drupal\Core\Theme\Registry')
+      ->addArgument(new Reference('cache.cache'))
+      ->addArgument(new Reference('lock'))
+      ->addArgument(new Reference('module_handler'))
+      ->addTag('needs_destruction');
 
     // Register a module handler for managing enabled modules.
     $container
@@ -646,7 +656,7 @@ function install_run_task($task, &$install_state) {
         'build_info' => array('args' => array(&$install_state)),
       );
       drupal_form_submit($function, $form_state);
-      $errors = form_get_errors();
+      $errors = form_get_errors($form_state);
       if (!empty($errors)) {
         throw new Exception(implode("\n", $errors));
       }
@@ -1115,11 +1125,9 @@ function install_settings_form($form, &$form_state, &$install_state) {
     '#title' => t('Database type'),
     '#required' => TRUE,
     '#default_value' => !empty($database['driver']) ? $database['driver'] : current($drivers_keys),
-    '#description' => t('The type of database your @drupal data will be stored in.', array('@drupal' => drupal_install_profile_distribution_name())),
   );
   if (count($drivers) == 1) {
     $form['driver']['#disabled'] = TRUE;
-    $form['driver']['#description'] .= ' ' . t('Your PHP configuration only supports a single database type, so it has been automatically selected.');
   }
 
   // Add driver specific configuration options.
@@ -1187,7 +1195,7 @@ function install_settings_form_validate($form, &$form_state) {
   $form_state['storage']['database'] = $database;
   $errors = install_database_errors($database, $form_state['values']['settings_file']);
   foreach ($errors as $name => $message) {
-    form_set_error($name, $message);
+    form_set_error($name, $form_state, $message);
   }
 }
 
@@ -1343,7 +1351,7 @@ function install_select_profile(&$install_state) {
  *
  * A profile will be selected if:
  * - Only one profile is available,
- * - A profile was submitted through $_POST,
+ * - A profile was submitted through \Drupal::request()->request,
  * - Exactly one of the profiles is marked as "exclusive".
  * If multiple profiles are marked as "exclusive" then no profile will be
  * selected.
@@ -1357,12 +1365,13 @@ function install_select_profile(&$install_state) {
  */
 function _install_select_profile($profiles) {
   // Don't need to choose profile if only one available.
+  $request_params = \Drupal::request()->request;
   if (count($profiles) == 1) {
     $profile = array_pop($profiles);
     return $profile->name;
   }
-  elseif (!empty($_POST['profile']) && isset($profiles[$_POST['profile']])) {
-    return $profiles[$_POST['profile']]->name;
+  elseif ($request_params->has('profile') && ($profile = $request_params->get('profile')) && isset($profiles[$profile])) {
+    return $profiles[$profile]->name;
   }
   // Check for a profile marked as "exclusive" and ensure that only one
   // profile is marked as such.
@@ -1543,6 +1552,7 @@ function install_select_language(&$install_state) {
   // Find all available translation files.
   $files = install_find_translations();
   $install_state['translations'] += $files;
+  $request_params = \Drupal::request()->request;
 
   // If a valid language code is set, continue with the next installation step.
   // When translations from the localization server are used, any language code
@@ -1550,9 +1560,9 @@ function install_select_language(&$install_state) {
   // langauges available at http://localize.drupal.org.
   // When files from the translation directory are used, we only accept
   // languages for which a file is available.
-  if (!empty($_POST['langcode'])) {
+  if ($request_params->has('langcode')) {
     $standard_languages = LanguageManager::getStandardLanguageList();
-    $langcode = $_POST['langcode'];
+    $langcode = $request_params->get('langcode');
     if ($langcode == 'en' || isset($files[$langcode]) || isset($standard_languages[$langcode])) {
       $install_state['parameters']['langcode'] = $langcode;
       return;
@@ -1638,16 +1648,14 @@ function install_select_language_form($form, &$form_state, $files = array()) {
 
   if (empty($files)) {
     $form['help'] = array(
-      '#type' => 'container',
+      '#type' => 'item',
+      '#markup' => '<p>Translations will be downloaded from the <a href="http://localize.drupal.org">Drupal Translation website</a>. ' .
+      'If you do not want this, select <em>English</em>.</p>',
       '#states' => array(
         'invisible' => array(
           'select[name="langcode"]' => array('value' => 'en'),
         ),
       ),
-    );
-    $form['help']['text'] = array(
-      '#markup' => '<p>Translations will be downloaded from the <a href="http://localize.drupal.org">Drupal Translation website</a>. ' .
-      'If you do not want this, select <em>English</em>.</p>',
     );
   }
   $form['actions'] = array('#type' => 'actions');
@@ -1667,7 +1675,7 @@ function install_select_language_form($form, &$form_state, $files = array()) {
  *
  * @return string
  *   A themed status report, or an exception if there are requirement errors.
- *   Upon successfull download the page is reloaded and no output is returned.
+ *   Upon successful download the page is reloaded and no output is returned.
  */
 function install_download_translation(&$install_state) {
   // Check whether all conditions are met to download. Download the translation
@@ -1677,7 +1685,7 @@ function install_download_translation(&$install_state) {
     return $output;
   }
 
-  // The download was successfull, reload the page in the new lanagage.
+  // The download was successful, reload the page in the new lanagage.
   install_goto(install_redirect_url($install_state));
 }
 
@@ -2096,7 +2104,8 @@ function install_configure_form($form, &$form_state, &$install_state) {
   // especially out of place on the last page of the installer, where it would
   // distract from the message that the Drupal installation has completed
   // successfully.)
-  if (empty($_POST) && (!drupal_verify_install_file(DRUPAL_ROOT . '/' . $settings_file, FILE_EXIST|FILE_READABLE|FILE_NOT_WRITABLE) || !drupal_verify_install_file(DRUPAL_ROOT . '/' . $settings_dir, FILE_NOT_WRITABLE, 'dir'))) {
+  $post_params = \Drupal::request()->request->all();
+  if (empty($post_params) && (!drupal_verify_install_file(DRUPAL_ROOT . '/' . $settings_file, FILE_EXIST|FILE_READABLE|FILE_NOT_WRITABLE) || !drupal_verify_install_file(DRUPAL_ROOT . '/' . $settings_dir, FILE_NOT_WRITABLE, 'dir'))) {
     drupal_set_message(t('All necessary changes to %dir and %file have been made, so you should remove write permissions to them now in order to avoid security risks. If you are unsure how to do so, consult the <a href="@handbook_url">online handbook</a>.', array('%dir' => $settings_dir, '%file' => $settings_file, '@handbook_url' => 'http://drupal.org/server-permissions')), 'warning');
   }
 
@@ -2202,7 +2211,7 @@ function install_finished(&$install_state) {
   // Will also trigger indexing of profile-supplied content or feeds.
   drupal_cron_run();
 
-  // Save a snapshot of the intially installed configuration.
+  // Save a snapshot of the initially installed configuration.
   $active = drupal_container()->get('config.storage');
   $snapshot = drupal_container()->get('config.storage.snapshot');
   config_import_create_snapshot($active, $snapshot);
@@ -2694,7 +2703,7 @@ function _install_configure_form($form, &$form_state, &$install_state) {
  */
 function install_configure_form_validate($form, &$form_state) {
   if ($error = user_validate_name($form_state['values']['account']['name'])) {
-    form_error($form['admin_account']['account']['name'], $error);
+    form_error($form['admin_account']['account']['name'], $form_state, $error);
   }
 }
 

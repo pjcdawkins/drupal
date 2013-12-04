@@ -37,7 +37,7 @@ use Drupal\picture\PictureMappingInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/config/media/picturemapping/{picture_mapping}"
+ *     "edit-form" = "picture.mapping_page_edit"
  *   }
  * )
  */
@@ -128,7 +128,7 @@ class PictureMapping extends ConfigEntityBase implements PictureMappingInterface
     $loaded_mappings = $this->mappings;
     $this->mappings = array();
     if ($this->breakpointGroup) {
-      foreach ($this->breakpointGroup->breakpoints as $breakpoint_id => $breakpoint) {
+      foreach ($this->breakpointGroup->getBreakpoints() as $breakpoint_id => $breakpoint) {
         // Get the mapping for the default multiplier.
         $this->mappings[$breakpoint_id]['1x'] = '';
         if (isset($loaded_mappings[$breakpoint_id]['1x'])) {
@@ -155,7 +155,7 @@ class PictureMapping extends ConfigEntityBase implements PictureMappingInterface
    */
   public function hasMappings() {
     $mapping_found = FALSE;
-    foreach ($this->mappings as $breakpoint => $multipliers) {
+    foreach ($this->mappings as $multipliers) {
       $filtered_array = array_filter($multipliers);
       if (!empty($filtered_array)) {
         $mapping_found = TRUE;

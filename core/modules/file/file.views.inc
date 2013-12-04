@@ -2,9 +2,7 @@
 
 /**
  * @file
- * Provide views data and handlers for file.module.
- *
- * @ingroup views_module_handlers
+ * Provide views data for file.module.
  */
 
 use Drupal\Core\Entity\FieldableDatabaseStorageController;
@@ -49,6 +47,15 @@ function file_views_data() {
     ),
     'sort' => array(
       'id' => 'standard',
+    ),
+    'relationship' => array(
+      'title' => t('File usage'),
+      'help' => t('Relate file entities to their usage.'),
+      'id' => 'standard',
+      'base' => 'file_usage',
+      'base field' => 'fid',
+      'field' => 'fid',
+      'label' => t('File usage'),
     ),
   );
 
@@ -182,11 +189,6 @@ function file_views_data() {
   // that we can create relationships from files to entities, and then on each core entity type base
   // table so that we can provide general relationships between entities and files.
   $data['file_usage']['table']['join'] = array(
-    // Link ourself to the {file_managed} table so we can provide file->entity relationships.
-    'file_managed' => array(
-      'field' => 'fid',
-      'left_field' => 'fid',
-    ),
     // Link ourself to the {node} table so we can provide node->file relationships.
     'node' => array(
       'field' => 'id',

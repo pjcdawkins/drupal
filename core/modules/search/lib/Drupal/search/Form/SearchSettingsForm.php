@@ -6,6 +6,7 @@
 
 namespace Drupal\search\Form;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Config\Context\ContextInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
@@ -218,7 +219,7 @@ class SearchSettingsForm extends ConfigFormBase {
       $new_plugins = array_filter($form_state['values']['active_plugins']);
       $default = $form_state['values']['default_plugin'];
       if (!in_array($default, $new_plugins, TRUE)) {
-        form_set_error('default_plugin', $form_state, $this->t('Your default search plugin is not selected as an active plugin.'));
+        $this->setFormError('default_plugin', $form_state, $this->t('Your default search plugin is not selected as an active plugin.'));
       }
     }
     // Handle per-plugin validation logic.
@@ -263,6 +264,7 @@ class SearchSettingsForm extends ConfigFormBase {
       $this->searchSettings->set('active_plugins', $new_plugins);
       drupal_set_message($this->t('The active search plugins have been changed.'));
       $this->state->set('menu_rebuild_needed', TRUE);
+      Cache::deleteTags(array('local_task' => TRUE));
     }
     $this->searchSettings->save();
   }

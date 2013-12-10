@@ -410,13 +410,13 @@ function taxonomy_field_views_data(FieldInterface $field) {
     foreach ($table_data as $field_name => $field_data) {
       if (isset($field_data['filter']) && $field_name != 'delta') {
         $data[$table_name][$field_name]['filter']['id'] = 'taxonomy_index_tid';
-        $allowed_values = $field->getFieldSetting('allowed_values');
+        $allowed_values = $field->getSetting('allowed_values');
         $data[$table_name][$field_name]['filter']['vocabulary'] = $allowed_values[0]['vocabulary'];
       }
     }
 
     // Add the relationship only on the tid field.
-    $field_name = $field->getFieldName();
+    $field_name = $field->getName();
     $data[$table_name][$field_name . '_target_id']['relationship'] = array(
       'id' => 'standard',
       'base' => 'taxonomy_term_data',
@@ -435,7 +435,7 @@ function taxonomy_field_views_data(FieldInterface $field) {
  * Views integration to provide reverse relationships on term references.
  */
 function taxonomy_field_views_data_views_data_alter(array &$data, FieldInterface $field) {
-  $field_name = $field->getFieldName();
+  $field_name = $field->getName();
   $entity_type = $field->entity_type;
   $entity_info = entity_get_info($entity_type);
   $pseudo_field_name = 'reverse_' . $field_name . '_' . $entity_type;
@@ -488,4 +488,17 @@ function views_taxonomy_set_breadcrumb(&$breadcrumb, &$argument) {
     }
     $breadcrumb[$path] = check_plain($parent->label());
   }
+}
+
+/**
+ * Implements hook_views_plugins_argument_validator_alter().
+ *
+ * Extend the generic entity argument validator.
+ *
+ * @see \Drupal\views\Plugin\views\argument_validator\Entity
+ */
+function taxonomy_views_plugins_argument_validator_alter(array &$plugins) {
+  $plugins['entity:taxonomy_term']['title'] = t('Taxonomy term ID');
+  $plugins['entity:taxonomy_term']['class'] = 'Drupal\taxonomy\Plugin\views\argument_validator\Term';
+  $plugins['entity:taxonomy_term']['provider'] = 'taxonomy';
 }

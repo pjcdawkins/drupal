@@ -8,7 +8,6 @@
 namespace Drupal\system\Tests\Bootstrap;
 
 use Drupal\simpletest\UnitTestBase;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -56,6 +55,7 @@ class OverrideServerVariablesUnitTest extends UnitTestBase {
       drupal_override_server_variables(array('url' => $url));
       foreach ($expected_server_values as $key => $value) {
         $this->assertIdentical(\Drupal::request()->server->get($key), $value);
+        $this->assertIdentical($_SERVER[$key], $value);
       }
     }
   }

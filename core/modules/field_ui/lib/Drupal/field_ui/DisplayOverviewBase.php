@@ -221,7 +221,7 @@ abstract class DisplayOverviewBase extends OverviewBase {
    */
   protected function buildFieldRow($field_id, FieldInstanceInterface $instance, EntityDisplayBaseInterface $entity_display, array $form, array &$form_state) {
     $display_options = $entity_display->getComponent($field_id);
-    $label = $instance->getFieldLabel();
+    $label = $instance->getLabel();
 
     $field_row = array(
       '#attributes' => array('class' => array('draggable', 'tabledrag-leaf')),
@@ -229,7 +229,7 @@ abstract class DisplayOverviewBase extends OverviewBase {
       '#region_callback' => array($this, 'getRowRegion'),
       '#js_settings' => array(
         'rowHandler' => 'field',
-        'defaultPlugin' => $this->getDefaultPlugin($instance->getFieldType()),
+        'defaultPlugin' => $this->getDefaultPlugin($instance->getType()),
       ),
       'human_name' => array(
         '#markup' => check_plain($label),
@@ -266,7 +266,7 @@ abstract class DisplayOverviewBase extends OverviewBase {
         '#type' => 'select',
         '#title' => $this->t('Plugin for @title', array('@title' => $label)),
         '#title_display' => 'invisible',
-        '#options' => $this->getPluginOptions($instance->getFieldType()),
+        '#options' => $this->getPluginOptions($instance->getType()),
         '#default_value' => $display_options ? $display_options['type'] : 'hidden',
         '#parents' => array('fields', $field_id, 'type'),
         '#attributes' => array('class' => array('field-plugin-type')),
@@ -358,7 +358,10 @@ abstract class DisplayOverviewBase extends OverviewBase {
             '#cell_attributes' => array('class' => array('field-plugin-summary-cell')),
           );
         }
-        if ($plugin->getSettings()) {
+
+        // Check selected plugin settings to display edit link or not.
+        $plugin_definition = $plugin->getPluginDefinition();
+        if ($plugin_definition['settings']) {
           $field_row['settings_edit'] = $base_button + array(
             '#type' => 'image_button',
             '#name' => $field_id . '_settings_edit',

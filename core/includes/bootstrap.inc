@@ -496,6 +496,9 @@ function drupal_override_server_variables($variables = array()) {
   );
   // Replace elements of the $_SERVER array, as appropriate.
   $request->server->replace($variables + $server_vars + $defaults);
+
+  // @todo remove once conf_path() no longer uses $_SERVER.
+  $_SERVER = $request->server->all();
 }
 
 /**

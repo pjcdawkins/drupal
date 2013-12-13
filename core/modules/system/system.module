@@ -123,8 +123,7 @@ function system_help($path, $arg) {
       }
       break;
     case 'admin/config/development/maintenance':
-      global $user;
-      if ($user->id() == 1) {
+      if (\Drupal::currentUser()->id() == 1) {
         return '<p>' . t('Use maintenance mode when making major updates, particularly if the updates could disrupt visitors or the update process. Examples include upgrading, importing or exporting content, modifying a theme, modifying content types, and making backups.') . '</p>';
       }
       break;
@@ -182,9 +181,6 @@ function system_theme() {
     'system_admin_index' => array(
       'variables' => array('menu_items' => NULL),
       'file' => 'system.admin.inc',
-    ),
-    'system_powered_by' => array(
-      'variables' => array(),
     ),
     'system_compact_link' => array(
       'variables' => array(),
@@ -1091,7 +1087,7 @@ function system_library_info() {
     'title' => 'Drupal autocomplete',
     'version' => \Drupal::VERSION,
     'js' => array(
-      'core/misc/autocomplete.js' => array('group' => JS_DEFAULT),
+      'core/misc/autocomplete.js' => array('group' => JS_LIBRARY, 'weight' => -1),
     ),
     'dependencies' => array(
       array('system', 'jquery'),
@@ -2190,7 +2186,7 @@ function system_user_login($account) {
  * Add the time zone field to the user edit and register forms.
  */
 function system_user_timezone(&$form, &$form_state) {
-  global $user;
+  $user = \Drupal::currentUser();
 
   $account = $form_state['controller']->getEntity();
   $form['timezone'] = array(
@@ -2737,15 +2733,6 @@ function system_time_zones($blank = NULL) {
   // Sort the translated time zones alphabetically.
   asort($zones);
   return $zones;
-}
-
-/**
- * Returns HTML for the Powered by Drupal text.
- *
- * @ingroup themeable
- */
-function theme_system_powered_by() {
-  return '<span>' . t('Powered by <a href="@poweredby">Drupal</a>', array('@poweredby' => 'http://drupal.org')) . '</span>';
 }
 
 /**

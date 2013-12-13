@@ -210,12 +210,18 @@ function _drupal_theme_initialize($theme, $base_theme = array()) {
     }
   }
 
-  // And now add the stylesheets properly
+  // And now add the stylesheets properly.
+  $css = array();
   foreach ($final_stylesheets as $media => $stylesheets) {
     foreach ($stylesheets as $stylesheet) {
-      drupal_add_css($stylesheet, array('group' => CSS_AGGREGATE_THEME, 'every_page' => TRUE, 'media' => $media));
+      $css['#attached']['css'][$stylesheet] = array(
+        'group' => CSS_AGGREGATE_THEME,
+        'every_page' => TRUE,
+        'media' => $media
+      );
     }
   }
+  drupal_render($css);
 
   // Do basically the same as the above for scripts
   $final_scripts = array();
@@ -1709,37 +1715,6 @@ function theme_table($variables) {
 
   $output .= "</table>\n";
   return $output;
-}
-
-/**
- * Prepares variables for tablesort indicator templates.
- *
- * Default template: tablesort-indicator.html.twig.
- *
- * @param array $variables
- *   An associative array containing:
- *   - style: Set to either 'asc' or 'desc'. This determines which icon to show.
- */
-function template_preprocess_tablesort_indicator(&$variables) {
-  // Provide the image attributes for an ascending or descending image.
-  if ($variables['style'] == 'asc') {
-    $variables['uri'] = 'core/misc/arrow-asc.png';
-    $alt_title = t('sort ascending');
-  }
-  else {
-    $variables['uri'] = 'core/misc/arrow-desc.png';
-    $alt_title = t('sort descending');
-  }
-
-  // Add the image element.
-  $variables['image'] = array(
-    '#theme' => 'image',
-    '#uri' => $variables['uri'],
-    '#width' => 13,
-    '#height' => 13,
-    '#alt' => $alt_title,
-    '#title' => $alt_title,
-  );
 }
 
 /**

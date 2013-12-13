@@ -8,8 +8,8 @@
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\entity\Entity\EntityDisplay;
 use Drupal\field\Field;
 
 /**
@@ -720,7 +720,7 @@ function field_attach_prepare_view($entity_type, array $entities, array $display
  *
  * @param \Drupal\Core\Entity\EntityInterface $entity
  *   The entity with fields to render.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity display object.
  * @param $langcode
  *   The language the field values are to be shown in. If no language is
@@ -734,7 +734,7 @@ function field_attach_prepare_view($entity_type, array $entities, array $display
  *
  * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
-function field_attach_view(EntityInterface $entity, EntityDisplay $display, $langcode = NULL, array $options = array()) {
+function field_attach_view(EntityInterface $entity, EntityViewDisplayInterface $display, $langcode = NULL, array $options = array()) {
   // For each field, call the view() method on the formatter object handed
   // by the entity display.
   $target_function = function (FieldDefinitionInterface $field_definition) use ($display) {
@@ -895,18 +895,15 @@ function field_valid_language($langcode, $default = TRUE) {
  */
 function field_language(EntityInterface $entity, $field_name = NULL, $langcode = NULL) {
   $langcode = \Drupal::entityManager()->getTranslationFromContext($entity, $langcode)->language()->id;
-  $definitions = $entity->getPropertyDefinitions();
   $translatable = field_has_translation_handler($entity->entityType());
   if (!isset($field_name)) {
     $display_langcodes = array();
-    foreach ($definitions as $name => $definition) {
-      if ($definition->isConfigurable()) {
-        $display_langcodes[$name] = $translatable ? $langcode : Language::LANGCODE_NOT_SPECIFIED;
-      }
+    foreach ($entity->getPropertyDefinitions() as $name => $definition) {
+      $display_langcodes[$name] = $translatable ? $langcode : Language::LANGCODE_NOT_SPECIFIED;
     }
     return $display_langcodes;
   }
-  elseif ($definitions[$field_name]->isConfigurable()) {
+  else {
     return $translatable ? $langcode : Language::LANGCODE_NOT_SPECIFIED;
   }
 }

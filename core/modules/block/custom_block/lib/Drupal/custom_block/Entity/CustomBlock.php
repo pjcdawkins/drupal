@@ -36,9 +36,9 @@ use Drupal\custom_block\CustomBlockInterface;
  *   base_table = "custom_block",
  *   revision_table = "custom_block_revision",
  *   links = {
- *     "canonical" = "custom_block.edit",
- *     "edit-form" = "custom_block.edit",
- *     "admin-form" = "custom_block.type_edit"
+ *     "canonical" = "/block/{custom_block}",
+ *     "edit-form" = "/block/{custom_block}",
+ *     "admin-form" = "/admin/structure/block/custom-blocks/manage/{custom_block_type}"
  *   },
  *   fieldable = TRUE,
  *   translatable = TRUE,

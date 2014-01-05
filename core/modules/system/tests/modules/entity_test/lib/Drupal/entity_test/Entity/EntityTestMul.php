@@ -36,9 +36,9 @@ use Drupal\entity_test\Entity\EntityTest;
  *     "label" = "name"
  *   },
  *   links = {
- *     "canonical" = "entity_test.edit_entity_test_mul",
- *     "edit-form" = "entity_test.edit_entity_test_mul",
- *     "admin-form" = "entity_test.admin_entity_test_mul"
+ *     "canonical" = "/entity_test_mul/manage/{entity_test_mul}",
+ *     "edit-form" = "/entity_test_mul/manage/{entity_test_mul}",
+ *     "admin-form" = "/entity_test_mul/structure/{bundle}"
  *   }
  * )
  */

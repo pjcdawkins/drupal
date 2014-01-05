@@ -38,9 +38,9 @@ use Drupal\Core\Language\Language;
  *     "label" = "name"
  *   },
  *   links = {
- *     "canonical" = "entity_test.render",
- *     "edit-form" = "entity_test.edit_entity_test",
- *     "admin-form" = "entity_test.admin_entity_test"
+ *     "canonical" = "/entity_test/{entity_test}",
+ *     "edit-form" = "/entity_test/manage/{entity_test}",
+ *     "admin-form" = "/entity_test/structure/{bundle}"
  *   }
  * )
  */

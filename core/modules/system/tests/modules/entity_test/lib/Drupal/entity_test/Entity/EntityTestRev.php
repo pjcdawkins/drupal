@@ -34,8 +34,8 @@ use Drupal\entity_test\Entity\EntityTest;
  *     "bundle" = "type"
  *   },
  *   links = {
- *     "canonical" = "entity_test.edit_entity_test_rev",
- *     "edit-form" = "entity_test.edit_entity_test_rev"
+ *     "canonical" = "/entity_test_rev/manage/{entity_test_rev}",
+ *     "edit-form" = "/entity_test_rev/manage/{entity_test_rev}"
  *   }
  * )
  */

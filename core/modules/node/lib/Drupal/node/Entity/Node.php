@@ -54,10 +54,10 @@ use Drupal\node\NodeInterface;
  *   bundle_entity_type = "node_type",
  *   permission_granularity = "bundle",
  *   links = {
- *     "canonical" = "node.view",
- *     "edit-form" = "node.page_edit",
- *     "version-history" = "node.revision_overview",
- *     "admin-form" = "node.type_edit"
+ *     "canonical" = "/node/{node}",
+ *     "edit-form" = "/node/{node}/edit",
+ *     "version-history" = "/node/{node}/revisions",
+ *     "admin-form" = "/admin/structure/types/manage/{node_type}"
  *   }
  * )
  */

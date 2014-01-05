@@ -48,7 +48,7 @@ use Drupal\taxonomy\TermInterface;
  *   links = {
  *     "canonical" = "taxonomy.term_page",
  *     "edit-form" = "taxonomy.term_edit",
- *     "admin-form" = "taxonomy.overview_terms"
+ *     "admin-form" = "/admin/structure/taxonomy/manage/{taxonomy_vocabulary}"
  *   },
  *   permission_granularity = "bundle"
  * )

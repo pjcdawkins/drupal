@@ -37,7 +37,7 @@ use Drupal\language\LanguageInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "language.edit"
+ *     "edit-form" = "admin/config/regional/language/edit/{language_entity}"
  *   }
  * )
  */

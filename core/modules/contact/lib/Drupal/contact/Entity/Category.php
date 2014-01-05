@@ -35,7 +35,7 @@ use Drupal\contact\CategoryInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "contact.category_edit"
+ *     "edit-form" = "admin/structure/contact/manage/{contact_category}"
  *   }
  * )
  */

@@ -46,9 +46,9 @@ use Drupal\Core\TypedData\DataDefinition;
  *     "bundle" = "field_id"
  *   },
  *   links = {
- *     "canonical" = "comment.permalink",
- *     "edit-form" = "comment.edit_page",
- *     "admin-form" = "comment.bundle"
+ *     "canonical" = "/comment/{comment}",
+ *     "edit-form" = "/comment/{comment}/edit",
+ *     "admin-form" = "/admin/structure/comments/manage/{bundle}"
  *   }
  * )
  */

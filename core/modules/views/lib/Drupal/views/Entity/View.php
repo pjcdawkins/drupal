@@ -32,6 +32,9 @@ use Drupal\views\ViewExecutable;
  *     "label" = "label",
  *     "uuid" = "uuid",
  *     "status" = "status"
+ *   },
+ *   links = {
+ *     "edit-form" = "admin/structure/views/view/{view}"
  *   }
  * )
  */

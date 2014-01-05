@@ -37,7 +37,7 @@ use Drupal\shortcut\ShortcutSetInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "shortcut.set_customize"
+ *     "edit-form" = "admin/config/user-interface/shortcut/manage/{shortcut_set}"
  *   }
  * )
  */

@@ -36,7 +36,7 @@ use Drupal\Core\Entity\EntityStorageControllerInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "block.admin_edit"
+ *     "edit-form" = "admin/structure/block/manage/{block}"
  *   }
  * )
  */

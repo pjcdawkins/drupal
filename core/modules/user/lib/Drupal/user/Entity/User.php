@@ -42,9 +42,9 @@ use Drupal\user\UserInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "canonical" = "user.view",
- *     "edit-form" = "user.edit",
- *     "admin-form" = "user.account_settings"
+ *     "canonical" = "/user/{user}",
+ *     "edit-form" = "/user/{user}/edit",
+ *     "admin-form" = "/admin/config/people/accounts"
  *   }
  * )
  */

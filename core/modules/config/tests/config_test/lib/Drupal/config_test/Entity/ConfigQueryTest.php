@@ -25,6 +25,9 @@ namespace Drupal\config_test\Entity;
  *     "id" = "id",
  *     "label" = "label",
  *     "uuid" = "uuid"
+ *   },
+ *   links = {
+ *     "edit-form" = "admin/structure/config_test/manage/{config_query_test}"
  *   }
  * )
  *

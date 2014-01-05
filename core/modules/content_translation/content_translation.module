@@ -87,9 +87,9 @@ function content_translation_entity_info_alter(array &$entity_info) {
       }
 
       if (!empty($info['links']['canonical'])) {
-        // Provide default route names for the translation paths.
+        // Provide default links for the translation paths.
         $info['links'] += array(
-          'drupal:content-translation-overview' => "content_translation.translation_overview_$entity_type",
+          'drupal:content-translation-overview' => $info['links']['canonical'] . '/translations',
         );
         $info['translation']['content_translation'] += array(
           'access_callback' => 'content_translation_translate_access',

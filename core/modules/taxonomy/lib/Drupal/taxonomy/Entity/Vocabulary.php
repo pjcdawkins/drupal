@@ -36,7 +36,7 @@ use Drupal\taxonomy\VocabularyInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "taxonomy.overview_terms"
+ *     "edit-form" = "admin/structure/taxonomy/manage/{taxonomy_vocabulary}"
  *   }
  * )
  */

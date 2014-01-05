@@ -48,6 +48,30 @@ class ContentTranslationLocalTasksTest extends LocalTaskIntegrationTest {
         'node' => $entity_type,
       )));
     \Drupal::getContainer()->set('content_translation.manager', $content_translation_manager);
+
+    // Route provider for injecting node.view into derivative lookup.
+    $collection = $this->getMockBuilder('Symfony\Component\Routing\RouteCollection')
+      ->disableOriginalConstructor()
+      ->setMethods(array('all'))
+      ->getMock();
+    $collection->expects($this->any())
+      ->method('all')
+      ->will($this->returnValue(array('node.view' => array())));
+    $route_provider = $this->getMock('Drupal\Core\Routing\RouteProviderInterface');
+    $route_provider->expects($this->any())
+      ->method('getRoutesByPattern')
+      ->will($this->returnValue($collection));
+    \Drupal::getContainer()->set('router.route_provider', $route_provider);
+
+    // Stub for t().
+    $string_translation = $this->getMock('Drupal\Core\StringTranslation\TranslationInterface');
+    $string_translation->expects($this->any())
+      ->method('translate')
+      ->will($this->returnCallback(function($string) {return $string;}));
+    \Drupal::getContainer()->set('string_translation', $string_translation);
+
+    // Load the content_translation.module file in order to run the alter hook.
+    require_once DRUPAL_ROOT . '/core/modules/content_translation/content_translation.module';
   }
 
   /**

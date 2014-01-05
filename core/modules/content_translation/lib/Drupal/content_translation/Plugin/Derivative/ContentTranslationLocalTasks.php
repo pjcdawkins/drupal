@@ -72,18 +72,21 @@ class ContentTranslationLocalTasks extends DerivativeBase implements ContainerDe
   public function getDerivativeDefinitions(array $base_plugin_definition) {
     // Create tabs for all possible entity types.
     foreach ($this->contentTranslationManager->getSupportedEntityTypes() as $entity_type => $entity_info) {
-      // Find the route name for the translation overview.
-      $translation_route_name = "content_translation.translation_overview_$entity_type";
-      $translation_tab = $translation_route_name;
 
-      $this->derivatives[$translation_tab] = $base_plugin_definition + array(
-        'entity_type' => $entity_type,
-        'title' => 'Translate',
-        'route_name' => $translation_route_name,
-        // @todo this base route is wrong, how can we get the canical route of
-        // this entity type?
-        'base_route' => $translation_route_name,
-      ) + $base_plugin_definition;
+      if ($path = $entity_info->getLinkTemplate('canonical')) {
+        if ($routes = $this->routeProvider->getRoutesByPattern($path)->all()) {
+          // Find the route name for the entity page.
+          $entity_route_name = key($routes);
+          $translation_route_name = "content_translation.translation_overview_$entity_type";
+
+          $this->derivatives[$translation_route_name] = array(
+            'entity_type' => $entity_type,
+            'title' => 'Translate',
+            'route_name' => $translation_route_name,
+            'base_route' => $entity_route_name,
+          ) + $base_plugin_definition;
+        }
+      }
     }
     return parent::getDerivativeDefinitions($base_plugin_definition);
   }

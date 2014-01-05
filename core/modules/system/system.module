@@ -257,7 +257,6 @@ function system_element_info() {
     '#post_render' => array('drupal_post_render_cache_tags_page_set'),
     '#show_messages' => TRUE,
     '#theme' => 'page',
-    '#theme_wrappers' => array('html'),
   );
   // By default, we don't want Ajax commands being rendered in the context of an
   // HTML page, so we don't provide defaults for #theme or #theme_wrappers.
@@ -875,6 +874,19 @@ function system_library_info() {
     'version' => \Drupal::VERSION,
     'js' => array(
       array('type' => 'setting', 'data' => array()),
+    ),
+  );
+
+  // Drupal's active link marking.
+  $libraries['drupal.active-link'] = array(
+    'title' => 'Drupal active link marking',
+    'version' => \Drupal::VERSION,
+    'js' => array(
+      'core/misc/active-link.js' => array(),
+    ),
+    'dependencies' => array(
+      array('system', 'drupal'),
+      array('system', 'drupalSettings'),
     ),
   );
 
@@ -1744,7 +1756,7 @@ function system_library_info() {
   $libraries['underscore'] = array(
     'title' => 'Underscore.js',
     'website' => 'http://underscorejs.org/',
-    'version' => '1.4.0',
+    'version' => '1.5.2',
     'js' => array(
       'core/assets/vendor/underscore/underscore.js' => array('group' => JS_LIBRARY, 'weight' => -20),
     ),
@@ -1754,7 +1766,7 @@ function system_library_info() {
   $libraries['backbone'] = array(
     'title' => 'Backbone.js',
     'website' => 'http://backbonejs.org/',
-    'version' => '0.9.2',
+    'version' => '1.1.0',
     'js' => array(
       'core/assets/vendor/backbone/backbone.js' => array('group' => JS_LIBRARY, 'weight' => -19),
     ),
@@ -2090,6 +2102,7 @@ function system_filetransfer_info() {
  * Implements hook_page_build().
  *
  * @see template_preprocess_maintenance_page()
+ * @see \Drupal\system\Controller\SystemController::setLinkActiveClass()
  */
 function system_page_build(&$page) {
   // Ensure the same CSS is loaded in template_preprocess_maintenance_page().
@@ -2108,6 +2121,41 @@ function system_page_build(&$page) {
     $page['#attached']['css'][$path . '/css/system.admin.css'] = array(
       'weight' => CSS_COMPONENT - 10,
     );
+  }
+
+  // Handle setting the "active" class on links by:
+  // - loading the active-link library if the current user is authenticated;
+  // - applying a post-render cache callback if the current user is anonymous.
+  // @see l()
+  // @see \Drupal\Core\Utility\LinkGenerator::generate()
+  // @see theme_links()
+  // @see \Drupal\system\Controller\SystemController::setLinkActiveClass
+  if (\Drupal::currentUser()->isAuthenticated()) {
+    $page['#attached']['library'][] = array('system', 'drupal.active-link');
+  }
+  else {
+    $page['#post_render_cache']['\Drupal\system\Controller\SystemController::setLinkActiveClass'] = array(
+      // Collect the current state that determines whether a link is active.
+      array(
+        'path' => current_path(),
+        'front' => drupal_is_front_page(),
+        'language' => language(\Drupal\Core\Language\Language::TYPE_URL)->id,
+        'query' => \Drupal::service('request')->query->all(),
+      )
+    );
+  }
+}
+
+/**
+ * Implements hook_custom_theme().
+ */
+function system_custom_theme() {
+  if (drupal_container()->isScopeActive('request')) {
+    $request = \Drupal::request();
+    $path = $request->attributes->get('_system_path');
+    if (user_access('view the administration theme') && path_is_admin($path)) {
+      return \Drupal::config('system.theme')->get('admin');
+    }
   }
 }
 

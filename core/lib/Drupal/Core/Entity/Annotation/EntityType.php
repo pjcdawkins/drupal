@@ -17,74 +17,13 @@ use Drupal\Component\Annotation\Plugin;
 class EntityType extends Plugin {
 
   /**
-   * The name of the entity type class.
+   * The class used to represent the entity type.
    *
-   * This is not provided manually, it will be added by the discovery mechanism.
-   *
-   * @var string
-   */
-  public $class;
-
-  /**
-   * The name of the entity type's base table.
-   *
-   * @todo This is only used by \Drupal\Core\Entity\DatabaseStorageController.
+   * It must implement \Drupal\Core\Entity\EntityTypeInterface.
    *
    * @var string
    */
-  public $base_table;
-
-  /**
-   * An associative array where the keys are the names of different controller
-   * types (listed below) and the values are the names of the classes that
-   * implement that controller:
-   * - storage: The name of the class that is used to load the objects. The
-   *   class must implement \Drupal\Core\Entity\EntityStorageControllerInterface.
-   * - form: An associative array where the keys are the names of the different
-   *   form operations (such as 'create', 'edit', or 'delete') and the values
-   *   are the names of the controller classes for those operations. The name of
-   *   the operation is passed also to the form controller's constructor, so
-   *   that one class can be used for multiple entity forms when the forms are
-   *   similar. The classes must implement
-   *   \Drupal\Core\Entity\EntityFormControllerInterface
-   * - list: The name of the class that provides listings of the entities. The
-   *   class must implement \Drupal\Core\Entity\EntityListControllerInterface.
-   * - render: The name of the class that is used to render the entities. The
-   *   class must implement \Drupal\Core\Entity\EntityViewBuilderInterface.
-   * - access: The name of the class that is used for access checks. The class
-   *   must implement \Drupal\Core\Entity\EntityAccessControllerInterface.
-   *   Defaults to \Drupal\Core\Entity\EntityAccessController.
-   * - translation: The name of the controller class that should be used to
-   *   handle the translation process. The class must implement
-   *   \Drupal\content_translation\ContentTranslationControllerInterface.
-   *
-   * @todo Interfaces from outside \Drupal\Core or \Drupal\Component should not
-   *   be used here.
-   *
-   * @var array
-   */
-  public $controllers = array(
-    'access' => 'Drupal\Core\Entity\EntityAccessController',
-  );
-
-  /**
-   * The name of the default administrative permission.
-   *
-   * The default \Drupal\Core\Entity\EntityAccessController class checks this
-   * permission for all operations in its checkAccess() method. Entities with
-   * more complex permissions can extend this class to do their own access
-   * checks.
-   *
-   * @var string (optional)
-   */
-  public $admin_permission;
-
-  /**
-   * Boolean indicating whether fields can be attached to entities of this type.
-   *
-   * @var bool (optional)
-   */
-  public $fieldable = FALSE;
+  public $entity_type_class = 'Drupal\Core\Entity\EntityType';
 
   /**
    * Boolean indicating if the persistent cache of field data should be used.
@@ -275,5 +214,18 @@ class EntityType extends Plugin {
    * @var string|bool (optional)
    */
   public $permission_granularity = 'entity_type';
+
+  /**
+   * {@inheritdoc}
+   */
+  public function get() {
+    $values = $this->definition;
+
+    // Use the specified entity type class, and remove it before instantiating.
+    $class = $values['entity_type_class'];
+    unset($values['entity_type_class']);
+
+    return new $class($values);
+  }
 
 }

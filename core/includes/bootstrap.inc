@@ -138,24 +138,19 @@ const DRUPAL_BOOTSTRAP_KERNEL = 1;
 const DRUPAL_BOOTSTRAP_PAGE_CACHE = 2;
 
 /**
- * Fourth bootstrap phase: initialize database layer.
+ * Fourth bootstrap phase: initialize the variable system.
  */
-const DRUPAL_BOOTSTRAP_DATABASE = 3;
+const DRUPAL_BOOTSTRAP_VARIABLES = 3;
 
 /**
- * Fifth bootstrap phase: initialize the variable system.
+ * Fifth bootstrap phase: load code for subsystems and modules.
  */
-const DRUPAL_BOOTSTRAP_VARIABLES = 4;
-
-/**
- * Sixth bootstrap phase: load code for subsystems and modules.
- */
-const DRUPAL_BOOTSTRAP_CODE = 5;
+const DRUPAL_BOOTSTRAP_CODE = 4;
 
 /**
  * Final bootstrap phase: initialize language, path, theme, and modules.
  */
-const DRUPAL_BOOTSTRAP_FULL = 6;
+const DRUPAL_BOOTSTRAP_FULL = 5;
 
 /**
  * Role ID for anonymous users; should match what's in the "role" table.
@@ -418,18 +413,9 @@ function config_get_config_directory($type = CONFIG_ACTIVE_DIRECTORY) {
   global $config_directories;
 
   if (!empty($config_directories[$type])) {
-    // Allow a configuration directory path to be outside of webroot.
-    if (empty($config_directories[$type]['absolute'])) {
-      $path = conf_path() . '/files/' . $config_directories[$type]['path'];
-    }
-    else {
-      $path = $config_directories[$type]['path'];
-    }
+    return $config_directories[$type];
   }
-  else {
-    throw new Exception(format_string('The configuration directory type %type does not exist.', array('%type' => $type)));
-  }
-  return $path;
+  throw new Exception(format_string('The configuration directory type %type does not exist.', array('%type' => $type)));
 }
 
 /**
@@ -1757,7 +1743,6 @@ function drupal_anonymous_user() {
  *   - DRUPAL_BOOTSTRAP_CONFIGURATION: Initializes configuration.
  *   - DRUPAL_BOOTSTRAP_KERNEL: Initalizes a kernel.
  *   - DRUPAL_BOOTSTRAP_PAGE_CACHE: Tries to serve a cached page.
- *   - DRUPAL_BOOTSTRAP_DATABASE: Initializes the database layer.
  *   - DRUPAL_BOOTSTRAP_VARIABLES: Initializes the variable system.
  *   - DRUPAL_BOOTSTRAP_CODE: Loads code for subsystems and modules.
  *   - DRUPAL_BOOTSTRAP_FULL: Fully loads Drupal. Validates and fixes input
@@ -1775,7 +1760,6 @@ function drupal_bootstrap($phase = NULL, $new_phase = TRUE) {
     DRUPAL_BOOTSTRAP_CONFIGURATION,
     DRUPAL_BOOTSTRAP_KERNEL,
     DRUPAL_BOOTSTRAP_PAGE_CACHE,
-    DRUPAL_BOOTSTRAP_DATABASE,
     DRUPAL_BOOTSTRAP_VARIABLES,
     DRUPAL_BOOTSTRAP_CODE,
     DRUPAL_BOOTSTRAP_FULL,
@@ -1816,10 +1800,6 @@ function drupal_bootstrap($phase = NULL, $new_phase = TRUE) {
 
         case DRUPAL_BOOTSTRAP_PAGE_CACHE:
           _drupal_bootstrap_page_cache();
-          break;
-
-        case DRUPAL_BOOTSTRAP_DATABASE:
-          _drupal_bootstrap_database();
           break;
 
         case DRUPAL_BOOTSTRAP_VARIABLES:
@@ -2024,6 +2004,7 @@ function _drupal_bootstrap_page_cache() {
   global $user;
 
   require_once __DIR__ . '/cache.inc';
+  require_once __DIR__ . '/database.inc';
   // Check for a cache mode force from settings.php.
   if (settings()->get('page_cache_without_database')) {
     $cache_enabled = TRUE;
@@ -2095,15 +2076,6 @@ function _drupal_initialize_db_test_prefix() {
       );
     }
   }
-}
-
-/**
- * Initializes the database system by loading database.inc.
- */
-function _drupal_bootstrap_database() {
-  // Initialize the database system. Note that the connection
-  // won't be initialized until it is actually requested.
-  require_once __DIR__ . '/database.inc';
 }
 
 /**
@@ -2293,7 +2265,7 @@ function _drupal_load_test_overrides($test_prefix) {
   $path_prefix = 'simpletest/' . substr($test_prefix, 10);
   $config_directories = array();
   foreach (array(CONFIG_ACTIVE_DIRECTORY, CONFIG_STAGING_DIRECTORY) as $type) {
-    $config_directories[$type] = array('path' => $path_prefix . '/config_' . $type);
+    $config_directories[$type] = conf_path() . '/files/' . $path_prefix . '/config_' . $type;
   }
 
   // Check for and load a settings.php file in the simpletest files directory.
@@ -2439,7 +2411,7 @@ function language_list($flags = Language::STATE_CONFIGURABLE) {
     $default = language_default();
     if (language_multilingual() || \Drupal::moduleHandler()->moduleExists('language')) {
       // Use language module configuration if available.
-      $language_entities = config_get_storage_names_with_prefix('language.entity');
+      $language_entities = config_get_storage_names_with_prefix('language.entity.');
 
       // Initialize default property so callers have an easy reference and can
       // save the same object without data loss.

@@ -8,7 +8,6 @@
 namespace Drupal\content_translation\Tests\Menu;
 
 use Drupal\Tests\Core\Menu\LocalTaskIntegrationTest;
-use Drupal\content_translation\Plugin\Derivative\ContentTranslationLocalTasks;;
 
 /**
  * Tests existence of block local tasks.
@@ -33,17 +32,20 @@ class ContentTranslationLocalTasksTest extends LocalTaskIntegrationTest {
     );
     parent::setUp();
 
-    // Entity manager stub for derivative building.
-    $entity_manager = $this->getMock('Drupal\Core\Entity\EntityManagerInterface');
-    $entity_manager->expects($this->any())
-      ->method('getDefinitions')
+    $entity_type = $this->getMock('Drupal\Core\Entity\EntityTypeInterface');
+    $entity_type->expects($this->any())
+      ->method('getLinkTemplate')
+      ->will($this->returnValueMap(array(
+        array('canonical', '/node/{node}'),
+        // @todo: this will obviously fail, what is the translation overview
+        // path for nodes?
+        array('drupal:content-translation-overview', '/i/have/no/idea'),
+      )));
+    $content_translation_manager = $this->getMock('Drupal\content_translation\ContentTranslationManagerInterface');
+    $content_translation_manager->expects($this->any())
+      ->method('getSupportedEntityTypes')
       ->will($this->returnValue(array(
-        'node' => array(
-          'translatable' => TRUE,
-          'links' => array(
-            'canonical' => '/node/{node}',
-          ),
-        ),
+        'node' => $entity_type,
       )));
     \Drupal::getContainer()->set('entity.manager', $entity_manager);
 
@@ -70,24 +72,6 @@ class ContentTranslationLocalTasksTest extends LocalTaskIntegrationTest {
 
     // Load the content_translation.module file in order to run the alter hook.
     require_once DRUPAL_ROOT . '/core/modules/content_translation/content_translation.module';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function getLocalTaskManager($modules, $route_name, $route_params) {
-    $manager = parent::getLocalTaskManager($modules, $route_name, $route_params);
-
-    // Duplicate content_translation_local_tasks_alter()'s code here to avoid
-    // having to load the .module file.
-    $this->moduleHandler->expects($this->once())
-      ->method('alter')
-      ->will($this->returnCallback(function ($hook, &$local_tasks) {
-          // Alters in tab_root_id onto the content translation local task.
-          $derivative = ContentTranslationLocalTasks::create(\Drupal::getContainer(), 'content_translation.local_tasks');
-          $derivative->alterLocalTasks($local_tasks);
-      }));
-    return $manager;
   }
 
   /**

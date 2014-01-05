@@ -326,7 +326,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
     // collisions with existing entity properties, but some is better than
     // none.
     foreach ($entity_manager->getDefinitions() as $type => $info) {
-      if (in_array($this->name, $info['entity_keys'])) {
+      if (in_array($this->name, $info->getKeys())) {
         throw new FieldException(format_string('Attempt to create field %name which is reserved by entity type %type.', array('%name' => $this->name, '%type' => $type)));
       }
     }
@@ -515,10 +515,10 @@ class Field extends ConfigEntityBase implements FieldInterface {
    * {@inheritdoc}
    */
   public function getSettings() {
-    // @todo field_info_field_types() calls _field_info_collate_types() which
-    //   maintains its own static cache. However, do some CPU and memory
-    //   profiling to see if it's worth statically caching $field_type_info, or
-    //   the default field and instance settings, within $this.
+    // @todo FieldTypePluginManager maintains its own static cache. However, do
+    //   some CPU and memory profiling to see if it's worth statically caching
+    //   $field_type_info, or the default field and instance settings, within
+    //   $this.
     $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
 
     $settings = $this->settings + $field_type_info['settings'] + $field_type_info['instance_settings'];
@@ -654,7 +654,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
       $factory = \Drupal::service('entity.query');
       // Entity Query throws an exception if there is no base table.
       $entity_info = \Drupal::entityManager()->getDefinition($this->entity_type);
-      if (!isset($entity_info['base_table'])) {
+      if (!$entity_info->getBaseTable()) {
         return FALSE;
       }
       $query = $factory->get($this->entity_type);

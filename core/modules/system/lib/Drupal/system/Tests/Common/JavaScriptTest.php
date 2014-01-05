@@ -37,6 +37,9 @@ class JavaScriptTest extends DrupalUnitTestBase {
 
   function setUp() {
     parent::setUp();
+    // There are dependencies in drupal_get_js() on the theme layer so we need
+    // to initialize it.
+    drupal_theme_initialize();
 
     // Disable preprocessing
     $config = \Drupal::config('system.performance');
@@ -80,7 +83,7 @@ class JavaScriptTest extends DrupalUnitTestBase {
     drupal_add_library('system', 'drupalSettings');
     $javascript = drupal_add_js();
     $last_settings = reset($javascript['settings']['data']);
-    $this->assertTrue(array_key_exists('currentPath', $last_settings), 'The current path JavaScript setting is set correctly.');
+    $this->assertTrue(array_key_exists('currentPath', $last_settings['path']), 'The current path JavaScript setting is set correctly.');
 
     $javascript = drupal_add_js(array('drupal' => 'rocks', 'dries' => 280342800), 'setting');
     $last_settings = end($javascript['settings']['data']);

@@ -40,13 +40,12 @@ class ContentTranslationRouteSubscriber extends RouteSubscriberBase {
    */
   protected function alterRoutes(RouteCollection $collection, $provider) {
     foreach ($this->contentTranslationManager->getSupportedEntityTypes() as $entity_type => $entity_info) {
-      $path = $entity_info['links']['drupal:content-translation-overview'];
+      $path = $entity_info->getLinkTemplate('drupal:content-translation-overview');
 
       $route = new Route(
        $path,
         array(
           '_content' => '\Drupal\content_translation\Controller\ContentTranslationController::overview',
-          '_title' => 'Translate',
           'account' => 'NULL',
           '_entity_type' => $entity_type,
         ),

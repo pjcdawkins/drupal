@@ -51,12 +51,12 @@ class ConfigImporterTest extends DrupalUnitTestBase {
     unset($GLOBALS['hook_config_test']);
 
     // Set up the ConfigImporter object for testing.
-    $config_comparer = new StorageComparer(
+    $storage_comparer = new StorageComparer(
       $this->container->get('config.storage.staging'),
       $this->container->get('config.storage')
     );
     $this->configImporter = new ConfigImporter(
-      $config_comparer->createChangelist(),
+      $storage_comparer->createChangelist(),
       $this->container->get('event_dispatcher'),
       $this->container->get('config.factory'),
       $this->container->get('entity.manager'),
@@ -93,6 +93,25 @@ class ConfigImporterTest extends DrupalUnitTestBase {
     }
     catch (ConfigImporterException $e) {
       $this->assertTrue(TRUE, 'ConfigImporterException thrown, successfully stopping an empty import.');
+    }
+  }
+
+  /**
+   * Tests verification of site UUID before importing configuration.
+   */
+  function testSiteUuidValidate() {
+    $staging = \Drupal::service('config.storage.staging');
+    // Create updated configuration object.
+    $config_data = \Drupal::config('system.site')->get();
+    // Generate a new site UUID.
+    $config_data['uuid'] = \Drupal::service('uuid')->generate();
+    $staging->write('system.site', $config_data);
+    try {
+      $this->configImporter->reset()->import();
+      $this->assertFalse(FALSE, 'ConfigImporterException not thrown, invalid import was not stopped due to mis-matching site UUID.');
+    }
+    catch (ConfigImporterException $e) {
+      $this->assertEqual($e->getMessage(), 'Site UUID in source storage does not match the target storage.');
     }
   }
 

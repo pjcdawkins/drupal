@@ -352,7 +352,7 @@ function comment_get_recent($number = 10) {
  * @param string $field_name
  *   The field name on the entity to which comments are attached to.
  *
- * @return array|NULL
+ * @return array|null
  *   An array "page=X" if the page number is greater than zero; NULL otherwise.
  */
 function comment_new_page_count($num_comments, $new_replies, EntityInterface $entity, $field_name = 'comment') {
@@ -1153,7 +1153,7 @@ function comment_load($cid, $reset = FALSE) {
  * @param $timestamp
  *   Time to count from (defaults to time of last user access to node).
  *
- * @return int|FALSE
+ * @return int|false
  *   The number of new comments or FALSE if the user is not logged in.
  */
 function comment_num_new($entity_id, $entity_type, $field_name = NULL, $timestamp = 0) {
@@ -1456,9 +1456,6 @@ function template_preprocess_comment(&$variables) {
     $variables['parent'] = '';
   }
 
-  // Preprocess fields.
-  field_attach_preprocess($comment, $variables['elements'], $variables);
-
   // Helpful $content variable for templates.
   foreach (element_children($variables['elements']) as $key) {
     $variables['content'][$key] = $variables['elements'][$key];
@@ -1572,19 +1569,6 @@ function template_preprocess_comment_wrapper(&$variables) {
   // Create separate variables for the comments and comment form.
   $variables['comments'] = $variables['content']['comments'];
   $variables['form'] = $variables['content']['comment_form'];
-}
-
-/**
- * Returns an array of viewing modes for comment listings.
- *
- * We can't use a global variable array because the locale system
- * is not initialized yet when the Comment module is loaded.
- */
-function _comment_get_modes() {
-  return array(
-    COMMENT_MODE_FLAT => t('Flat list'),
-    COMMENT_MODE_THREADED => t('Threaded list')
-  );
 }
 
 /**

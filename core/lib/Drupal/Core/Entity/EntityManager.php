@@ -297,15 +297,13 @@ class EntityManager extends PluginManagerBase implements EntityManagerInterface 
    * {@inheritdoc}
    */
   public function getAdminPath($entity_type, $bundle) {
-    $admin_path = '';
     $entity_info = $this->getDefinition($entity_type);
     // Check for an entity type's admin base path.
-    if ($admin_form = $entity_info->getLinkTemplate('admin-form')) {
-      $route_parameters[$entity_info->getBundleEntityType()] = $bundle;
-      $admin_path = \Drupal::urlGenerator()->getPathFromRoute($admin_form, $route_parameters);
+    if ($entity_info->hasLinkTemplate('admin-form')) {
+      return $entity_info->getLinkTemplate('admin-form');
     }
 
-    return $admin_path;
+    return '';
   }
 
   /**

@@ -64,7 +64,7 @@ class ContentTranslationDeleteForm extends ConfirmFormBase {
    */
   public function getCancelRoute() {
     return array(
-      'route_name' => $this->entity->entityInfo()->getLinkTemplate('drupal:content-translation-overview'),
+      'route_name' => 'content_translation.translation_overview_' . $this->entity->entityType(),
       'route_parameters' => array(
         $this->entity->entityType() => $this->entity->id(),
       ),

@@ -40,7 +40,7 @@ use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/config/media/image-styles/manage/{image_style}"
+ *     "edit-form" = "/admin/config/media/image-styles/manage/{image_style}"
  *   }
  * )
  */

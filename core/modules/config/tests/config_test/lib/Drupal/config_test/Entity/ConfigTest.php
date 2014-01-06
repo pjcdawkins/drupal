@@ -33,7 +33,7 @@ use Drupal\config_test\ConfigTestInterface;
  *     "status" = "status"
  *   },
  *   links = {
- *     "edit-form" = "admin/structure/config_test/manage/{config_test}"
+ *     "edit-form" = "/admin/structure/config_test/manage/{config_test}"
  *   }
  * )
  */

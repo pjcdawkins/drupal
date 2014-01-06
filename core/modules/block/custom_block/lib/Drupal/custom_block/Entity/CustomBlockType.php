@@ -36,7 +36,7 @@ use Drupal\custom_block\CustomBlockTypeInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/structure/block/custom-blocks/manage/{custom_block_type}"
+ *     "edit-form" = "/admin/structure/block/custom-blocks/manage/{custom_block_type}"
  *   }
  * )
  */

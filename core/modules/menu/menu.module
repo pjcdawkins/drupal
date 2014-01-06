@@ -102,7 +102,7 @@ function menu_entity_info(&$entity_info) {
     ->setForm('edit', 'Drupal\menu\MenuFormController')
     ->setForm('delete', 'Drupal\menu\Form\MenuDeleteForm')
     ->setList('Drupal\menu\MenuListController')
-    ->setLinkTemplate('edit-form', 'admin/structure/menu/manage/{menu}');
+    ->setLinkTemplate('edit-form', '/admin/structure/menu/manage/{menu}');
 
   $entity_info['menu_link']
     ->setForm('delete', 'Drupal\menu\Form\MenuLinkDeleteForm')

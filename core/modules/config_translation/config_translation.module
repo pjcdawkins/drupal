@@ -119,10 +119,12 @@ function config_translation_config_translation_info(&$info) {
       continue;
     }
 
+    $edit_routes = $route_provider->getRoutesByPattern($entity_info->getLinkTemplate('edit-form'))->all();
+
     // Use the entity type as the plugin ID.
     $info[$entity_type] = array(
       'class' => '\Drupal\config_translation\ConfigEntityMapper',
-      'base_route_name' => $entity_info->getLinkTemplate('edit-form'),
+      'base_route_name' => key($edit_routes),
       'title' => '!label !entity_type',
       'names' => array(),
       'entity_type' => $entity_type,

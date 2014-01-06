@@ -35,7 +35,7 @@ use Drupal\system\DateFormatInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/config/regional/date-time/formats/manage/{date_format}"
+ *     "edit-form" = "/admin/config/regional/date-time/formats/manage/{date_format}"
  *   }
  * )
  */

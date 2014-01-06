@@ -66,5 +66,5 @@ function action_entity_info(&$entity_info) {
     ->setForm('edit', 'Drupal\action\ActionEditFormController')
     ->setForm('delete', 'Drupal\action\Form\ActionDeleteForm')
     ->setList('Drupal\action\ActionListController')
-    ->setLinkTemplate('edit-form', 'admin/config/system/actions/configure/{action}');
+    ->setLinkTemplate('edit-form', '/admin/config/system/actions/configure/{action}');
 }

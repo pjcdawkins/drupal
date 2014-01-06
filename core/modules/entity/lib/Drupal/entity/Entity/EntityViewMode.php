@@ -48,7 +48,7 @@ use Drupal\entity\EntityViewModeInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/structure/display-modes/view/manage/{view_mode}"
+ *     "edit-form" = "/admin/structure/display-modes/view/manage/{view_mode}"
  *   }
  * )
  */

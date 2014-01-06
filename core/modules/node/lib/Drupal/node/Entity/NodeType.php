@@ -37,7 +37,7 @@ use Drupal\node\NodeTypeInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "edit-form" = "admin/structure/types/manage/{node_type}"
+ *     "edit-form" = "/admin/structure/types/manage/{node_type}"
  *   }
  * )
  */

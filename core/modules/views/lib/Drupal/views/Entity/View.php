@@ -34,7 +34,7 @@ use Drupal\views\ViewExecutable;
  *     "status" = "status"
  *   },
  *   links = {
- *     "edit-form" = "admin/structure/views/view/{view}"
+ *     "edit-form" = "/admin/structure/views/view/{view}"
  *   }
  * )
  */

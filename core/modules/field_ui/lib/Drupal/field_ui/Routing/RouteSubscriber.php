@@ -42,11 +42,7 @@ class RouteSubscriber extends RouteSubscriberBase {
     foreach ($this->manager->getDefinitions() as $entity_type => $entity_info) {
       $defaults = array();
       if ($entity_info->isFieldable() && $entity_info->hasLinkTemplate('admin-form')) {
-        // Try to get the route from the current collection.
-        if (!$entity_route = $collection->get($entity_info->getLinkTemplate('admin-form'))) {
-          continue;
-        }
-        $path = $entity_route->getPath();
+        $path = $entity_info->getLinkTemplate('admin-form');
 
         $route = new Route(
           "$path/fields/{field_instance}",

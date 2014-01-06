@@ -33,7 +33,7 @@ use Drupal\Core\Field\FieldDefinition;
  *     "bundle" = "id"
  *   },
  *   links = {
- *     "admin-form" = "contact.category_edit"
+ *     "admin-form" = "/admin/structure/contact/manage/{contact_category}"
  *   }
  * )
  */

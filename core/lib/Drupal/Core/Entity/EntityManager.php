@@ -300,7 +300,8 @@ class EntityManager extends PluginManagerBase implements EntityManagerInterface 
     $entity_info = $this->getDefinition($entity_type);
     // Check for an entity type's admin base path.
     if ($entity_info->hasLinkTemplate('admin-form')) {
-      return $entity_info->getLinkTemplate('admin-form');
+      $template = $entity_info->getLinkTemplate('admin-form');
+      return str_replace(array('{entity_type}', '{bundle}'), array($entity_type, $bundle), $template);
     }
 
     return '';

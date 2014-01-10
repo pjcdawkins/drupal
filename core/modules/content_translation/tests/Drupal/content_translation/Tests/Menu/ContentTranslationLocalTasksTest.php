@@ -37,9 +37,7 @@ class ContentTranslationLocalTasksTest extends LocalTaskIntegrationTest {
       ->method('getLinkTemplate')
       ->will($this->returnValueMap(array(
         array('canonical', '/node/{node}'),
-        // @todo: this will obviously fail, what is the translation overview
-        // path for nodes?
-        array('drupal:content-translation-overview', '/i/have/no/idea'),
+        array('drupal:content-translation-overview', '/node/{node}/translations'),
       )));
     $content_translation_manager = $this->getMock('Drupal\content_translation\ContentTranslationManagerInterface');
     $content_translation_manager->expects($this->any())

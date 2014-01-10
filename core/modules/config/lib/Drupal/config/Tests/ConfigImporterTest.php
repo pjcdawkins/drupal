@@ -44,7 +44,7 @@ class ConfigImporterTest extends DrupalUnitTestBase {
 
     $this->installSchema('system', 'config_snapshot');
 
-    config_install_default_config('module', 'config_test');
+    $this->installConfig(array('config_test'));
     // Installing config_test's default configuration pollutes the global
     // variable being used for recording hook invocations by this test already,
     // so it has to be cleared out manually.
@@ -62,7 +62,8 @@ class ConfigImporterTest extends DrupalUnitTestBase {
       $this->container->get('entity.manager'),
       $this->container->get('lock'),
       $this->container->get('uuid'),
-      $this->container->get('config.typed')
+      $this->container->get('config.typed'),
+      $this->container->get('module_handler')
     );
     $this->copyConfig($this->container->get('config.storage'), $this->container->get('config.storage.staging'));
   }
@@ -229,6 +230,7 @@ class ConfigImporterTest extends DrupalUnitTestBase {
     $this->configImporter->reset()->import();
 
     // Verify the values were updated.
+    \Drupal::configFactory()->reset($name);
     $config = \Drupal::config($name);
     $this->assertIdentical($config->get('foo'), 'beer');
     $config = \Drupal::config($dynamic_name);

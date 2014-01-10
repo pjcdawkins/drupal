@@ -1214,24 +1214,12 @@ function drupal_http_header_attributes(array $attributes = array()) {
  *     internal to the site, $options['language'] is used to determine whether
  *     the link is "active", or pointing to the current page (the language as
  *     well as the path must match). This element is also used by url().
- *   - 'set_active_class' (default FALSE): Whether l() should compare the $path,
- *     language and query options to the current URL to determine whether the
- *     link is "active". If so, an "active" class will be applied to the link.
- *     It is important to use this sparingly since it is usually unnecessary and
- *     requires extra processing.
- *     For anonymous users, the "active" class will be calculated on the server,
- *     because most sites serve each anonymous user the same cached page anyway.
- *     For authenticated users, the "active" class will be calculated on the
- *     client (through JavaScript), only data- attributes are added to links to
- *     prevent breaking the render cache. The JavaScript is added in
- *     system_page_build().
  *   - Additional $options elements used by the url() function.
  *
  * @return string
  *   An HTML string containing a link to the given path.
  *
  * @see url()
- * @see system_page_build()
  */
 function l($text, $path, array $options = array()) {
   // Start building a structured representation of our link to be altered later.
@@ -1247,7 +1235,6 @@ function l($text, $path, array $options = array()) {
     'query' => array(),
     'html' => FALSE,
     'language' => NULL,
-    'set_active_class' => FALSE,
   );
 
   // Add a hreflang attribute if we know the language of this link's url and
@@ -1256,21 +1243,35 @@ function l($text, $path, array $options = array()) {
     $variables['options']['attributes']['hreflang'] = $variables['options']['language']->id;
   }
 
-  // Set the "active" class if the 'set_active_class' option is not empty.
-  if (!empty($variables['options']['set_active_class'])) {
-    // Add a "data-drupal-link-query" attribute to let the drupal.active-link
-    // library know the query in a standardized manner.
-    if (!empty($variables['options']['query'])) {
-      $query = $variables['options']['query'];
-      ksort($query);
-      $variables['options']['attributes']['data-drupal-link-query'] = Json::encode($query);
-    }
+  // Because l() is called very often we statically cache values that require an
+  // extra function call.
+  static $drupal_static_fast;
+  if (!isset($drupal_static_fast['active'])) {
+    $drupal_static_fast['active'] = &drupal_static(__FUNCTION__);
+  }
+  $active = &$drupal_static_fast['active'];
+  if (!isset($active)) {
+    $active = array(
+      'path' => current_path(),
+      'front_page' => drupal_is_front_page(),
+      'language' => language(Language::TYPE_URL)->id,
+      'query' => \Drupal::service('request')->query->all(),
+    );
+  }
 
-    // Add a "data-drupal-link-system-path" attribute to let the
-    // drupal.active-link library know the path in a standardized manner.
-    if (!isset($variables['options']['attributes']['data-drupal-link-system-path'])) {
-      $variables['options']['attributes']['data-drupal-link-system-path'] = \Drupal::service('path.alias_manager.cached')->getSystemPath($path);
-    }
+  // Determine whether this link is "active', meaning that it links to the
+  // current page. It is important that we stop checking "active" conditions if
+  // we know the link is not active. This helps ensure that l() remains fast.
+  // An active link's path is equal to the current path.
+  $variables['url_is_active'] = ($path == $active['path'] || ($path == '<front>' && $active['front_page']))
+  // The language of an active link is equal to the current language.
+  && (empty($variables['options']['language']) || $variables['options']['language']->id == $active['language'])
+  // The query parameters of an active link are equal to the current parameters.
+  && ($variables['options']['query'] == $active['query']);
+
+  // Add the "active" class if appropriate.
+  if ($variables['url_is_active']) {
+    $variables['options']['attributes']['class'][] = 'active';
   }
 
   // Remove all HTML and PHP tags from a tooltip, calling expensive strip_tags()
@@ -1401,7 +1402,7 @@ function drupal_add_html_head_link($attributes, $header = FALSE) {
 /**
  * Adds a cascading stylesheet to the stylesheet queue.
  *
- * Calling drupal_static_reset('drupal_add_css') will clear all cascading
+ * Calling drupal_static_reset('_drupal_add_css') will clear all cascading
  * stylesheets added so far.
  *
  * If CSS aggregation/compression is enabled, all cascading style sheets added
@@ -1420,7 +1421,7 @@ function drupal_add_html_head_link($attributes, $header = FALSE) {
  * all typical visitors and most pages of a site. It is critical that all
  * preprocessed files are added unconditionally on every page, even if the
  * files do not happen to be needed on a page. This is normally done by calling
- * drupal_add_css() in a hook_page_build() implementation.
+ * _drupal_add_css() in a hook_page_build() implementation.
  *
  * Non-preprocessed files should only be added to the page when they are
  * actually needed.
@@ -1493,9 +1494,9 @@ function drupal_add_html_head_link($attributes, $header = FALSE) {
  *     - Then by the 'every_page' flag, with TRUE coming before FALSE.
  *     - Then by weight.
  *     - Then by the order in which the CSS was added. For example, all else
- *       being the same, a stylesheet added by a call to drupal_add_css() that
+ *       being the same, a stylesheet added by a call to _drupal_add_css() that
  *       happened later in the page request gets added to the page after one for
- *       which drupal_add_css() happened earlier in the page request.
+ *       which _drupal_add_css() happened earlier in the page request.
  *     Available constants are:
  *     - CSS_BASE: Styles for HTML elements ("base" styles).
  *     - CSS_LAYOUT: Styles that layout a page.
@@ -1522,7 +1523,7 @@ function drupal_add_html_head_link($attributes, $header = FALSE) {
  *
  * @see drupal_get_css()
  */
-function drupal_add_css($data = NULL, $options = NULL) {
+function _drupal_add_css($data = NULL, $options = NULL) {
   $css = &drupal_static(__FUNCTION__, array());
 
   // Construct the options, taking the defaults into consideration.
@@ -1612,13 +1613,13 @@ function drupal_add_css($data = NULL, $options = NULL) {
  * @return
  *   A string of XHTML CSS tags.
  *
- * @see drupal_add_css()
+ * @see _drupal_add_css()
  */
 function drupal_get_css($css = NULL, $skip_alter = FALSE) {
   global $theme_info;
 
   if (!isset($css)) {
-    $css = drupal_add_css();
+    $css = _drupal_add_css();
   }
 
   // Allow modules and themes to alter the CSS items.
@@ -1671,12 +1672,12 @@ function drupal_get_css($css = NULL, $skip_alter = FALSE) {
  *
  * @param $a
  *   First item for comparison. The compared items should be associative arrays
- *   of member items from drupal_add_css() or drupal_add_js().
+ *   of member items from _drupal_add_css() or _drupal_add_js().
  * @param $b
  *   Second item for comparison.
  *
- * @see drupal_add_css()
- * @see drupal_add_js()
+ * @see _drupal_add_css()
+ * @see _drupal_add_js()
  */
 function drupal_sort_css_js($a, $b) {
   // First order by group, so that all items in the CSS_AGGREGATE_DEFAULT group
@@ -1758,7 +1759,7 @@ function drupal_sort_css_js($a, $b) {
  *
  * @param $element
  *   A render array containing:
- *   - '#items': The CSS items as returned by drupal_add_css() and altered by
+ *   - '#items': The CSS items as returned by _drupal_add_css() and altered by
  *     drupal_get_css().
  *
  * @return
@@ -1980,17 +1981,17 @@ function drupal_html_id($id) {
  *
  * Examples:
  * @code
- *   drupal_add_js('core/misc/collapse.js');
- *   drupal_add_js('core/misc/collapse.js', 'file');
- *   drupal_add_js('jQuery(document).ready(function () { alert("Hello!"); });', 'inline');
- *   drupal_add_js('jQuery(document).ready(function () { alert("Hello!"); });',
+ *   _drupal_add_js('core/misc/collapse.js');
+ *   _drupal_add_js('core/misc/collapse.js', 'file');
+ *   _drupal_add_js('jQuery(document).ready(function () { alert("Hello!"); });', 'inline');
+ *   _drupal_add_js('jQuery(document).ready(function () { alert("Hello!"); });',
  *     array('type' => 'inline', 'scope' => 'footer', 'weight' => 5)
  *   );
- *   drupal_add_js('http://example.com/example.js', 'external');
- *   drupal_add_js(array('myModule' => array('key' => 'value')), 'setting');
+ *   _drupal_add_js('http://example.com/example.js', 'external');
+ *   _drupal_add_js(array('myModule' => array('key' => 'value')), 'setting');
  * @endcode
  *
- * Calling drupal_static_reset('drupal_add_js') will clear all JavaScript added
+ * Calling drupal_static_reset('_drupal_add_js') will clear all JavaScript added
  * so far.
  *
  * If JavaScript aggregation is enabled, all JavaScript files added with
@@ -2007,7 +2008,7 @@ function drupal_html_id($id) {
  * all typical visitors and most pages of a site. It is critical that all
  * preprocessed files are added unconditionally on every page, even if the
  * files are not needed on a page. This is normally done by calling
- * drupal_add_js() in a hook_page_build() implementation.
+ * _drupal_add_js() in a hook_page_build() implementation.
  *
  * Non-preprocessed files should only be added to the page when they are
  * actually needed.
@@ -2084,9 +2085,9 @@ function drupal_html_id($id) {
  *     - Then by the 'every_page' flag, with TRUE coming before FALSE.
  *     - Then by weight.
  *     - Then by the order in which the JavaScript was added. For example, all
- *       else being the same, JavaScript added by a call to drupal_add_js() that
+ *       else being the same, JavaScript added by a call to _drupal_add_js() that
  *       happened later in the page request gets added to the page after one for
- *       which drupal_add_js() happened earlier in the page request.
+ *       which _drupal_add_js() happened earlier in the page request.
  *   - cache: If set to FALSE, the JavaScript file is loaded anew on every page
  *     call; in other words, it is not cached. Used only when 'type' references
  *     a JavaScript file. Defaults to TRUE.
@@ -2103,13 +2104,13 @@ function drupal_html_id($id) {
  * @return
  *   The current array of JavaScript files, settings, and in-line code,
  *   including Drupal defaults, anything previously added with calls to
- *   drupal_add_js(), and this function call's additions.
+ *   _drupal_add_js(), and this function call's additions.
  *
  * @deprecated as of Drupal 8.0. Use the #attached key in render arrays instead.
  *
  * @see drupal_get_js()
  */
-function drupal_add_js($data = NULL, $options = NULL) {
+function _drupal_add_js($data = NULL, $options = NULL) {
   $javascript = &drupal_static(__FUNCTION__, array());
 
   // Construct the options, taking the defaults into consideration.
@@ -2127,7 +2128,7 @@ function drupal_add_js($data = NULL, $options = NULL) {
   $options['preprocess'] = $options['cache'] && empty($options['attributes']) ? $options['preprocess'] : FALSE;
 
   // Tweak the weight so that files of the same weight are included in the
-  // order of the calls to drupal_add_js().
+  // order of the calls to _drupal_add_js().
   $options['weight'] += count($javascript) / 1000;
   if (isset($data)) {
     switch ($options['type']) {
@@ -2148,7 +2149,6 @@ function drupal_add_js($data = NULL, $options = NULL) {
           // @todo Make this less hacky: http://drupal.org/node/1547376.
           $scriptPath = $GLOBALS['script_path'];
           $pathPrefix = '';
-          $current_query = \Drupal::service('request')->query->all();
           url('', array('script' => &$scriptPath, 'prefix' => &$pathPrefix));
           $current_path = current_path();
           $current_path_is_admin = FALSE;
@@ -2156,20 +2156,13 @@ function drupal_add_js($data = NULL, $options = NULL) {
           if (!(defined('MAINTENANCE_MODE') && MAINTENANCE_MODE === 'update')) {
             $current_path_is_admin = path_is_admin($current_path);
           }
-          $path = array(
+          $javascript['settings']['data'][] = array(
             'basePath' => base_path(),
             'scriptPath' => $scriptPath,
             'pathPrefix' => $pathPrefix,
             'currentPath' => $current_path,
             'currentPathIsAdmin' => $current_path_is_admin,
-            'isFront' => drupal_is_front_page(),
-            'currentLanguage' => \Drupal::languageManager()->getLanguage(Language::TYPE_URL)->id,
           );
-          if (!empty($current_query)) {
-            ksort($current_query);
-            $path['currentQuery'] = (object) $current_query;
-          }
-          $javascript['settings']['data'][] = array('path' => $path);
         }
         // All JavaScript settings are placed in the header of the page with
         // the library weight so that inline scripts appear afterwards.
@@ -2196,7 +2189,7 @@ function drupal_add_js($data = NULL, $options = NULL) {
  *   (optional) The default data parameter for the JavaScript item array.
  *
  * @see drupal_get_js()
- * @see drupal_add_js()
+ * @see _drupal_add_js()
  */
 function drupal_js_defaults($data = NULL) {
   return array(
@@ -2224,7 +2217,7 @@ function drupal_js_defaults($data = NULL) {
  *
  * Note that hook_js_alter(&$javascript) is called during this function call
  * to allow alterations of the JavaScript during its presentation. Calls to
- * drupal_add_js() from hook_js_alter() will not be added to the output
+ * _drupal_add_js() from hook_js_alter() will not be added to the output
  * presentation. The correct way to add JavaScript during hook_js_alter()
  * is to add another element to the $javascript array, deriving from
  * drupal_js_defaults(). See locale_js_alter() for an example of this.
@@ -2246,13 +2239,13 @@ function drupal_js_defaults($data = NULL) {
  * @return
  *   All JavaScript code segments and includes for the scope as HTML tags.
  *
- * @see drupal_add_js()
+ * @see _drupal_add_js()
  * @see locale_js_alter()
  * @see drupal_js_defaults()
  */
 function drupal_get_js($scope = 'header', $javascript = NULL, $skip_alter = FALSE, $is_ajax = FALSE) {
   if (!isset($javascript)) {
-    $javascript = drupal_add_js();
+    $javascript = _drupal_add_js();
   }
   if (empty($javascript)) {
     return '';
@@ -2301,17 +2294,17 @@ function drupal_get_js($scope = 'header', $javascript = NULL, $skip_alter = FALS
       // Skip if no files were added to the page otherwise jQuery.extend() will
       // overwrite the drupalSettings.ajaxPageState.css object with an empty
       // array.
-      $css = drupal_add_css();
+      $css = _drupal_add_css();
       if (!empty($css)) {
         // Cast the array to an object to be on the safe side even if not empty.
         $setting['ajaxPageState']['css'] = (object) array_fill_keys(array_keys($css), 1);
       }
 
-      drupal_add_js($setting, 'setting');
+      _drupal_add_js($setting, 'setting');
 
       // If we're outputting the header scope, then this might be the final time
       // that drupal_get_js() is running, so add the settings to this output as well
-      // as to the drupal_add_js() cache. If $items['settings'] doesn't exist, it's
+      // as to the _drupal_add_js() cache. If $items['settings'] doesn't exist, it's
       // because drupal_get_js() was intentionally passed a $javascript argument
       // stripped of settings, potentially in order to override how settings get
       // output, so in this case, do not add the setting to this output.
@@ -2363,7 +2356,7 @@ function drupal_get_js($scope = 'header', $javascript = NULL, $skip_alter = FALS
  *
  * By following jQuery.extend() merge logic rather than common PHP array merge
  * logic, the following are ensured:
- * - drupal_add_js() is idempotent: calling it twice with the same parameters
+ * - _drupal_add_js() is idempotent: calling it twice with the same parameters
  *   does not change the output sent to the browser.
  * - If pieces of the page are rendered in separate PHP requests and the
  *   returned settings are merged by JavaScript, the resulting settings are the
@@ -2372,7 +2365,7 @@ function drupal_get_js($scope = 'header', $javascript = NULL, $skip_alter = FALS
  * @param $settings_items
  *   An array of settings arrays, as returned by:
  *   @code
- *     $js = drupal_add_js();
+ *     $js = _drupal_add_js();
  *     $settings_items = $js['settings']['data'];
  *   @endcode
  *
@@ -2380,7 +2373,7 @@ function drupal_get_js($scope = 'header', $javascript = NULL, $skip_alter = FALS
  *   A merged $settings array, suitable for JSON encoding and returning to the
  *   browser.
  *
- * @see drupal_add_js()
+ * @see _drupal_add_js()
  * @see drupal_pre_render_scripts()
  */
 function drupal_merge_js_settings($settings_items) {
@@ -2413,7 +2406,7 @@ function drupal_merge_attached(array $a, array $b) {
  *
  * @param $element
  *   A render array containing:
- *   - #items: The JavaScript items as returned by drupal_add_js() and
+ *   - #items: The JavaScript items as returned by _drupal_add_js() and
  *     altered by drupal_get_js().
  *   - #group_callback: A function to call to group #items. Following
  *     this function, #aggregate_callback is called to aggregate items within
@@ -2444,6 +2437,7 @@ function drupal_pre_render_scripts($elements) {
  * to elements using the #attached property. The #attached property is an
  * associative array, where the keys are the the attachment types and the values
  * are the attached data. For example:
+ *
  * @code
  * $build['#attached'] = array(
  *   'library' => array(array('taxonomy', 'taxonomy')),
@@ -2481,8 +2475,8 @@ function drupal_pre_render_scripts($elements) {
  *   dependencies were met.
  *
  * @see drupal_add_library()
- * @see drupal_add_js()
- * @see drupal_add_css()
+ * @see _drupal_add_js()
+ * @see _drupal_add_css()
  * @see drupal_render()
  */
 function drupal_process_attached($elements, $dependency_check = FALSE) {
@@ -2507,7 +2501,7 @@ function drupal_process_attached($elements, $dependency_check = FALSE) {
   unset($elements['#attached']['library']);
 
   // Add both the JavaScript and the CSS.
-  // The parameters for drupal_add_js() and drupal_add_css() require special
+  // The parameters for _drupal_add_js() and _drupal_add_css() require special
   // handling.
   foreach (array('js', 'css') as $type) {
     foreach ($elements['#attached'][$type] as $data => $options) {
@@ -2523,7 +2517,7 @@ function drupal_process_attached($elements, $dependency_check = FALSE) {
         $data = $options['data'];
         unset($options['data']);
       }
-      call_user_func('drupal_add_' . $type, $data, $options);
+      call_user_func('_drupal_add_' . $type, $data, $options);
     }
     unset($elements['#attached'][$type]);
   }
@@ -3247,8 +3241,15 @@ function drupal_cron_run() {
       $end = time() + (isset($info['cron']['time']) ? $info['cron']['time'] : 15);
       $queue = \Drupal::queue($queue_name);
       while (time() < $end && ($item = $queue->claimItem())) {
-        call_user_func_array($callback, array($item->data));
-        $queue->deleteItem($item);
+        try {
+          call_user_func_array($callback, array($item->data));
+          $queue->deleteItem($item);
+        }
+        catch (Exception $e) {
+          // In case of exception log it and leave the item in the queue
+          // to be processed again later.
+          watchdog_exception('cron', $e);
+        }
       }
     }
   }

@@ -66,6 +66,18 @@ const REGIONS_VISIBLE = 'visible';
 const REGIONS_ALL = 'all';
 
 /**
+ * Defines the max length for an email address
+ *
+ * The maximum length of an e-mail address is 254 characters. RFC 3696
+ * specifies a total length of 320 characters, but mentions that
+ * addresses longer than 256 characters are not normally useful. Erratum
+ * 1690 was then released which corrected this value to 254 characters.
+ * @see http://tools.ietf.org/html/rfc3696#section-3
+ * @see http://www.rfc-editor.org/errata_search.php?rfc=3696&eid=1690
+ */
+const EMAIL_MAX_LENGTH = 254;
+
+/**
  * Implements hook_help().
  */
 function system_help($path, $arg) {
@@ -337,8 +349,7 @@ function system_element_info() {
   $types['email'] = array(
     '#input' => TRUE,
     '#size' => 60,
-    // user.module is not loaded in case of early bootstrap errors.
-    '#maxlength' => defined('EMAIL_MAX_LENGTH') ? EMAIL_MAX_LENGTH : 255,
+    '#maxlength' => EMAIL_MAX_LENGTH,
     '#autocomplete_route_name' => FALSE,
     '#process' => array('form_process_autocomplete', 'ajax_process_form', 'form_process_pattern'),
     '#element_validate' => array('form_validate_email'),
@@ -874,19 +885,6 @@ function system_library_info() {
     'version' => \Drupal::VERSION,
     'js' => array(
       array('type' => 'setting', 'data' => array()),
-    ),
-  );
-
-  // Drupal's active link marking.
-  $libraries['drupal.active-link'] = array(
-    'title' => 'Drupal active link marking',
-    'version' => \Drupal::VERSION,
-    'js' => array(
-      'core/misc/active-link.js' => array(),
-    ),
-    'dependencies' => array(
-      array('system', 'drupal'),
-      array('system', 'drupalSettings'),
     ),
   );
 
@@ -2102,7 +2100,6 @@ function system_filetransfer_info() {
  * Implements hook_page_build().
  *
  * @see template_preprocess_maintenance_page()
- * @see \Drupal\system\Controller\SystemController::setLinkActiveClass()
  */
 function system_page_build(&$page) {
   // Ensure the same CSS is loaded in template_preprocess_maintenance_page().
@@ -2120,28 +2117,6 @@ function system_page_build(&$page) {
   if (path_is_admin(current_path())) {
     $page['#attached']['css'][$path . '/css/system.admin.css'] = array(
       'weight' => CSS_COMPONENT - 10,
-    );
-  }
-
-  // Handle setting the "active" class on links by:
-  // - loading the active-link library if the current user is authenticated;
-  // - applying a post-render cache callback if the current user is anonymous.
-  // @see l()
-  // @see \Drupal\Core\Utility\LinkGenerator::generate()
-  // @see theme_links()
-  // @see \Drupal\system\Controller\SystemController::setLinkActiveClass
-  if (\Drupal::currentUser()->isAuthenticated()) {
-    $page['#attached']['library'][] = array('system', 'drupal.active-link');
-  }
-  else {
-    $page['#post_render_cache']['\Drupal\system\Controller\SystemController::setLinkActiveClass'] = array(
-      // Collect the current state that determines whether a link is active.
-      array(
-        'path' => current_path(),
-        'front' => drupal_is_front_page(),
-        'language' => language(\Drupal\Core\Language\Language::TYPE_URL)->id,
-        'query' => \Drupal::service('request')->query->all(),
-      )
     );
   }
 }
@@ -2542,6 +2517,26 @@ function system_region_list($theme_key, $show = REGIONS_ALL) {
   }
 
   return $list;
+}
+
+/**
+ * Array sorting callback; sorts modules by their name.
+ */
+function system_sort_modules_by_info_name($a, $b) {
+  return strcasecmp($a->info['name'], $b->info['name']);
+}
+
+/**
+ * Array sorting callback; sorts modules or themes by their name.
+ */
+function system_sort_themes($a, $b) {
+  if ($a->is_default) {
+    return -1;
+  }
+  if ($b->is_default) {
+    return 1;
+  }
+  return strcasecmp($a->info['name'], $b->info['name']);
 }
 
 /**

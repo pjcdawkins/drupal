@@ -75,25 +75,15 @@ services:
     arguments: ['@config.cachedstorage.storage', '@cache.config']
     tags:
       - { name: persist }
-  config.context.factory:
-    class: Drupal\Core\Config\Context\ConfigContextFactory
-    arguments: ['@event_dispatcher', '@uuid']
-  config.context:
-    class: Drupal\Core\Config\Context\ContextInterface
-    tags:
-      - { name: persist }
-    factory_method: get
-    factory_service: config.context.factory
-  config.context.free:
-    class: Drupal\Core\Config\Context\ContextInterface
-    factory_method: get
-    factory_service: config.context.factory
-    arguments: [Drupal\Core\Config\Context\FreeConfigContext]
   config.factory:
     class: Drupal\Core\Config\ConfigFactory
     tags:
       - { name: persist }
-    arguments: ['@config.storage', '@config.context', '@config.typed']
+      - { name: event_subscriber }
+    arguments: ['@config.storage', '@event_dispatcher', '@config.typed']
+  config.installer:
+    class: Drupal\Core\Config\ConfigInstaller
+    arguments: ['@config.factory', '@config.storage', '@config.typed', '@entity.manager', '@event_dispatcher']
   config.storage.staging:
     class: Drupal\Core\Config\FileStorage
     factory_class: Drupal\Core\Config\FileStorageFactory
@@ -190,7 +180,7 @@ services:
     arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
   theme_handler:
     class: Drupal\Core\Extension\ThemeHandler
-    arguments: ['@config.factory', '@module_handler', '@cache.cache', '@info_parser', '@router.builder']
+    arguments: ['@config.factory', '@module_handler', '@cache.cache', '@info_parser', '@config.installer', '@router.builder']
   entity.manager:
     class: Drupal\Core\Entity\EntityManager
     arguments: ['@container.namespaces', '@service_container', '@module_handler', '@cache.cache', '@language_manager', '@string_translation']
@@ -286,7 +276,7 @@ services:
       - { name: persist }
   link_generator:
     class: Drupal\Core\Utility\LinkGenerator
-    arguments: ['@url_generator', '@module_handler', '@language_manager', '@path.alias_manager.cached']
+    arguments: ['@url_generator', '@module_handler', '@language_manager']
     calls:
       - [setRequest, ['@?request']]
   router.dynamic:
@@ -617,7 +607,7 @@ services:
     arguments: ['@module_handler']
   date:
     class: Drupal\Core\Datetime\Date
-    arguments: ['@entity.manager', '@language_manager', '@string_translation']
+    arguments: ['@entity.manager', '@language_manager', '@string_translation', '@config.factory']
   feed.bridge.reader:
     class: Drupal\Component\Bridge\ZfExtensionManagerSfContainer
     calls:

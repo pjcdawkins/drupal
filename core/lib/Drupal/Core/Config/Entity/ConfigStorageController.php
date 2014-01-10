@@ -7,6 +7,7 @@
 
 namespace Drupal\Core\Config\Entity;
 
+use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityMalformedException;
 use Drupal\Core\Entity\EntityStorageControllerBase;
@@ -14,6 +15,7 @@ use Drupal\Core\Config\Config;
 use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\Component\Uuid\UuidInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -344,9 +346,13 @@ class ConfigStorageController extends EntityStorageControllerBase {
       $id = $entity->getOriginalId();
     }
     $config = $this->configFactory->get($prefix . $id);
-    $is_new = $config->isNew();
 
-    if (!$is_new && !isset($entity->original)) {
+    // Prevent overwriting an existing configuration file if the entity is new.
+    if ($entity->isNew() && !$config->isNew()) {
+      throw new EntityStorageException(String::format('@type entity with ID @id already exists.', array('@type' => $this->entityType, '@id' => $id)));
+    }
+
+    if (!$config->isNew() && !isset($entity->original)) {
       $this->resetCache(array($id));
       $entity->original = $this->load($id);
     }
@@ -356,7 +362,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
       // - Storage controller needs to access the original object.
       // - The object needs to be renamed/copied in ConfigFactory and reloaded.
       // - All instances of the object need to be renamed.
-      $this->configFactory->rename($prefix . $id, $prefix . $entity->id());
+      $config = $this->configFactory->rename($prefix . $id, $prefix . $entity->id());
     }
 
     // Build an ID if none is set.
@@ -372,7 +378,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
       $config->set($key, $value);
     }
 
-    if (!$is_new) {
+    if (!$config->isNew()) {
       $return = SAVED_UPDATED;
       $config->save();
       $entity->postSave($this, TRUE);

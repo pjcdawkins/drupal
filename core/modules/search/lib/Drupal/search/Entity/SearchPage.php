@@ -33,7 +33,7 @@ use Drupal\search\SearchPageInterface;
  *   },
  *   admin_permission = "administer search",
  *   links = {
- *     "edit-form" = "search.edit"
+ *     "edit-form" = "/admin/config/search/settings/manage/{search_page}"
  *   },
  *   config_prefix = "search.page",
  *   entity_keys = {

@@ -384,6 +384,9 @@ class Comment extends ContentEntityBase implements CommentInterface {
       'label' => t('Subject'),
       'description' => t('The comment title or subject.'),
       'type' => 'string_field',
+      'property_constraints' => array(
+        'value' => array('Length' => array('max' => 64)),
+      ),
     );
     $properties['uid'] = array(
       'label' => t('User ID'),
@@ -399,21 +402,37 @@ class Comment extends ContentEntityBase implements CommentInterface {
       'description' => t("The comment author's name."),
       'type' => 'string_field',
       'settings' => array('default_value' => ''),
+      'property_constraints' => array(
+        'value' => array(
+          'Length' => array('max' => 60),
+        ),
+      ),
+      'constraints' => array(
+        'CommentName' => array(),
+      ),
     );
     $properties['mail'] = array(
       'label' => t('e-mail'),
       'description' => t("The comment author's e-mail address."),
-      'type' => 'string_field',
+      'type' => 'email_field',
     );
     $properties['homepage'] = array(
       'label' => t('Homepage'),
       'description' => t("The comment author's home page address."),
-      'type' => 'string_field',
+      'type' => 'uri_field',
+      // URIs are not length limited by RFC 2616, but we can only store 255
+      // characters in our DB schema.
+      'property_constraints' => array(
+        'value' => array('Length' => array('max' => 255)),
+      ),
     );
     $properties['hostname'] = array(
       'label' => t('Hostname'),
       'description' => t("The comment author's hostname."),
       'type' => 'string_field',
+      'property_constraints' => array(
+        'value' => array('Length' => array('max' => 255)),
+      ),
     );
     $properties['created'] = array(
       'label' => t('Created'),
@@ -434,6 +453,9 @@ class Comment extends ContentEntityBase implements CommentInterface {
       'label' => t('Thread place'),
       'description' => t("The alphadecimal representation of the comment's place in a thread, consisting of a base 36 string prefixed by an integer indicating its length."),
       'type' => 'string_field',
+      'property_constraints' => array(
+        'value' => array('Length' => array('max' => 255)),
+      ),
     );
     $properties['entity_type'] = array(
       'label' => t('Entity type'),

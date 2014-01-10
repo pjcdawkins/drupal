@@ -7,20 +7,23 @@
 
 namespace Drupal\comment\Tests;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\system\Tests\Entity\EntityUnitTestBase;
 
 /**
  * Tests comment validation constraints.
  */
-class CommentValidationTest extends DrupalUnitTestBase {
+class CommentValidationTest extends EntityUnitTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('comment', 'node', 'entity', 'field', 'text', 'field_sql_storage', 'user', 'system');
+  public static $modules = array('comment', 'node');
 
+  /**
+   * {@inheritdoc}
+   */
   public static function getInfo() {
     return array(
       'name' => 'Comment Validation',
@@ -29,16 +32,12 @@ class CommentValidationTest extends DrupalUnitTestBase {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function setUp() {
     parent::setUp();
-    $this->installSchema('node', 'node');
-    $this->installSchema('node', 'node_revision');
-    $this->installSchema('node', 'node_field_data');
-    $this->installSchema('node', 'node_field_revision');
-    $this->installSchema('user', 'users');
-    $this->installSchema('user', 'users_roles');
-    $this->installSchema('system', 'sequences');
-    user_install();
+    $this->installSchema('node', array('node', 'node_field_data', 'node_field_revision', 'node_revision'));
   }
 
   /**
@@ -74,7 +73,7 @@ class CommentValidationTest extends DrupalUnitTestBase {
     $comment->set('name', 'test');
     $violations = $comment->validate();
     $this->assertEqual(count($violations), 1, "Violation found on author name collision");
-    $this->assertEqual($violations[0]->getPropertyPath(), "name.0");
+    $this->assertEqual($violations[0]->getPropertyPath(), "name");
     $this->assertEqual($violations[0]->getMessage(), t('The name you used belongs to a registered user.'));
 
     // Make the name valid.

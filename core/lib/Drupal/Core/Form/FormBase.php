@@ -49,6 +49,13 @@ abstract class FormBase extends DependencySerialization implements FormInterface
   protected $configFactory;
 
   /**
+   * The form error handler.
+   *
+   * @var \Drupal\Core\Form\FormErrorInterface
+   */
+  protected $errorHandler;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
@@ -178,7 +185,7 @@ abstract class FormBase extends DependencySerialization implements FormInterface
    *   The current user.
    */
   protected function currentUser() {
-    return $this->getRequest()->attributes->get('_account');
+    return \Drupal::currentUser();
   }
 
   /**
@@ -207,11 +214,45 @@ abstract class FormBase extends DependencySerialization implements FormInterface
   /**
    * Returns the service container.
    *
+   * This method is marked private to prevent sub-classes from retrieving
+   * services from the container through it. Instead,
+   * \Drupal\Core\DependencyInjection\ContainerInjectionInterface should be used
+   * for injecting services.
+   *
    * @return \Symfony\Component\DependencyInjection\ContainerInterface $container
    *   The service container.
    */
-  protected function container() {
+  private function container() {
     return \Drupal::getContainer();
+  }
+
+  /**
+   * Returns the form error handler.
+   *
+   * @return \Drupal\Core\Form\FormErrorInterface
+   *   The form error handler.
+   */
+  protected function errorHandler() {
+    if (!$this->errorHandler) {
+      $this->errorHandler = \Drupal::service('form_builder');
+    }
+    return $this->errorHandler;
+  }
+
+  /**
+   * Files an error against a form element.
+   *
+   * @param string $name
+   *   The name of the form element.
+   * @param array $form_state
+   *   An associative array containing the current state of the form.
+   * @param string $message
+   *   (optional) The error message to present to the user.
+   *
+   * @see \Drupal\Core\Form\FormErrorInterface::setErrorByName()
+   */
+  protected function setFormError($name, array &$form_state, $message = '') {
+    $this->errorHandler()->setErrorByName($name, $form_state, $message);
   }
 
 }

@@ -7,11 +7,10 @@
 
 namespace Drupal\node\Entity;
 
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\node\NodeTypeInterface;
-use Drupal\Core\Entity\Annotation\EntityType;
-use Drupal\Core\Annotation\Translation;
 
 /**
  * Defines the Node type configuration entity.
@@ -176,21 +175,21 @@ class NodeType extends ConfigEntityBase implements NodeTypeInterface {
         node_add_body_field($this, $label);
       }
     }
-    elseif ($this->getOriginalID() != $this->id()) {
+    elseif ($this->getOriginalId() != $this->id()) {
       // Clear the node type cache to reflect the rename.
       \Drupal::cache()->deleteTags(array('node_types' => TRUE));
 
-      $update_count = node_type_update_nodes($this->getOriginalID(), $this->id());
+      $update_count = node_type_update_nodes($this->getOriginalId(), $this->id());
       if ($update_count) {
         drupal_set_message(format_plural($update_count,
           'Changed the content type of 1 post from %old-type to %type.',
           'Changed the content type of @count posts from %old-type to %type.',
           array(
-            '%old-type' => $this->getOriginalID(),
+            '%old-type' => $this->getOriginalId(),
             '%type' => $this->id(),
           )));
       }
-      entity_invoke_bundle_hook('rename', 'node', $this->getOriginalID(), $this->id());
+      entity_invoke_bundle_hook('rename', 'node', $this->getOriginalId(), $this->id());
     }
     else {
       // Invalidate the cache tag of the updated node type only.
@@ -209,6 +208,28 @@ class NodeType extends ConfigEntityBase implements NodeTypeInterface {
     foreach ($entities as $entity) {
       entity_invoke_bundle_hook('delete', 'node', $entity->id());
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function preCreate(EntityStorageControllerInterface $storage_controller, array &$values) {
+    parent::preCreate($storage_controller, $values);
+
+    // Ensure default values are set.
+    if (!isset($values['settings']['node'])) {
+      $values['settings']['node'] = array();
+    }
+    $values['settings']['node'] = NestedArray::mergeDeep(array(
+      'options' => array(
+        'status' => TRUE,
+        'promote' => TRUE,
+        'sticky' => FALSE,
+        'revision' => FALSE,
+      ),
+      'preview' => DRUPAL_OPTIONAL,
+      'submitted' => TRUE,
+    ), $values['settings']['node']);
   }
 
 }

@@ -7,9 +7,9 @@
 
 namespace Drupal\node\Access;
 
-use Drupal\Core\Access\AccessCheckInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\node\NodeInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,7 +18,7 @@ use Symfony\Component\Routing\Route;
 /**
  * Provides an access checker for node revisions.
  */
-class NodeRevisionAccessCheck implements AccessCheckInterface {
+class NodeRevisionAccessCheck implements AccessInterface {
 
   /**
    * The node storage.
@@ -60,13 +60,6 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
     $this->nodeStorage = $entity_manager->getStorageController('node');
     $this->nodeAccess = $entity_manager->getAccessController('node');
     $this->connection = $connection;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function applies(Route $route) {
-    return array_key_exists('_access_node_revision', $route->getRequirements());
   }
 
   /**
@@ -135,8 +128,9 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
 
     if (!isset($this->access[$cid])) {
       // Perform basic permission checks first.
-      if (!user_access($map[$op], $account) && !user_access($type_map[$op], $account) && !user_access('administer nodes', $account)) {
-        return $this->access[$cid] = FALSE;
+      if (!$account->hasPermission($map[$op]) && !$account->hasPermission($type_map[$op]) && !$account->hasPermission('administer nodes')) {
+        $this->access[$cid] = FALSE;
+        return FALSE;
       }
 
       // There should be at least two revisions. If the vid of the given node
@@ -147,7 +141,7 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
       if ($node->isDefaultRevision() && ($this->connection->query('SELECT COUNT(*) FROM {node_field_revision} WHERE nid = :nid AND default_langcode = 1', array(':nid' => $node->id()))->fetchField() == 1 || $op == 'update' || $op == 'delete')) {
         $this->access[$cid] = FALSE;
       }
-      elseif (user_access('administer nodes', $account)) {
+      elseif ($account->hasPermission('administer nodes')) {
         $this->access[$cid] = TRUE;
       }
       else {

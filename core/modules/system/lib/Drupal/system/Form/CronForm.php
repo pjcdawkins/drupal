@@ -8,8 +8,7 @@
 namespace Drupal\system\Form;
 
 use Drupal\Core\Config\ConfigFactory;
-use Drupal\Core\Config\Context\ContextInterface;
-use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
+use Drupal\Core\KeyValueStore\StateInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -22,7 +21,7 @@ class CronForm extends ConfigFormBase {
   /**
    * Stores the state storage service.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface
+   * @var \Drupal\Core\KeyValueStore\StateInterface
    */
   protected $state;
 
@@ -31,13 +30,11 @@ class CronForm extends ConfigFormBase {
    *
    * @param \Drupal\Core\Config\ConfigFactory $config_factory
    *   The factory for configuration objects.
-   * @param \Drupal\Core\Config\Context\ContextInterface $context
-   *   The configuration context used for this configuration object.
-   * @param \Drupal\Core\KeyValueStore\KeyValueStoreInterface $state
-   *   The state key value store.
+   * @param \Drupal\Core\KeyValueStore\StateInterface $state
+   *   The state keyvalue collection to use.
    */
-  public function __construct(ConfigFactory $config_factory, ContextInterface $context, KeyValueStoreInterface $state) {
-    parent::__construct($config_factory, $context);
+  public function __construct(ConfigFactory $config_factory, StateInterface $state) {
+    parent::__construct($config_factory);
     $this->state = $state;
   }
 
@@ -47,7 +44,6 @@ class CronForm extends ConfigFormBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('config.factory'),
-      $container->get('config.context.free'),
       $container->get('state')
     );
   }

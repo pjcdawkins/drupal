@@ -10,8 +10,6 @@ namespace Drupal\filter\Plugin\Filter;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Component\Utility\Xss;
-use Drupal\Core\Annotation\Translation;
-use Drupal\filter\Annotation\Filter;
 use Drupal\filter\Plugin\FilterBase;
 
 /**
@@ -19,7 +17,6 @@ use Drupal\filter\Plugin\FilterBase;
  *
  * @Filter(
  *   id = "filter_caption",
- *   module = "filter",
  *   title = @Translation("Display image captions and align images"),
  *   description = @Translation("Uses data-caption and data-align attributes on &lt;img&gt; tags to caption and align images."),
  *   type = FILTER_TYPE_TRANSFORM_REVERSIBLE
@@ -31,8 +28,6 @@ class FilterCaption extends FilterBase {
    * {@inheritdoc}
    */
   public function process($text, $langcode, $cache, $cache_id) {
-    $search = array();
-    $replace = array();
 
     if (stristr($text, 'data-caption') !== FALSE || stristr($text, 'data-align') !== FALSE) {
       $dom = filter_dom_load($text);

@@ -7,8 +7,8 @@
 
 namespace Drupal\aggregator\Access;
 
-use Drupal\Core\Access\StaticAccessCheckInterface;
 use Drupal\Core\Database\Connection;
+use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Route;
@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Route;
 /**
  * Provides an access check for aggregator categories routes.
  */
-class CategoriesAccessCheck implements StaticAccessCheckInterface {
+class CategoriesAccessCheck implements AccessInterface {
 
   /**
    * The database connection.
@@ -33,13 +33,6 @@ class CategoriesAccessCheck implements StaticAccessCheckInterface {
    */
   public function __construct(Connection $database) {
     $this->database = $database;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function appliesTo() {
-    return array('_access_aggregator_categories');
   }
 
   /**

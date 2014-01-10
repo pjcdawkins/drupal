@@ -7,6 +7,7 @@
 
 namespace Drupal\Tests\Core\Access;
 
+use Drupal\Core\Access\AccessInterface;
 use Drupal\Core\Access\DefaultAccessCheck;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -51,14 +52,6 @@ class DefaultAccessCheckTest extends UnitTestCase {
     $this->accessChecker = new DefaultAccessCheck();
   }
 
-
-  /**
-   * Tests the appliesTo method.
-   */
-  public function testAppliesTo() {
-    $this->assertEquals($this->accessChecker->appliesTo(), array('_access'), 'Access checker returned the expected appliesTo() array.');
-  }
-
   /**
    * Test the access method.
    */
@@ -66,13 +59,13 @@ class DefaultAccessCheckTest extends UnitTestCase {
     $request = new Request(array());
 
     $route = new Route('/test-route', array(), array('_access' => 'NULL'));
-    $this->assertNull($this->accessChecker->access($route, $request, $this->account));
+    $this->assertSame(AccessInterface::DENY, $this->accessChecker->access($route, $request, $this->account));
 
     $route = new Route('/test-route', array(), array('_access' => 'FALSE'));
-    $this->assertFalse($this->accessChecker->access($route, $request, $this->account));
+    $this->assertSame(AccessInterface::KILL, $this->accessChecker->access($route, $request, $this->account));
 
     $route = new Route('/test-route', array(), array('_access' => 'TRUE'));
-    $this->assertTrue($this->accessChecker->access($route, $request, $this->account));
+    $this->assertSame(AccessInterface::ALLOW, $this->accessChecker->access($route, $request, $this->account));
   }
 
 }

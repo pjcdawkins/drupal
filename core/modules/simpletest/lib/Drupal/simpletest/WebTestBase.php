@@ -277,7 +277,7 @@ abstract class WebTestBase extends TestBase {
         $settings['uid'] = $this->loggedInUser->id();
       }
       else {
-        global $user;
+        $user = \Drupal::currentUser() ?: $GLOBALS['user'];
         $settings['uid'] = $user->id();
       }
     }
@@ -645,6 +645,9 @@ abstract class WebTestBase extends TestBase {
     if ($pass) {
       $this->loggedInUser = $account;
       $this->container->set('current_user', $account);
+      // @todo Temporary workaround for not being able to use synchronized
+      //   services in non dumped container.
+      $this->container->get('access_subscriber')->setCurrentUser($account);
     }
   }
 
@@ -714,7 +717,7 @@ abstract class WebTestBase extends TestBase {
    * @see \Drupal\simpletest\WebTestBase::prepareEnvironment()
    */
   protected function setUp() {
-    global $user, $conf;
+    global $conf;
 
     // When running tests through the Simpletest UI (vs. on the command line),
     // Simpletest's batch conflicts with the installer's batch. Batch API does
@@ -841,7 +844,7 @@ abstract class WebTestBase extends TestBase {
     }
 
     // Use the test mail class instead of the default mail handler class.
-    \Drupal::config('system.mail')->set('interface.default', 'Drupal\Core\Mail\VariableLog')->save();
+    \Drupal::config('system.mail')->set('interface.default', 'Drupal\Core\Mail\TestMailCollector')->save();
 
     drupal_set_time_limit($this->timeLimit);
     // Temporary fix so that when running from run-tests.sh we don't get an
@@ -1008,6 +1011,7 @@ abstract class WebTestBase extends TestBase {
     // Clear the tag cache.
     drupal_static_reset('Drupal\Core\Cache\CacheBackendInterface::tagCache');
     \Drupal::service('config.factory')->reset();
+    \Drupal::state()->resetCache();
   }
 
   /**
@@ -1132,14 +1136,30 @@ abstract class WebTestBase extends TestBase {
     if (!empty($this->curlCookies)) {
       $cookies = $this->curlCookies;
     }
-    // In order to debug webtests you need to either set a cookie or have the
-    // xdebug session in the URL. If the developer listens to connection on the
-    // parent site, by default the cookie is not forwarded to the client side,
-    // so you can't debug actual running code. In order to make debuggers work
+    // In order to debug web tests you need to either set a cookie, have the
+    // Xdebug session in the URL or set an environment variable in case of CLI
+    // requests. If the developer listens to connection on the parent site, by
+    // default the cookie is not forwarded to the client side, so you cannot
+    // debug the code running on the child site. In order to make debuggers work
     // this bit of information is forwarded. Make sure that the debugger listens
     // to at least three external connections.
-    if (isset($_COOKIE['XDEBUG_SESSION'])) {
-      $cookies[] = 'XDEBUG_SESSION=' . $_COOKIE['XDEBUG_SESSION'];
+    $request = \Drupal::request();
+    $cookie_params = $request->cookies;
+    if ($cookie_params->has('XDEBUG_SESSION')) {
+      $cookies[] = 'XDEBUG_SESSION=' . $cookie_params->get('XDEBUG_SESSION');
+    }
+    // For CLI requests, the information is stored in $_SERVER.
+    $server = $request->server;
+    if ($server->has('XDEBUG_CONFIG')) {
+      // $_SERVER['XDEBUG_CONFIG'] has the form "key1=value1 key2=value2 ...".
+      $pairs = explode(' ', $server->get('XDEBUG_CONFIG'));
+      foreach ($pairs as $pair) {
+        list($key, $value) = explode('=', $pair);
+        // Account for key-value pairs being separated by multiple spaces.
+        if (trim($key, ' ') == 'idekey') {
+          $cookies[] = 'XDEBUG_SESSION=' . trim($value, ' ');
+        }
+      }
     }
 
     // Merge additional cookies in.
@@ -2260,7 +2280,7 @@ abstract class WebTestBase extends TestBase {
    */
   protected function clickLink($label, $index = 0) {
     $url_before = $this->getUrl();
-    $urls = $this->xpath('//a[normalize-space(text())=:label]', array(':label' => $label));
+    $urls = $this->xpath('//a[normalize-space()=:label]', array(':label' => $label));
 
     if (isset($urls[$index])) {
       $url_target = $this->getAbsoluteUrl($urls[$index]['href']);
@@ -2432,7 +2452,7 @@ abstract class WebTestBase extends TestBase {
    *   An array containing e-mail messages captured during the current test.
    */
   protected function drupalGetMails($filter = array()) {
-    $captured_emails = \Drupal::state()->get('system.test_email_collector') ?: array();
+    $captured_emails = \Drupal::state()->get('system.test_mail_collector') ?: array();
     $filtered_emails = array();
 
     foreach ($captured_emails as $message) {
@@ -3429,7 +3449,7 @@ abstract class WebTestBase extends TestBase {
    *   TRUE on pass, FALSE on fail.
    */
   protected function assertMail($name, $value = '', $message = '', $group = 'E-mail') {
-    $captured_emails = \Drupal::state()->get('system.test_email_collector') ?: array();
+    $captured_emails = \Drupal::state()->get('system.test_mail_collector') ?: array();
     $email = end($captured_emails);
     return $this->assertTrue($email && isset($email[$name]) && $email[$name] == $value, $message, $group);
   }

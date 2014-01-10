@@ -23,7 +23,7 @@ function content_translation_overview(EntityInterface $entity) {
   $languages = language_list();
   $original = $entity->getUntranslated()->language()->id;
   $translations = $entity->getTranslationLanguages();
-  $field_ui = \Drupal::moduleHandler()->moduleExists('field_ui') && user_access('administer ' . $entity->entityType() . ' fields');
+  $administrator = \Drupal::currentUser()->hasPermission('administer languages');
 
   $rel = array();
   foreach (array('canonical', 'edit-form', 'drupal:content-translation-overview') as $name) {
@@ -43,7 +43,7 @@ function content_translation_overview(EntityInterface $entity) {
     // Determine whether the current entity is translatable.
     $translatable = FALSE;
     foreach (field_info_instances($entity->entityType(), $entity->bundle()) as $instance) {
-      if ($instance->isFieldTranslatable()) {
+      if ($instance->isTranslatable()) {
         $translatable = TRUE;
         break;
       }
@@ -122,12 +122,8 @@ function content_translation_overview(EntityInterface $entity) {
             $links['add'] = isset($add_links->links[$langcode]['href']) ? $add_links->links[$langcode] : array('href' => $add_path, 'language' => $language);
             $links['add']['title'] = t('Add');
           }
-          elseif ($field_ui) {
-            $entity_path = $entity_manager->getAdminPath($entity->entityType(), $entity->bundle());
-            // Link directly to the fields tab to make it easier to find the
-            // setting to enable translation on fields.
-            $path = $entity_path . '/fields';
-            $links['nofields'] = array('title' => t('No translatable fields'), 'href' => $path, 'language' => $language);
+          elseif ($administrator) {
+            $links['nofields'] = array('title' => t('No translatable fields'), 'route_name' => 'language.content_settings_page', 'language' => $language);
           }
         }
 
@@ -138,7 +134,7 @@ function content_translation_overview(EntityInterface $entity) {
     }
   }
 
-  drupal_set_title(t('Translations of %label', array('%label' => $entity->label())), PASS_THROUGH);
+  $build['#title'] = t('Translations of %label', array('%label' => $entity->label()));
 
   // Add metadata to the build render array to let other modules know about
   // which entity this is.
@@ -195,13 +191,11 @@ function content_translation_add_page(EntityInterface $entity, Language $source 
   $target = !empty($target) ? $target : language(Language::TYPE_CONTENT);
   // @todo Exploit the upcoming hook_entity_prepare() when available.
   content_translation_prepare_translation($entity, $source, $target);
-  $info = $entity->entityInfo();
-  $operation = isset($info['default_operation']) ? $info['default_operation'] : 'default';
   $form_state['langcode'] = $target->id;
   $form_state['content_translation']['source'] = $source;
   $form_state['content_translation']['target'] = $target;
   $form_state['content_translation']['translation_form'] = !$entity->access('update');
-  return \Drupal::entityManager()->getForm($entity, $operation, $form_state);
+  return \Drupal::entityManager()->getForm($entity, 'default', $form_state);
 }
 
 /**
@@ -220,11 +214,9 @@ function content_translation_add_page(EntityInterface $entity, Language $source 
  */
 function content_translation_edit_page(EntityInterface $entity, Language $language = NULL) {
   $language = !empty($language) ? $language : language(Language::TYPE_CONTENT);
-  $info = $entity->entityInfo();
-  $operation = isset($info['default_operation']) ? $info['default_operation'] : 'default';
   $form_state['langcode'] = $language->id;
   $form_state['content_translation']['translation_form'] = TRUE;
-  return \Drupal::entityManager()->getForm($entity, $operation, $form_state);
+  return \Drupal::entityManager()->getForm($entity, 'default', $form_state);
 }
 
 /**
@@ -242,46 +234,4 @@ function content_translation_prepare_translation(EntityInterface $entity, Langua
     $source_translation = $entity->getTranslation($source->id);
     $entity->addTranslation($target->id, $source_translation->getPropertyValues());
   }
-}
-
-/**
- * Form constructor for the translation deletion confirmation.
- *
- * @deprecated Use \Drupal\content_translation\Form\ContentTranslationForm::deleteTranslation()
- */
-function content_translation_delete_confirm(array $form, array $form_state, EntityInterface $entity, Language $language) {
-  $controller = content_translation_controller($entity->entityType());
-  $uri = $entity->uri('drupal:content-translation-overview');
-
-  return confirm_form(
-    $form,
-    t('Are you sure you want to delete the @language translation of %label?', array('@language' => $language->name, '%label' => $entity->label())),
-    $uri['path'],
-    t('This action cannot be undone.'),
-    t('Delete'),
-    t('Cancel')
-  );
-}
-
-/**
- * Form submission handler for content_translation_delete_confirm().
- */
-function content_translation_delete_confirm_submit(array $form, array &$form_state) {
-  list($entity, $language) = $form_state['build_info']['args'];
-  $controller = content_translation_controller($entity->entityType());
-
-  // Remove the translated values.
-  $entity->removeTranslation($language->id);
-  $entity->save();
-
-  // Remove any existing path alias for the removed translation.
-  // @todo This should be taken care of by the Path module.
-  if (\Drupal::moduleHandler()->moduleExists('path')) {
-    $uri = $entity->uri();
-    $conditions = array('source' => $uri['path'], 'langcode' => $language->id);
-    \Drupal::service('path.crud')->delete($conditions);
-  }
-
-  $uri = $entity->uri('drupal:content-translation-overview');
-  $form_state['redirect'] = $uri['path'];
 }

@@ -5,7 +5,7 @@
  * Contains \Drupal\Tests\Core\Entity\Controller\EntityViewControllerTest.
  */
 
-namespace Drupal\Core\Tests\Entity\Controller;
+namespace Drupal\Tests\Core\Entity\Controller;
 
 use Drupal\Core\Entity\Controller\EntityViewController;
 use Drupal\Tests\UnitTestCase;
@@ -19,8 +19,8 @@ class EntityViewControllerTest extends UnitTestCase{
 
   public static function getInfo() {
     return array(
-      'name' => 'Entity route enhancer test',
-      'description' => 'Tests the entity route enhancer.',
+      'name' => 'Entity view controller test',
+      'description' => 'Tests the entity view controller.',
       'group' => 'Entity'
     );
   }

@@ -25,20 +25,18 @@ class ContentTranslationController implements ContentTranslationControllerInterf
   /**
    * The entity info of the entity being translated.
    *
-   * @var array
+   * @var \Drupal\Core\Entity\EntityTypeInterface
    */
   protected $entityInfo;
 
   /**
    * Initializes an instance of the content translation controller.
    *
-   * @param string $entity_type
-   *   The type of the entity being translated.
-   * @param array $entity_info
+   * @param \Drupal\Core\Entity\EntityTypeInterface $entity_info
    *   The info array of the given entity type.
    */
-  public function __construct($entity_type, $entity_info) {
-    $this->entityType = $entity_type;
+  public function __construct($entity_info) {
+    $this->entityType = $entity_info->id();
     $this->entityInfo = $entity_info;
   }
 
@@ -63,8 +61,8 @@ class ContentTranslationController implements ContentTranslationControllerInterf
     $translate_permission = TRUE;
     // If no permission granularity is defined this entity type does not need an
     // explicit translate permission.
-    if (!user_access('translate any entity') && !empty($info['permission_granularity'])) {
-      $translate_permission = user_access($info['permission_granularity'] == 'bundle' ? "translate {$entity->bundle()} {$entity->entityType()}" : "translate {$entity->entityType()}");
+    if (!user_access('translate any entity') && $permission_granularity = $info->getPermissionGranularity()) {
+      $translate_permission = user_access($permission_granularity == 'bundle' ? "translate {$entity->bundle()} {$entity->entityType()}" : "translate {$entity->entityType()}");
     }
     return $translate_permission && user_access("$op content translations");
   }
@@ -104,7 +102,7 @@ class ContentTranslationController implements ContentTranslationControllerInterf
         $t_args = array('%language' => $languages[$form_langcode]->name, '%title' => $entity->label());
         $title = empty($source_langcode) ? $title . ' [' . t('%language translation', $t_args) . ']' : t('Create %language translation of %title', $t_args);
       }
-      drupal_set_title($title, PASS_THROUGH);
+      $form['#title'] = $title;
     }
 
     // Display source language selector only if we are creating a new
@@ -234,7 +232,14 @@ class ContentTranslationController implements ContentTranslationControllerInterf
         );
       }
 
-      $name = $new_translation ? $GLOBALS['user']->getUsername() : user_load($entity->translation[$form_langcode]['uid'])->getUsername();
+      // Default to the anonymous user.
+      $name = '';
+      if ($new_translation) {
+        $name = \Drupal::currentUser()->getUsername();
+      }
+      elseif ($entity->translation[$form_langcode]['uid']) {
+        $name = user_load($entity->translation[$form_langcode]['uid'])->getUsername();
+      }
       $form['content_translation']['name'] = array(
         '#type' => 'textfield',
         '#title' => t('Authored by'),
@@ -407,11 +412,11 @@ class ContentTranslationController implements ContentTranslationControllerInterf
       $translation = $form_state['values']['content_translation'];
       // Validate the "authored by" field.
       if (!empty($translation['name']) && !($account = user_load_by_name($translation['name']))) {
-        form_set_error('content_translation][name', t('The translation authoring username %name does not exist.', array('%name' => $translation['name'])));
+        form_set_error('content_translation][name', $form_state, t('The translation authoring username %name does not exist.', array('%name' => $translation['name'])));
       }
       // Validate the "authored on" field.
       if (!empty($translation['created']) && strtotime($translation['created']) === FALSE) {
-        form_set_error('content_translation][created', t('You have to specify a valid translation authoring date.'));
+        form_set_error('content_translation][created', $form_state, t('You have to specify a valid translation authoring date.'));
       }
     }
   }

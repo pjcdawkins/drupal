@@ -51,8 +51,7 @@ function hook_hook_info() {
  *
  * Modules may specify whether or not the routing paths they define are
  * to be considered administrative. Other modules may use this information to
- * display those pages differently (e.g. in a modal overlay, or in a different
- * theme).
+ * display those pages differently.
  *
  * To change the administrative status of menu items defined in another module's
  * routing paths, modules should implement hook_admin_paths_alter().
@@ -271,7 +270,7 @@ function hook_element_info_alter(&$type) {
  * @param $javascript
  *   An array of all JavaScript being presented on the page.
  *
- * @see drupal_add_js()
+ * @see _drupal_add_js()
  * @see drupal_get_js()
  * @see drupal_js_defaults()
  */
@@ -294,11 +293,11 @@ function hook_js_alter(&$javascript) {
  *   version_compare() to compare different versions.
  * - 'js': An array of JavaScript elements; each element's key is used as $data
  *   argument, each element's value is used as $options array for
- *   drupal_add_js(). To add library-specific (not module-specific) JavaScript
+ *   _drupal_add_js(). To add library-specific (not module-specific) JavaScript
  *   settings, the key may be skipped, the value must specify
  *   'type' => 'setting', and the actual settings must be contained in a 'data'
  *   element of the value.
- * - 'css': Like 'js', an array of CSS elements passed to drupal_add_css().
+ * - 'css': Like 'js', an array of CSS elements passed to _drupal_add_css().
  * - 'dependencies': An array of libraries that are required for a library. Each
  *   element is an array listing the module and name of another library. Note
  *   that all dependencies for each dependent library will also be added when
@@ -391,7 +390,7 @@ function hook_library_info_alter(&$libraries, $module) {
  * @param $css
  *   An array of all CSS items (files and inline CSS) being requested on the page.
  *
- * @see drupal_add_css()
+ * @see _drupal_add_css()
  * @see drupal_get_css()
  */
 function hook_css_alter(&$css) {
@@ -669,7 +668,7 @@ function hook_menu_local_actions_alter(&$local_actions) {
  * @see \Drupal\Core\Menu\LocalTaskInterface
  * @see \Drupal\Core\Menu\LocalTaskManager
  */
-function hook_local_task_alter(&$local_tasks) {
+function hook_local_tasks_alter(&$local_tasks) {
   // Remove a specified local task plugin.
   unset($local_tasks['example_plugin_id']);
 }
@@ -1362,7 +1361,7 @@ function hook_theme($existing, $type, $theme, $path) {
  *
  * The $theme_registry array is keyed by theme hook name, and contains the
  * information returned from hook_theme(), as well as additional properties
- * added by _theme_process_registry().
+ * added by \Drupal\Core\Theme\Registry::processExtension().
  *
  * For example:
  * @code
@@ -1385,7 +1384,7 @@ function hook_theme($existing, $type, $theme, $path) {
  *   The entire cache of theme registry information, post-processing.
  *
  * @see hook_theme()
- * @see _theme_process_registry()
+ * @see \Drupal\Core\Theme\Registry::processExtension()
  */
 function hook_theme_registry_alter(&$theme_registry) {
   // Kill the next/previous forum topic navigation links.
@@ -1423,36 +1422,6 @@ function hook_theme_registry_alter(&$theme_registry) {
  */
 function hook_template_preprocess_default_variables_alter(&$variables) {
   $variables['is_admin'] = user_access('access administration pages');
-}
-
-/**
- * Return the machine-readable name of the theme to use for the current page.
- *
- * This hook can be used to dynamically set the theme for the current page
- * request. It should be used by modules which need to override the theme
- * based on dynamic conditions (for example, a module which allows the theme to
- * be set based on the current user's role). The return value of this hook will
- * be used on all pages except those which have a valid per-page or per-section
- * theme set via a theme callback function in hook_menu(); the themes on those
- * pages can only be overridden using hook_menu_alter().
- *
- * Note that returning different themes for the same path may not work with page
- * caching. This is most likely to be a problem if an anonymous user on a given
- * path could have different themes returned under different conditions.
- *
- * Since only one theme can be used at a time, the last (i.e., highest
- * weighted) module which returns a valid theme name from this hook will
- * prevail.
- *
- * @return
- *   The machine-readable name of the theme that should be used for the current
- *   page request. The value returned from this function will only have an
- *   effect if it corresponds to a currently-active theme on the site. Do not
- *   return a value if you do not wish to set a custom theme.
- */
-function hook_custom_theme() {
-  // Allow the user to request a particular theme via a query parameter.
-  return \Drupal::request()->query->get('theme');
 }
 
 /**
@@ -1852,7 +1821,7 @@ function hook_file_download($uri) {
  *   shipped file.
  */
 function hook_file_url_alter(&$uri) {
-  global $user;
+  $user = \Drupal::currentUser();
 
   // User 1 will always see the local file in this example.
   if ($user->id() == 1) {
@@ -2603,7 +2572,7 @@ function hook_install_tasks(&$install_state) {
  *
  * Elements available to be altered are only those added using
  * drupal_add_html_head_link() or drupal_add_html_head(). CSS and JS files
- * are handled using drupal_add_css() and drupal_add_js(), so the head links
+ * are handled using _drupal_add_css() and _drupal_add_js(), so the head links
  * for those files will not appear in the $head_elements array.
  *
  * @param $head_elements
@@ -2719,8 +2688,7 @@ function hook_url_outbound_alter(&$path, &$options, $original_path) {
 
   // Instead of pointing to user/[uid]/edit, point to user/me/edit.
   if (preg_match('|^user/([0-9]*)/edit(/.*)?|', $path, $matches)) {
-    global $user;
-    if ($user->id() == $matches[1]) {
+    if (\Drupal::currentUser()->id() == $matches[1]) {
       $path = 'user/me/edit' . $matches[2];
     }
   }
@@ -2986,16 +2954,6 @@ function hook_token_info_alter(&$data) {
  * @ingroup batch
  */
 function hook_batch_alter(&$batch) {
-  // If the current page request is inside the overlay, add ?render=overlay to
-  // the success callback URL, so that it appears correctly within the overlay.
-  if (overlay_get_mode() == 'child') {
-    if (isset($batch['url_options']['query'])) {
-      $batch['url_options']['query']['render'] = 'overlay';
-    }
-    else {
-      $batch['url_options']['query'] = array('render' => 'overlay');
-    }
-  }
 }
 
 /**
@@ -3324,8 +3282,7 @@ function hook_link_alter(&$variables) {
  * identified when you are looking at the Drupal source code by having
  * "@ Annotation" in their documentation blocks (without the space after @). To
  * find examples of annotation for a particular annotation class, such as
- * EntityType, look for class files that contain a PHP "use" declaration of the
- * annotation class, or files that have an @ annotation section using the
+ * EntityType, look for class files that have an @ annotation section using the
  * annotation class.
  * @}
  */

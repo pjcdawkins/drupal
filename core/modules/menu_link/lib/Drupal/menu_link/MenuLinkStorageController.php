@@ -12,6 +12,7 @@ use Drupal\Core\Entity\DatabaseStorageController;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Database\Connection;
+use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\field\FieldInfo;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Cmf\Component\Routing\RouteProviderInterface;
@@ -48,10 +49,8 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
   /**
    * Overrides DatabaseStorageController::__construct().
    *
-   * @param string $entity_type
-   *   The entity type for which the instance is created.
-   * @param array $entity_info
-   *   An array of entity info for the entity type.
+   * @param \Drupal\Core\Entity\EntityTypeInterface $entity_info
+   *   The entity info for the entity type.
    * @param \Drupal\Core\Database\Connection $database
    *   The database connection to be used.
    * @param \Drupal\Component\Uuid\UuidInterface $uuid_service
@@ -59,8 +58,8 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
    * @param \Symfony\Cmf\Component\Routing\RouteProviderInterface $route_provider
    *   The route provider service.
    */
-  public function __construct($entity_type, array $entity_info, Connection $database, UuidInterface $uuid_service, RouteProviderInterface $route_provider) {
-    parent::__construct($entity_type, $entity_info, $database, $uuid_service);
+  public function __construct(EntityTypeInterface $entity_info, Connection $database, UuidInterface $uuid_service, RouteProviderInterface $route_provider) {
+    parent::__construct($entity_info, $database, $uuid_service);
 
     $this->routeProvider = $route_provider;
 
@@ -84,9 +83,8 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
   /**
    * {@inheritdoc}
    */
-  public static function createInstance(ContainerInterface $container, $entity_type, array $entity_info) {
+  public static function createInstance(ContainerInterface $container, EntityTypeInterface $entity_info) {
     return new static(
-      $entity_type,
       $entity_info,
       $container->get('database'),
       $container->get('uuid'),
@@ -106,50 +104,9 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
   }
 
   /**
-   * Overrides DatabaseStorageController::attachLoad().
-   *
-   * @todo Don't call parent::attachLoad() at all because we want to be able to
-   * control the entity load hooks.
-   */
-  protected function attachLoad(&$menu_links, $load_revision = FALSE) {
-    $routes = array();
-
-    foreach ($menu_links as &$menu_link) {
-      $menu_link->options = unserialize($menu_link->options);
-      $menu_link->route_parameters = unserialize($menu_link->route_parameters);
-
-      // Use the weight property from the menu link.
-      $menu_link->router_item['weight'] = $menu_link->weight;
-
-      // By default use the menu_name as type.
-      $menu_link->bundle = $menu_link->menu_name;
-
-      // For all links that have an associated route, load the route object now
-      // and save it on the object. That way we avoid a select N+1 problem later.
-      if ($menu_link->route_name) {
-        $routes[$menu_link->id()] = $menu_link->route_name;
-      }
-    }
-
-    // Now mass-load any routes needed and associate them.
-    if ($routes) {
-      $route_objects = $this->routeProvider->getRoutesByNames($routes);
-      foreach ($routes as $entity_id => $route) {
-        // Not all stored routes will be valid on load.
-        if (isset($route_objects[$route])) {
-          $menu_links[$entity_id]->setRouteObject($route_objects[$route]);
-        }
-      }
-    }
-
-    parent::attachLoad($menu_links, $load_revision);
-  }
-
-  /**
    * Overrides DatabaseStorageController::save().
    */
   public function save(EntityInterface $entity) {
-    $entity_class = $this->entityInfo['class'];
 
     // We return SAVED_UPDATED by default because the logic below might not
     // update the entity if its values haven't changed, so returning FALSE
@@ -164,7 +121,7 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
       }
 
       if ($entity->isNew()) {
-        $entity->mlid = $this->database->insert($this->entityInfo['base_table'])->fields(array('menu_name' => 'tools'))->execute();
+        $entity->mlid = $this->database->insert($this->entityInfo->getBaseTable())->fields(array('menu_name' => 'tools'))->execute();
         $entity->enforceIsNew();
       }
 
@@ -180,7 +137,7 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
       // $entity may have additional keys left over from building a router entry.
       // The intersect removes the extra keys, allowing a meaningful comparison.
       if ($entity->isNew() || (array_intersect_key(get_object_vars($entity), get_object_vars($entity->original)) != get_object_vars($entity->original))) {
-        $return = drupal_write_record($this->entityInfo['base_table'], $entity, $this->idKey);
+        $return = drupal_write_record($this->entityInfo->getBaseTable(), $entity, $this->idKey);
 
         if ($return) {
           if (!$entity->isNew()) {
@@ -242,11 +199,11 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
       );
     $query_result = $query->execute();
 
-    if (!empty($this->entityInfo['class'])) {
+    if ($class = $this->entityInfo->getClass()) {
       // We provide the necessary arguments for PDO to create objects of the
       // specified entity class.
       // @see \Drupal\Core\Entity\EntityInterface::__construct()
-      $query_result->setFetchMode(\PDO::FETCH_CLASS, $this->entityInfo['class'], array(array(), $this->entityType));
+      $query_result->setFetchMode(\PDO::FETCH_CLASS, $class, array(array(), $this->entityType));
     }
 
     return $query_result->fetchAllAssoc($this->idKey);
@@ -322,7 +279,7 @@ class MenuLinkStorageController extends DatabaseStorageController implements Men
    * {@inheritdoc}
    */
   public function moveChildren(EntityInterface $entity) {
-    $query = $this->database->update($this->entityInfo['base_table']);
+    $query = $this->database->update($this->entityInfo->getBaseTable());
 
     $query->fields(array('menu_name' => $entity->menu_name));
 

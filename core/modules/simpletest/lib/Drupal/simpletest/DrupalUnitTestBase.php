@@ -13,6 +13,7 @@ use Drupal\Core\KeyValueStore\KeyValueMemoryFactory;
 use Symfony\Component\DependencyInjection\Reference;
 use Drupal\Core\Database\Database;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Base test case class for Drupal unit tests.
@@ -101,6 +102,13 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
     $this->kernel = new DrupalKernel('unit_testing', drupal_classloader(), FALSE);
     $this->kernel->boot();
 
+    // Create a minimal system.module configuration object so that the list of
+    // enabled modules can be maintained allowing
+    // \Drupal\Core\Config\ConfigInstaller::installDefaultConfig() to work.
+    // Write directly to active storage to avoid early instantiation of
+    // the event dispatcher which can prevent modules from registering events.
+    \Drupal::service('config.storage')->write('system.module', array('enabled' => array()));
+
     // Collect and set a fixed module list.
     $class = get_class($this);
     $modules = array();
@@ -174,10 +182,8 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
         ->addArgument(new Reference('service_container'))
         ->addArgument(new Reference('settings'));
 
-      $container->register('state', 'Drupal\Core\KeyValueStore\KeyValueStoreInterface')
-        ->setFactoryService(new Reference('keyvalue'))
-        ->setFactoryMethod('get')
-        ->addArgument('state');
+      $container->register('state', 'Drupal\Core\KeyValueStore\State')
+        ->addArgument(new Reference('keyvalue'));
     }
 
     if ($container->hasDefinition('path_processor_alias')) {
@@ -189,6 +195,12 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
       $definition->clearTag('path_processor_inbound')->clearTag('path_processor_outbound');
     }
 
+    if ($container->hasDefinition('password')) {
+      $container->getDefinition('password')->setArguments(array(1));
+    }
+
+    $request = Request::create('/');
+    $this->container->set('request', $request);
   }
 
   /**
@@ -204,7 +216,7 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
           '@module' => $module,
         )));
       }
-      config_install_default_config('module', $module);
+      \Drupal::service('config.installer')->installDefaultConfig('module', $module);
     }
     $this->pass(format_string('Installed default config: %modules.', array(
       '%modules' => implode(', ', $modules),
@@ -263,9 +275,16 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
     // Set the list of modules in the extension handler.
     $module_handler = $this->container->get('module_handler');
     $module_filenames = $module_handler->getModuleList();
+    // Write directly to active storage to avoid early instantiation of
+    // the event dispatcher which can prevent modules from registering events.
+    $active_storage =  \Drupal::service('config.storage');
+    $system_config = $active_storage->read('system.module');
     foreach ($modules as $module) {
       $module_filenames[$module] = drupal_get_filename('module', $module);
+      // Maintain the list of enabled modules in configuration.
+      $system_config['enabled'][$module] = 0;
     }
+    $active_storage->write('system.module', $system_config);
     $module_handler->setModuleList($module_filenames);
     $module_handler->resetImplementations();
     // Update the kernel to make their services available.
@@ -294,9 +313,12 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
     // Unset the list of modules in the extension handler.
     $module_handler = $this->container->get('module_handler');
     $module_filenames = $module_handler->getModuleList();
+    $system_config = $this->container->get('config.factory')->get('system.module');
     foreach ($modules as $module) {
       unset($module_filenames[$module]);
+      $system_config->clear('enabled.' . $module);
     }
+    $system_config->save();
     $module_handler->setModuleList($module_filenames);
     $module_handler->resetImplementations();
     // Update the kernel to remove their services.

@@ -2,7 +2,8 @@
  * @file
  * A Backbone View that provides an entity level toolbar.
  */
-(function ($, Backbone, Drupal, debounce) {
+
+(function ($, _, Backbone, Drupal, debounce) {
 
 "use strict";
 
@@ -12,9 +13,9 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
 
   events: function () {
     var map = {
-      'click.edit button.action-save': 'onClickSave',
-      'click.edit button.action-cancel': 'onClickCancel',
-      'mouseenter.edit': 'onMouseenter'
+      'click button.action-save': 'onClickSave',
+      'click button.action-cancel': 'onClickCancel',
+      'mouseenter': 'onMouseenter'
     };
     return map;
   },
@@ -28,11 +29,11 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
     this.$entity = $(this.model.get('el'));
 
     // Rerender whenever the entity state changes.
-    this.model.on('change:isActive change:isDirty change:state', this.render, this);
+    this.listenTo(this.model, 'change:isActive change:isDirty change:state', this.render);
     // Also rerender whenever a different field is highlighted or activated.
-    this.appModel.on('change:highlightedField change:activeField', this.render, this);
+    this.listenTo(this.appModel, 'change:highlightedField change:activeField', this.render);
     // Rerender when a field of the entity changes state.
-    this.model.get('fields').on('change:state', this.fieldStateChange, this);
+    this.listenTo(this.model.get('fields'), 'change:state', this.fieldStateChange);
 
     // Reposition the entity toolbar as the viewport and the position within the
     // viewport changes.
@@ -116,7 +117,13 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
    * {@inheritdoc}
    */
   remove: function () {
+    // Remove additional DOM elements controlled by this View.
     this.$fence.remove();
+
+    // Stop listening to additional events.
+    $(window).off('resize.edit scroll.edit');
+    $(document).off('drupalViewportOffsetChange.edit');
+
     Backbone.View.prototype.remove.call(this);
   },
 
@@ -224,13 +231,35 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
      *     element that the 'my' element will be positioned against. Also known
      *     as the 'of' element.
      */
-    function refinePosition (suggested, info) {
+    function refinePosition (view, suggested, info) {
+      // Determine if the pointer should be on the top or bottom.
+      var isBelow = suggested.top > info.target.top;
+      info.element.element.toggleClass('edit-toolbar-pointer-top', isBelow);
+      // Don't position the toolbar past the first or last editable field if
+      // the entity is the target.
+      if (view.$entity[0] === info.target.element[0]) {
+        // Get the first or last field according to whether the toolbar is above
+        // or below the entity.
+        var $field = view.$entity.find('.edit-editable').eq((isBelow) ? -1 : 0);
+        if ($field.length > 0) {
+          suggested.top = (isBelow) ? ($field.offset().top + $field.outerHeight(true)) : $field.offset().top - info.element.element.outerHeight(true);
+        }
+      }
+      // Don't let the toolbar go outside the fence.
+      var fenceTop = view.$fence.offset().top;
+      var fenceHeight = view.$fence.height();
+      var toolbarHeight = info.element.element.outerHeight(true);
+      if (suggested.top < fenceTop) {
+        suggested.top = fenceTop;
+      }
+      else if ((suggested.top + toolbarHeight) > (fenceTop + fenceHeight)) {
+        suggested.top = fenceTop + fenceHeight - toolbarHeight;
+      }
+      // Position the toolbar.
       info.element.element.css({
         left: Math.floor(suggested.left),
         top: Math.floor(suggested.top)
       });
-      // Determine if the pointer should be on the top or bottom.
-      info.element.element.toggleClass('edit-toolbar-pointer-top', info.element.top > info.target.top);
     }
 
     /**
@@ -246,7 +275,7 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
           at: edge + '+' + (1 + horizontalPadding) + ' top',
           of: of,
           collision: 'flipfit',
-          using: refinePosition,
+          using: refinePosition.bind(null, that),
           within: that.$fence
         })
         // Resize the toolbar to match the dimensions of the field, up to a
@@ -439,6 +468,7 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
   show: function (toolgroup) {
     this.$el.removeClass('edit-animate-invisible');
   }
+
 });
 
-})(jQuery, Backbone, Drupal, Drupal.debounce);
+})(jQuery, _, Backbone, Drupal, Drupal.debounce);

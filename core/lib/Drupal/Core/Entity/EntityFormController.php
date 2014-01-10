@@ -7,12 +7,9 @@
 
 namespace Drupal\Core\Entity;
 
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Form\FormBase;
-use Drupal\Core\TypedData\TranslatableInterface;
-use Drupal\entity\EntityFormDisplayInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Language\Language;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Base class for entity form controllers.
@@ -125,15 +122,6 @@ class EntityFormController extends FormBase implements EntityFormControllerInter
     $this->prepareEntity();
 
     $form_display = entity_get_render_form_display($this->entity, $this->getOperation());
-
-    // Let modules alter the form display.
-    $form_display_context = array(
-      'entity_type' => $this->entity->entityType(),
-      'bundle' => $this->entity->bundle(),
-      'form_mode' => $this->getOperation(),
-    );
-    $this->moduleHandler->alter('entity_form_display', $form_display, $form_display_context);
-
     $this->setFormDisplay($form_display, $form_state);
 
     // Invoke the prepare form hooks.
@@ -150,8 +138,7 @@ class EntityFormController extends FormBase implements EntityFormControllerInter
     $entity = $this->entity;
     // @todo Exploit the Field API to generate the default widgets for the
     // entity properties.
-    $info = $entity->entityInfo();
-    if (!empty($info['fieldable'])) {
+    if ($entity->entityInfo()->isFieldable()) {
       field_attach_form($entity, $form, $form_state, $this->getFormLangcode($form_state));
     }
 
@@ -176,6 +163,10 @@ class EntityFormController extends FormBase implements EntityFormControllerInter
    * @see \Drupal\Core\Entity\EntityFormController::form()
    */
   public function processForm($element, $form_state, $form) {
+    // If the form is cached, process callbacks may not have a valid reference
+    // to the entity object, hence we must restore it.
+    $this->entity = $form_state['controller']->getEntity();
+
     // Assign the weights configured in the form display.
     foreach ($this->getFormDisplay($form_state)->getComponents() as $name => $options) {
       if (isset($element[$name])) {

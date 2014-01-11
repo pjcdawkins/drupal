@@ -38,6 +38,8 @@ abstract class FileManagedTestBase extends FileTestBase {
    *   'insert', etc.
    */
   function assertFileHooksCalled($expected) {
+    \Drupal::state()->resetCache();
+
     // Determine which hooks were called.
     $actual = array_keys(array_filter(file_test_get_all_calls()));
 
@@ -109,7 +111,8 @@ abstract class FileManagedTestBase extends FileTestBase {
     $file->filename = drupal_basename($file->uri);
     $file->filemime = 'text/plain';
     $file->uid = 1;
-    $file->timestamp = REQUEST_TIME;
+    $file->created = REQUEST_TIME;
+    $file->changed = REQUEST_TIME;
     $file->filesize = filesize($file->uri);
     $file->status = 0;
     // Write the record directly rather than using the API so we don't invoke

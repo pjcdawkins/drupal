@@ -236,7 +236,7 @@ class ViewEditFormController extends ViewFormControllerBase {
     $view = $this->entity;
     foreach ($view->getExecutable()->validate() as $display_errors) {
       foreach ($display_errors as $error) {
-        form_set_error('', $error);
+        $this->setFormError('', $form_state, $error);
       }
     }
   }
@@ -248,27 +248,32 @@ class ViewEditFormController extends ViewFormControllerBase {
     parent::submit($form, $form_state);
 
     $view = $this->entity;
+    $executable = $view->getExecutable();
+
     // Go through and remove displayed scheduled for removal.
     $displays = $view->get('display');
     foreach ($displays as $id => $display) {
       if (!empty($display['deleted'])) {
-        $view->getExecutable()->displayHandlers->remove($id);
+        $executable->displayHandlers->remove($id);
         unset($displays[$id]);
       }
     }
+
     // Rename display ids if needed.
-    foreach ($view->getExecutable()->displayHandlers as $id => $display) {
+    foreach ($executable->displayHandlers as $id => $display) {
       if (!empty($display->display['new_id'])) {
         $new_id = $display->display['new_id'];
-        $view->getExecutable()->displayHandlers->set($new_id, $view->getExecutable()->displayHandlers->get($id));
-        $view->getExecutable()->displayHandlers->get($new_id)->display['id'] = $new_id;
+        $display->display['id'] = $new_id;
+        unset($display->display['new_id']);
+        $executable->displayHandlers->set($new_id, $display);
 
         $displays[$new_id] = $displays[$id];
         unset($displays[$id]);
+
         // Redirect the user to the renamed display to be sure that the page itself exists and doesn't throw errors.
         $form_state['redirect_route'] = array(
           'route_name' => 'views_ui.edit_display',
-          'route_parameters' => array('view' => $view->id(), 'display_id' => $id),
+          'route_parameters' => array('view' => $view->id(), 'display_id' => $new_id),
         );
       }
     }
@@ -292,9 +297,6 @@ class ViewEditFormController extends ViewFormControllerBase {
         if (($display->getPluginId() == 'page') && ($old_path == $destination) && ($old_path != $view->getExecutable()->displayHandlers->get($id)->getOption('path'))) {
           $destination = $view->getExecutable()->displayHandlers->get($id)->getOption('path');
           $query->remove('destination');
-          // @todo For whatever reason drupal_goto is still using $_GET.
-          // @see http://drupal.org/node/1668866
-          unset($_GET['destination']);
         }
       }
       $form_state['redirect'] = $destination;

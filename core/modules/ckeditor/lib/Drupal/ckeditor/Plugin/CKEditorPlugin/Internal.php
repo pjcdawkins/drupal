@@ -9,8 +9,6 @@ namespace Drupal\ckeditor\Plugin\CKEditorPlugin;
 
 use Drupal\ckeditor\CKEditorPluginBase;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\ckeditor\Annotation\CKEditorPlugin;
-use Drupal\Core\Annotation\Translation;
 use Drupal\editor\Entity\Editor;
 
 /**
@@ -260,7 +258,7 @@ class Internal extends CKEditorPluginBase {
     $possible_format_tags = array('h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre');
     foreach ($possible_format_tags as $tag) {
       $input = '<' . $tag . '>TEST</' . $tag . '>';
-      $output = trim(check_markup($input, $editor->format));
+      $output = trim(check_markup($input, $editor->format, '', TRUE));
       if ($input == $output) {
         $format_tags[] = $tag;
       }

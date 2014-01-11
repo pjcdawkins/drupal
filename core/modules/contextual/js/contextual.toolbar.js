@@ -20,8 +20,19 @@ var strings = {
  *   A contextual links DOM element as rendered by the server.
  */
 function initContextualToolbar (context) {
+  if (!Drupal.contextual || !Drupal.contextual.collection) {
+    return;
+  }
+
   var contextualToolbar = Drupal.contextualToolbar;
-  var model = contextualToolbar.model = new contextualToolbar.Model();
+  var model = contextualToolbar.model = new contextualToolbar.Model({
+    // Checks whether localStorage indicates we should start in edit mode
+    // rather than view mode.
+    // @see Drupal.contextualToolbar.VisualView.persist()
+    isViewing: localStorage.getItem('Drupal.contextualToolbar.isViewing') !== 'false'
+  }, {
+    contextualCollection: Drupal.contextual.collection,
+  });
 
   var viewOptions = {
     el: $('.toolbar .toolbar-bar .contextual-toolbar-tab'),
@@ -30,46 +41,6 @@ function initContextualToolbar (context) {
   };
   new contextualToolbar.VisualView(viewOptions);
   new contextualToolbar.AuralView(viewOptions);
-
-  // Update the model based on overlay events.
-  $(document).on({
-    'drupalOverlayOpen.contextualToolbar': function () {
-      model.set('overlayIsOpen', true);
-    },
-    'drupalOverlayClose.contextualToolbar': function () {
-      model.set('overlayIsOpen', false);
-    }
-  });
-
-  // Show the edit tab while there's >=1 contextual link.
-  if (Drupal.contextual && Drupal.contextual.collection) {
-    var contextualCollection = Drupal.contextual.collection;
-    var trackContextualCount = function () {
-      model.set('contextualCount', contextualCollection.length);
-    };
-    contextualCollection.on('reset remove add', trackContextualCount);
-    trackContextualCount();
-
-    // Whenever edit mode is toggled, lock all contextual links.
-    model.on('change:isViewing', function() {
-      contextualCollection.each(function (contextualModel) {
-        contextualModel.set('isLocked', !model.get('isViewing'));
-      });
-    });
-    // When a new contextual link is added and edit mode is enabled, lock it.
-    contextualCollection.on('add', function (contextualModel) {
-      if (!model.get('isViewing')) {
-        contextualModel.set('isLocked', true);
-      }
-    });
-  }
-
-  // Checks whether localStorage indicates we should start in edit mode
-  // rather than view mode.
-  // @see Drupal.contextualToolbar.VisualView.persist()
-  if (localStorage.getItem('Drupal.contextualToolbar.isViewing') === 'false') {
-    model.set('isViewing', false);
-  }
 }
 
 /**
@@ -98,20 +69,75 @@ Drupal.contextualToolbar = {
       // Indicates whether the toggle is currently in "view" or "edit" mode.
       isViewing: true,
       // Indicates whether the toggle should be visible or hidden. Automatically
-      // calculated, depends on overlayIsOpen and contextualCount.
+      // calculated, depends on contextualCount.
       isVisible: false,
-      // Indicates whether the overlay is open or not.
-      overlayIsOpen: false,
       // Tracks how many contextual links exist on the page.
       contextualCount: 0,
       // A TabbingContext object as returned by Drupal.TabbingManager: the set
       // of tabbable elements when edit mode is enabled.
       tabbingContext: null
     },
-    initialize: function () {
-      this.on('change:overlayIsOpen change:contextualCount', function (model) {
-        model.set('isVisible', !model.get('overlayIsOpen') && model.get('contextualCount') > 0);
+
+    /**
+     * {@inheritdoc}
+     *
+     * @param Object attrs
+     * @param Object options
+     *   An object with the following option:
+     *     - Backbone.collection contextualCollection: the collection of
+     *       Drupal.contextual.Model models that represent the contextual links
+     *       on the page.
+     */
+    initialize: function (attrs, options) {
+      // Respond to new/removed contextual links.
+      this.listenTo(options.contextualCollection, {
+        'reset remove add': this.countCountextualLinks,
+        'add': this.lockNewContextualLinks
       });
+
+      this.listenTo(this, {
+        // Automatically determine visibility.
+        'change:contextualCount': this.updateVisibility,
+        // Whenever edit mode is toggled, lock all contextual links.
+        'change:isViewing': function (model, isViewing) {
+          options.contextualCollection.each(function (contextualModel) {
+            contextualModel.set('isLocked', !isViewing);
+          });
+        }
+      });
+    },
+
+    /**
+     * Tracks the number of contextual link models in the collection.
+     *
+     * @param Drupal.contextual.Model affectedModel
+     *   The contextual links model that was added or removed.
+     * @param Backbone.Collection contextualCollection
+     *    The collection of contextual link models.
+     */
+    countCountextualLinks: function (contextualModel, contextualCollection) {
+      this.set('contextualCount', contextualCollection.length);
+    },
+
+    /**
+     * Lock newly added contextual links if edit mode is enabled.
+     *
+     * @param Drupal.contextual.Model addedContextualModel
+     *   The contextual links model that was added.
+     * @param Backbone.Collection contextualCollection
+     *    The collection of contextual link models.
+     */
+    lockNewContextualLinks: function (contextualModel, contextualCollection) {
+      if (!this.get('isViewing')) {
+        contextualModel.set('isLocked', true);
+      }
+    },
+
+    /**
+     * Automatically updates visibility of the view/edit mode toggle.
+     */
+    updateVisibility: function () {
+      this.set('isVisible', this.get('contextualCount') > 0);
     }
   }),
 
@@ -140,8 +166,8 @@ Drupal.contextualToolbar = {
      * {@inheritdoc}
      */
     initialize: function () {
-      this.model.on('change', this.render, this);
-      this.model.on('change:isViewing', this.persist, this);
+      this.listenTo(this.model, 'change', this.render);
+      this.listenTo(this.model, 'change:isViewing', this.persist);
     },
 
     /**
@@ -187,9 +213,11 @@ Drupal.contextualToolbar = {
     /*
      * {@inheritdoc}
      */
-    initialize: function () {
-      this.model.on('change', this.render, this);
-      this.model.on('change:isViewing', this.manageTabbing, this);
+    initialize: function (options) {
+      this.options = options;
+
+      this.listenTo(this.model, 'change', this.render);
+      this.listenTo(this.model, 'change:isViewing', this.manageTabbing);
 
       $(document).on('keyup', _.bind(this.onKeypress, this));
     },

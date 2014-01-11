@@ -61,7 +61,7 @@ class FileWidget extends WidgetBase {
    * Special handling for draggable multiple widgets and 'add more' button.
    */
   protected function formMultipleElements(FieldItemListInterface $items, array &$form, array &$form_state) {
-    $field_name = $this->fieldDefinition->getFieldName();
+    $field_name = $this->fieldDefinition->getName();
     $parents = $form['#parents'];
 
     // Load the items for form rebuilds from the field state as they might not be
@@ -73,7 +73,7 @@ class FileWidget extends WidgetBase {
     }
 
     // Determine the number of widgets to display.
-    $cardinality = $this->fieldDefinition->getFieldCardinality();
+    $cardinality = $this->fieldDefinition->getCardinality();
     switch ($cardinality) {
       case FieldDefinitionInterface::CARDINALITY_UNLIMITED:
         $max = count($items);
@@ -86,8 +86,8 @@ class FileWidget extends WidgetBase {
         break;
     }
 
-    $title = check_plain($this->fieldDefinition->getFieldLabel());
-    $description = field_filter_xss($this->fieldDefinition->getFieldDescription());
+    $title = check_plain($this->fieldDefinition->getLabel());
+    $description = field_filter_xss($this->fieldDefinition->getDescription());
 
     $elements = array();
 
@@ -152,6 +152,11 @@ class FileWidget extends WidgetBase {
       $elements['#field_name'] = $element['#field_name'];
       $elements['#language'] = $element['#language'];
       $elements['#display_field'] = (bool) $this->getFieldSetting('display_field');
+      // The field settings include defaults for the field type. However, this
+      // widget is a base class for other widgets (e.g., ImageWidget) that may
+      // act on field types without these expected settings.
+      $field_settings = $this->getFieldSettings() + array('display_field' => NULL);
+      $elements['#display_field'] = (bool) $field_settings['display_field'];
 
       // Add some properties that will eventually be added to the file upload
       // field. These are added here so that they may be referenced easily
@@ -183,7 +188,7 @@ class FileWidget extends WidgetBase {
       'description_field' => NULL,
     );
 
-    $cardinality = $this->fieldDefinition->getFieldCardinality();
+    $cardinality = $this->fieldDefinition->getCardinality();
     $defaults = array(
       'fids' => array(),
       'display' => (bool) $field_settings['display_default'],

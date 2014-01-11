@@ -8,6 +8,7 @@
 namespace Drupal\filter\Tests;
 
 use Drupal\Core\TypedData\AllowedValuesInterface;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\filter\Plugin\DataType\FilterFormat;
 use Drupal\system\Tests\Entity\EntityUnitTestBase;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
@@ -191,8 +192,8 @@ class FilterAPITest extends EntityUnitTestBase {
    * Tests the function of the typed data type.
    */
   function testTypedDataAPI() {
-    $definition = array('type' => 'filter_format');
-    $data = \Drupal::typedData()->create($definition);
+    $definition = DataDefinition::create('filter_format');
+    $data = \Drupal::typedDataManager()->create($definition);
 
     $this->assertTrue($data instanceof AllowedValuesInterface, 'Typed data object implements \Drupal\Core\TypedData\AllowedValuesInterface');
 

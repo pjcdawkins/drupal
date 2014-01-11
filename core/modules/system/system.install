@@ -44,7 +44,7 @@ function system_requirements($phase) {
   }
 
   // Web server information.
-  $software = $_SERVER['SERVER_SOFTWARE'];
+  $software = \Drupal::request()->server->get('SERVER_SOFTWARE');
   $requirements['webserver'] = array(
     'title' => t('Web server'),
     'value' => $software,
@@ -277,7 +277,7 @@ function system_requirements($phase) {
     // Determine when cron last ran.
     $cron_last = \Drupal::state()->get('system.cron_last');
     if (!is_numeric($cron_last)) {
-      $cron_last = variable_get('install_time', 0);
+      $cron_last = \Drupal::state()->get('install_time', 0);
     }
 
     // Determine severity based on time since cron last ran.
@@ -518,6 +518,15 @@ function system_requirements($phase) {
       );
     }
     $requirements['update status']['title'] = t('Update notifications');
+
+    if (settings()->get('rebuild_access')) {
+      $requirements['rebuild access'] = array(
+        'title' => t('Rebuild access'),
+        'value' => t('Enabled'),
+        'severity' => REQUIREMENT_ERROR,
+        'description' => t('The rebuild_access setting is enabled in settings.php. It is recommended to have this setting disabled unless you are performing a rebuild.'),
+      );
+    }
   }
 
   // Ensure that if upgrading from 7 to 8 we have no disabled modules.
@@ -548,7 +557,7 @@ function system_requirements($phase) {
 function system_install() {
   // Enable and set the default theme. Can't use theme_enable() this early in
   // installation.
-  config_install_default_config('theme', 'stark');
+  \Drupal::service('config.installer')->installDefaultConfig('theme', 'stark');
   \Drupal::config('system.theme')
     ->set('default', 'stark')
     ->save();
@@ -556,6 +565,11 @@ function system_install() {
   // Populate the cron key state variable.
   $cron_key = Crypt::randomStringHashed(55);
   \Drupal::state()->set('system.cron_key', $cron_key);
+
+  // Populate the site UUID.
+  \Drupal::config('system.site')
+    ->set('uuid', \Drupal::service('uuid')->generate())
+    ->save();
 }
 
 /**
@@ -824,20 +838,6 @@ function system_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'theme_callback' => array(
-        'description' => 'A function which returns the name of the theme that will be used to render this page. If left empty, the default theme will be used.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'theme_arguments' => array(
-        'description' => 'A serialized array of arguments for the theme callback.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
       'type' => array(
         'description' => 'Numeric representation of the type of the menu item, like MENU_LOCAL_TASK.',
         'type' => 'int',
@@ -962,8 +962,8 @@ function system_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'route_set' => array(
-        'description' => 'The route set grouping to which a route belongs.',
+      'provider' => array(
+        'description' => 'The provider grouping to which a route belongs.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -989,7 +989,7 @@ function system_schema() {
     ),
     'indexes' => array(
       'pattern_outline_fit' => array('pattern_outline', 'fit'),
-      'route_set' => array('route_set'),
+      'provider' => array('provider'),
     ),
     'primary key' => array('name'),
   );
@@ -1620,8 +1620,8 @@ function system_update_8022() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'route_set' => array(
-        'description' => 'The route set grouping to which a route belongs.',
+      'provider' => array(
+        'description' => 'The provider grouping to which a route belongs.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -1647,7 +1647,7 @@ function system_update_8022() {
     ),
     'indexes' => array(
       'pattern_outline_fit' => array('pattern_outline', 'fit'),
-      'route_set' => array('route_set'),
+      'provider' => array('provider'),
     ),
     'primary key' => array('name'),
   );
@@ -1873,17 +1873,6 @@ function system_update_8041() {
  */
 function system_update_8042() {
   \Drupal::moduleHandler()->install(array('entity'));
-}
-
-/**
- * Move system theme settings from variable to config.
- *
- * @ingroup config_upgrade
- */
-function system_update_8043() {
-  update_variables_to_config('system.performance', array(
-    'theme_link' => 'theme_link',
-  ));
 }
 
 /**

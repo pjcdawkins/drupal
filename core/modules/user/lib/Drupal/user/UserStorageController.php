@@ -9,6 +9,7 @@ namespace Drupal\user;
 
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Password\PasswordInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\field\FieldInfo;
@@ -41,10 +42,8 @@ class UserStorageController extends FieldableDatabaseStorageController implement
   /**
    * Constructs a new UserStorageController object.
    *
-   * @param string $entity_type
-   *  The entity type for which the instance is created.
-   * @param array $entity_info
-   *   An array of entity info for the entity type.
+   * @param \Drupal\Core\Entity\EntityTypeInterface $entity_info
+   *   The entity info for the entity type.
    * @param \Drupal\Core\Database\Connection $database
    *   The database connection to be used.
    * @param \Drupal\field\FieldInfo $field_info
@@ -56,8 +55,8 @@ class UserStorageController extends FieldableDatabaseStorageController implement
    * @param \Drupal\user\UserDataInterface $user_data
    *   The user data service.
    */
-  public function __construct($entity_type, $entity_info, Connection $database, FieldInfo $field_info, UuidInterface $uuid_service, PasswordInterface $password, UserDataInterface $user_data) {
-    parent::__construct($entity_type, $entity_info, $database, $field_info, $uuid_service);
+  public function __construct(EntityTypeInterface $entity_info, Connection $database, FieldInfo $field_info, UuidInterface $uuid_service, PasswordInterface $password, UserDataInterface $user_data) {
+    parent::__construct($entity_info, $database, $field_info, $uuid_service);
 
     $this->password = $password;
     $this->userData = $user_data;
@@ -66,9 +65,8 @@ class UserStorageController extends FieldableDatabaseStorageController implement
   /**
    * {@inheritdoc}
    */
-  public static function createInstance(ContainerInterface $container, $entity_type, array $entity_info) {
+  public static function createInstance(ContainerInterface $container, EntityTypeInterface $entity_info) {
     return new static(
-      $entity_type,
       $entity_info,
       $container->get('database'),
       $container->get('field.info'),
@@ -79,9 +77,9 @@ class UserStorageController extends FieldableDatabaseStorageController implement
   }
 
   /**
-   * Overrides Drupal\Core\Entity\DatabaseStorageController::attachLoad().
+   * {@inheritdoc}
    */
-  function attachLoad(&$queried_users, $load_revision = FALSE) {
+  function postLoad(array &$queried_users) {
     foreach ($queried_users as $key => $record) {
       $queried_users[$key]->roles = array();
       if ($record->uid) {
@@ -95,9 +93,9 @@ class UserStorageController extends FieldableDatabaseStorageController implement
     // Add any additional roles from the database.
     $this->addRoles($queried_users);
 
-    // Call the default attachLoad() method. This will add fields and call
+    // Call the default postLoad() method. This will add fields and call
     // hook_user_load().
-    parent::attachLoad($queried_users, $load_revision);
+    parent::postLoad($queried_users);
   }
 
   /**

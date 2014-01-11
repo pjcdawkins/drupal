@@ -10,6 +10,7 @@ namespace Drupal\block\Tests\Views;
 use Drupal\Component\Utility\String;
 use Drupal\views\Tests\ViewTestBase;
 use Drupal\views\Tests\ViewTestData;
+use Drupal\Core\Template\Attribute;
 
 /**
  * Defines a test for block display.
@@ -143,7 +144,7 @@ class DisplayBlockTest extends ViewTestBase {
     $block_storage_controller = $this->container->get('entity.manager')->getStorageController('block');
 
     // Remove the block display, so both block entities from the first view
-    // should both dissapear.
+    // should both disappear.
     $view = views_get_view('test_view_block');
     $view->initDisplay();
     $view->displayHandlers->remove('block_1');
@@ -171,6 +172,19 @@ class DisplayBlockTest extends ViewTestBase {
     $this->drupalGet('test-page');
     $this->assertNoBlockAppears($block_3);
     $this->assertBlockAppears($block_4);
+  }
+
+  /**
+   * Tests views block plugin definitions.
+   */
+  public function testViewsBlockPlugins() {
+    // Ensures that the cache setting gets to the block settings.
+    $instance = $this->container->get('plugin.manager.block')->createInstance('views_block:test_view_block2-block_2');
+    $configuration = $instance->getConfiguration();
+    $this->assertEqual($configuration['cache'], DRUPAL_NO_CACHE);
+    $instance = $this->container->get('plugin.manager.block')->createInstance('views_block:test_view_block2-block_3');
+    $configuration = $instance->getConfiguration();
+    $this->assertEqual($configuration['cache'], DRUPAL_CACHE_PER_USER);
   }
 
   /**
@@ -220,6 +234,45 @@ class DisplayBlockTest extends ViewTestBase {
 
     $config = $block->getPlugin()->getConfiguration();
     $this->assertEqual(5, $config['items_per_page'], "'Items per page' is properly saved.");
+
+    // Tests the override of the label capability.
+    $edit = array();
+    $edit['settings[views_label_checkbox]'] = 1;
+    $edit['settings[views_label]'] = 'Custom title';
+    $this->drupalPostForm('admin/structure/block/add/views_block:test_view_block-block_1/' . $default_theme, $edit, t('Save block'));
+
+    $block = $storage->load('views_block__test_view_block_block_1_5');
+    $config = $block->getPlugin()->getConfiguration();
+    $this->assertEqual('Custom title', $config['views_label'], "'Label' is properly saved.");
+  }
+
+  /**
+   * Tests the actual rendering of the views block.
+   */
+  public function testBlockRendering() {
+    // Create a block and set a custom title.
+    $block = $this->drupalPlaceBlock('views_block:test_view_block-block_1', array('title' => 'test_view_block-block_1:1', 'views_label' => 'Custom title'));
+    $this->drupalGet('');
+
+    $result = $this->xpath('//div[contains(@class, "region-sidebar-first")]/div[contains(@class, "block-views")]/h2');
+    $this->assertEqual((string) $result[0], 'Custom title');
+
+    // Don't override the title anymore.
+    $plugin = $block->getPlugin();
+    $plugin->setConfigurationValue('views_label', '');
+    $block->save();
+
+    $this->drupalGet('');
+    $result = $this->xpath('//div[contains(@class, "region-sidebar-first")]/div[contains(@class, "block-views")]/h2');
+    $this->assertEqual((string) $result[0], 'test_view_block');
+
+    // Hide the title.
+    $block->getPlugin()->setConfigurationValue('label_display', FALSE);
+    $block->save();
+
+    $this->drupalGet('');
+    $result = $this->xpath('//div[contains(@class, "region-sidebar-first")]/div[contains(@class, "block-views")]/h2');
+    $this->assertTrue(empty($result), 'The title is not visible.');
   }
 
   /**
@@ -232,7 +285,7 @@ class DisplayBlockTest extends ViewTestBase {
 
     $id = 'block:block=' . $block->id() . ':|views_ui_edit:view=test_view_block:location=block&name=test_view_block&display_id=block_1';
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:assertContextualLinkPlaceHolder()
-    $this->assertRaw('<div data-contextual-id="'. $id . '"></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
+    $this->assertRaw('<div' . new Attribute(array('data-contextual-id' => $id)) . '></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
 
     // Get server-rendered contextual links.
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:renderContextualLinks()

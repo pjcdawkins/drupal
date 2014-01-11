@@ -246,7 +246,7 @@ class RouteProvider implements RouteProviderInterface {
 
     $ancestors = $this->getCandidateOutlines($parts);
 
-    $routes = $this->connection->query("SELECT name, route FROM {" . $this->connection->escapeTable($this->tableName) . "} WHERE pattern_outline IN (:patterns) ORDER BY fit DESC", array(
+    $routes = $this->connection->query("SELECT name, route FROM {" . $this->connection->escapeTable($this->tableName) . "} WHERE pattern_outline IN (:patterns) ORDER BY fit DESC, name ASC", array(
       ':patterns' => $ancestors,
     ))
       ->fetchAllKeyed();
@@ -260,6 +260,13 @@ class RouteProvider implements RouteProviderInterface {
     }
 
     return $collection;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getAllRoutes() {
+    return new LazyLoadingRouteCollection($this->connection, $this->tableName);
   }
 
 }

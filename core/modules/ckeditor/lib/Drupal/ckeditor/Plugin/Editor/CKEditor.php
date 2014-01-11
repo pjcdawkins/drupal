@@ -13,8 +13,6 @@ use Drupal\ckeditor\CKEditorPluginManager;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageManager;
 use Drupal\editor\Plugin\EditorBase;
-use Drupal\editor\Annotation\Editor;
-use Drupal\Core\Annotation\Translation;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\editor\Entity\Editor as EditorEntity;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -320,9 +318,9 @@ class CKEditor extends EditorBase implements ContainerFactoryPluginInterface {
     if (empty($langcodes)) {
       $langcodes = array();
       // Collect languages included with CKEditor based on file listing.
-      $ckeditor_languages = glob(DRUPAL_ROOT . '/core/assets/vendor/ckeditor/lang/*.js');
-      foreach ($ckeditor_languages as $language_filename) {
-        $langcode = basename($language_filename, '.js');
+      $ckeditor_languages = new \GlobIterator(DRUPAL_ROOT . '/core/assets/vendor/ckeditor/lang/*.js');
+      foreach ($ckeditor_languages as $language_file) {
+        $langcode = $language_file->getBasename('.js');
         $langcodes[$langcode] = $langcode;
       }
       cache('ckeditor.languages')->set('langcodes', $langcodes);

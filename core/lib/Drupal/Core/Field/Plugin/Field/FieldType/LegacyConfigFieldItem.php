@@ -7,10 +7,10 @@
 
 namespace Drupal\Core\Field\Plugin\Field\FieldType;
 
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\PrepareCacheInterface;
 use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\Core\Field\ConfigFieldItemBase;
-use Drupal\field\FieldInterface;
 use Drupal\field\FieldInstanceInterface;
 
 /**
@@ -31,13 +31,13 @@ abstract class LegacyConfigFieldItem extends ConfigFieldItemBase implements Prep
   /**
    * {@inheritdoc}
    */
-  public static function schema(FieldInterface $field) {
-    $definition = \Drupal::service('plugin.manager.field.field_type')->getDefinition($field->type);
+  public static function schema(FieldDefinitionInterface $field_definition) {
+    $definition = \Drupal::service('plugin.manager.field.field_type')->getDefinition($field_definition->type);
     $module = $definition['provider'];
     module_load_install($module);
     $callback = "{$module}_field_schema";
     if (function_exists($callback)) {
-      return $callback($field);
+      return $callback($field_definition);
     }
   }
 
@@ -51,7 +51,7 @@ abstract class LegacyConfigFieldItem extends ConfigFieldItemBase implements Prep
     $item = $this->getValue(TRUE);
     // The previous hook was never called on an empty item, but
     // ContentEntityBase always creates a FieldItem element for an empty field.
-    return empty($item) || $callback($item, $this->getFieldDefinition()->getFieldType());
+    return empty($item) || $callback($item, $this->getFieldDefinition()->getType());
   }
 
   /**

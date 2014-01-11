@@ -8,6 +8,7 @@
 namespace Drupal\config\Tests;
 
 use Drupal\Core\Entity\EntityMalformedException;
+use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Language\Language;
 use Drupal\simpletest\WebTestBase;
 
@@ -46,7 +47,7 @@ class ConfigEntityTest extends WebTestBase {
 
     // Verify ConfigEntity properties/methods on the newly created empty entity.
     $this->assertIdentical($empty->isNew(), TRUE);
-    $this->assertIdentical($empty->getOriginalID(), NULL);
+    $this->assertIdentical($empty->getOriginalId(), NULL);
     $this->assertIdentical($empty->bundle(), 'config_test');
     $this->assertIdentical($empty->id(), NULL);
     $this->assertTrue($empty->uuid());
@@ -100,7 +101,7 @@ class ConfigEntityTest extends WebTestBase {
 
     // Verify methods on the newly created entity.
     $this->assertIdentical($config_test->isNew(), TRUE);
-    $this->assertIdentical($config_test->getOriginalID(), $expected['id']);
+    $this->assertIdentical($config_test->getOriginalId(), $expected['id']);
     $this->assertIdentical($config_test->id(), $expected['id']);
     $this->assertTrue($config_test->uuid());
     $expected['uuid'] = $config_test->uuid();
@@ -124,7 +125,7 @@ class ConfigEntityTest extends WebTestBase {
     $this->assertIdentical($config_test->uuid(), $expected['uuid']);
     $this->assertIdentical($config_test->label(), $expected['label']);
     $this->assertIdentical($config_test->isNew(), FALSE);
-    $this->assertIdentical($config_test->getOriginalID(), $expected['id']);
+    $this->assertIdentical($config_test->getOriginalId(), $expected['id']);
 
     // Save again, and verify correct status and properties again.
     $status = $config_test->save();
@@ -133,26 +134,20 @@ class ConfigEntityTest extends WebTestBase {
     $this->assertIdentical($config_test->uuid(), $expected['uuid']);
     $this->assertIdentical($config_test->label(), $expected['label']);
     $this->assertIdentical($config_test->isNew(), FALSE);
-    $this->assertIdentical($config_test->getOriginalID(), $expected['id']);
+    $this->assertIdentical($config_test->getOriginalId(), $expected['id']);
 
-    // Re-create the entity with the same ID and verify updated status.
+    // Ensure that creating an entity with the same id as an existing one is not
+    // possible.
     $same_id = entity_create('config_test', array(
       'id' => $config_test->id(),
     ));
     $this->assertIdentical($same_id->isNew(), TRUE);
-    $status = $same_id->save();
-    $this->assertIdentical($status, SAVED_UPDATED);
-
-    // Verify that the entity was overwritten.
-    $same_id = entity_load('config_test', $config_test->id());
-    $this->assertIdentical($same_id->id(), $config_test->id());
-    $this->assertIdentical($same_id->label(), NULL);
-    $this->assertNotEqual($same_id->uuid(), $config_test->uuid());
-
-    // Delete the overridden entity first.
-    $same_id->delete();
-    // Revert to previous state.
-    $config_test->save();
+    try {
+      $same_id->save();
+      $this->fail('Not possible to overwrite an entity entity.');
+    } catch (EntityStorageException $e) {
+      $this->pass('Not possible to overwrite an entity entity.');
+    }
 
     // Verify that renaming the ID returns correct status and properties.
     $ids = array($expected['id'], 'second_' . $this->randomName(4), 'third_' . $this->randomName(4));
@@ -161,7 +156,7 @@ class ConfigEntityTest extends WebTestBase {
       $new_id = $ids[$i];
       // Before renaming, everything should point to the current ID.
       $this->assertIdentical($config_test->id(), $old_id);
-      $this->assertIdentical($config_test->getOriginalID(), $old_id);
+      $this->assertIdentical($config_test->getOriginalId(), $old_id);
 
       // Rename.
       $config_test->id = $new_id;
@@ -172,7 +167,7 @@ class ConfigEntityTest extends WebTestBase {
 
       // Verify that originalID points to new ID directly after renaming.
       $this->assertIdentical($config_test->id(), $new_id);
-      $this->assertIdentical($config_test->getOriginalID(), $new_id);
+      $this->assertIdentical($config_test->getOriginalId(), $new_id);
     }
 
     // Test config entity prepopulation.

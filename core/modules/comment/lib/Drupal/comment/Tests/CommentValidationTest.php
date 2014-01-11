@@ -93,6 +93,7 @@ class CommentValidationTest extends EntityUnitTestBase {
     $violations = $comment->validate();
     $this->assertEqual(count($violations), 1, 'Violation found when homepage is invalid');
     $this->assertEqual($violations[0]->getPropertyPath(), 'homepage.0.value');
+    // @todo This message should be improved in https://drupal.org/node/2171539
     $this->assertEqual($violations[0]->getMessage(), t('This value should be of the correct primitive type.'));
     $comment->set('homepage', NULL);
 

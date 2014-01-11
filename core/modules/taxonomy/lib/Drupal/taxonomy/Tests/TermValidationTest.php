@@ -7,19 +7,19 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\simpletest\DrupalUnitTestBase;
+use Drupal\system\Tests\Entity\EntityUnitTestBase;
 
 /**
  * Tests term validation constraints.
  */
-class TermValidationTest extends DrupalUnitTestBase {
+class TermValidationTest extends EntityUnitTestBase {
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = array('field', 'taxonomy');
+  public static $modules = array('taxonomy');
 
   public static function getInfo() {
     return array(
@@ -41,7 +41,10 @@ class TermValidationTest extends DrupalUnitTestBase {
    * Tests the term validation constraints.
    */
   public function testValidation() {
-    $term = entity_create('taxonomy_term', array('name' => 'test', 'vid' => 'tags'));
+    $term = $this->entityManager->getStorageController('taxonomy_term')->create(array(
+      'name' => 'test',
+      'vid' => 'tags',
+    ));
     $violations = $term->validate();
     $this->assertEqual(count($violations), 0, 'No violations when validating a default term.');
 

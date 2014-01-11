@@ -384,7 +384,7 @@ class Comment extends ContentEntityBase implements CommentInterface {
     $fields['subject'] = FieldDefinition::create('string')
       ->setLabel(t('Subject'))
       ->setDescription(t('The comment title or subject.'))
-      ->setPropertyConstraints('value', array('Length' => array('max' => 64)));
+      ->setSetting('max_length', 64);
 
     $fields['uid'] = FieldDefinition::create('entity_reference')
       ->setLabel(t('User ID'))
@@ -397,8 +397,10 @@ class Comment extends ContentEntityBase implements CommentInterface {
     $fields['name'] = FieldDefinition::create('string')
       ->setLabel(t('Name'))
       ->setDescription(t("The comment author's name."))
-      ->setSetting('default_value', '')
-      ->setPropertyConstraints('value', array('Length' => array('max' => 60)))
+      ->setSettings(array(
+        'default_value' => '',
+        'max_length' => 60,
+      ))
       ->setConstraints(array('CommentName' => array()));
 
     $fields['mail'] = FieldDefinition::create('email')
@@ -409,13 +411,13 @@ class Comment extends ContentEntityBase implements CommentInterface {
       ->setLabel(t('Homepage'))
       ->setDescription(t("The comment author's home page address."))
       // URIs are not length limited by RFC 2616, but we can only store 255
-      // characters in our DB schema.
-      ->setPropertyConstraints('value', array('Length' => array('max' => 255)));
+      // characters in our comment DB schema.
+      ->setSetting('max_length', 255);
 
     $fields['hostname'] = FieldDefinition::create('string')
       ->setLabel(t('Hostname'))
       ->setDescription(t("The comment author's hostname."))
-      ->setPropertyConstraints('value', array('Length' => array('max' => 255)));
+      ->setSetting('max_length', 128);
 
     // @todo Convert to a "created" field in https://drupal.org/node/2145103.
     $fields['created'] = FieldDefinition::create('integer')
@@ -435,7 +437,7 @@ class Comment extends ContentEntityBase implements CommentInterface {
     $fields['thread'] = FieldDefinition::create('string')
       ->setLabel(t('Thread place'))
       ->setDescription(t("The alphadecimal representation of the comment's place in a thread, consisting of a base 36 string prefixed by an integer indicating its length."))
-      ->setPropertyConstraints('value', array('Length' => array('max' => 255)));
+      ->setSetting('max_length', 255);
 
     $fields['entity_type'] = FieldDefinition::create('string')
       ->setLabel(t('Entity type'))

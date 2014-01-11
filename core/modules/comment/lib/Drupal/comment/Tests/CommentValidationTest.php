@@ -96,8 +96,8 @@ class CommentValidationTest extends EntityUnitTestBase {
     $this->assertEqual($violations[0]->getMessage(), t('This value should be of the correct primitive type.'));
     $comment->set('homepage', NULL);
 
-    $comment->set('hostname', $this->randomString(256));
-    $this->assertLengthViolation($comment, 'hostname', 255);
+    $comment->set('hostname', $this->randomString(129));
+    $this->assertLengthViolation($comment, 'hostname', 128);
     $comment->set('hostname', NULL);
 
     $comment->set('thread', $this->randomString(256));

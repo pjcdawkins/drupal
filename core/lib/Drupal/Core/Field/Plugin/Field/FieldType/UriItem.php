@@ -8,7 +8,6 @@
 namespace Drupal\Core\Field\Plugin\Field\FieldType;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Field\FieldItemBase;
 use Drupal\Core\TypedData\DataDefinition;
 
 /**
@@ -21,7 +20,7 @@ use Drupal\Core\TypedData\DataDefinition;
  *   configurable = FALSE
  * )
  */
-class UriItem extends FieldItemBase {
+class UriItem extends StringItem {
 
   /**
    * Field definitions of the contained properties.

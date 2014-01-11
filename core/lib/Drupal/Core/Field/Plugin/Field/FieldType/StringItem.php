@@ -62,4 +62,23 @@ class StringItem extends FieldItemBase {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getConstraints() {
+    $constraints = parent::getConstraints();
+
+    // Not all plugins that inherit from this class have a configureable maximum
+    // length, so we only apply the length constraint conditionally. Example:
+    // UuidItem has a fixed length of 128.
+    if ($max_length = $this->getFieldSetting('max_length')) {
+      $constraint_manager = \Drupal::typedDataManager()->getValidationConstraintManager();
+      $constraints[] = $constraint_manager->create('ComplexData', array(
+        'value' => array('Length' => array('max' => $max_length))
+      ));
+    }
+
+    return $constraints;
+  }
+
 }

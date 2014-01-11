@@ -29,7 +29,7 @@ class CommentNameConstraintValidator extends ConstraintValidator {
       if ($author_is_unauthenticated) {
         $users = \Drupal::entityManager()->getStorageController('user')->loadByProperties(array('name' => $author_name));
         if (!empty($users)) {
-          $this->context->addViolation($constraint->message);
+          $this->context->addViolation($constraint->message, array('%name' => $author_name));
         }
       }
     }

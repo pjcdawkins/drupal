@@ -74,7 +74,7 @@ class CommentValidationTest extends EntityUnitTestBase {
     $violations = $comment->validate();
     $this->assertEqual(count($violations), 1, "Violation found on author name collision");
     $this->assertEqual($violations[0]->getPropertyPath(), "name");
-    $this->assertEqual($violations[0]->getMessage(), t('The name you used belongs to a registered user.'));
+    $this->assertEqual($violations[0]->getMessage(), t('The name %name you used belongs to a registered user.', array('%name' => 'test')));
 
     // Make the name valid.
     $comment->set('name', $this->randomString());

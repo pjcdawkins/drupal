@@ -21,5 +21,5 @@ use Symfony\Component\Validator\Constraint;
  */
 class CommentNameConstraint extends Constraint {
 
-  public $message = 'The name you used belongs to a registered user.';
+  public $message = 'The name %name you used belongs to a registered user.';
 }

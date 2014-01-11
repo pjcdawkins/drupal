@@ -68,7 +68,7 @@ class StringItem extends FieldItemBase {
   public function getConstraints() {
     $constraints = parent::getConstraints();
 
-    // Not all plugins that inherit from this class have a configureable maximum
+    // Not all plugins that inherit from this class have a configurable maximum
     // length, so we only apply the length constraint conditionally. Example:
     // UuidItem has a fixed length of 128.
     if ($max_length = $this->getFieldSetting('max_length')) {

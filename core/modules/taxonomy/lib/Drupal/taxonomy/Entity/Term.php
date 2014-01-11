@@ -210,8 +210,7 @@ class Term extends ContentEntityBase implements TermInterface {
       ->setDescription(t('The term UUID.'))
       ->setReadOnly(TRUE);
 
-    // @todo Convert this to an entity_reference once that works with config
-    // entities.
+    // @todo Convert this to an entity_reference field.
     $fields['vid'] = FieldDefinition::create('string')
       ->setLabel(t('Vocabulary ID'))
       ->setDescription(t('The ID of the vocabulary to which the term is assigned.'));

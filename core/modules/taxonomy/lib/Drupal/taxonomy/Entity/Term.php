@@ -223,7 +223,8 @@ class Term extends ContentEntityBase implements TermInterface {
     $fields['name'] = FieldDefinition::create('string')
       ->setLabel(t('Name'))
       ->setDescription(t('The term name.'))
-      ->setRequired(TRUE);
+      ->setRequired(TRUE)
+      ->setSetting('max_length', 255);
 
     $fields['description'] = FieldDefinition::create('text_long')
       ->setLabel(t('Description'))

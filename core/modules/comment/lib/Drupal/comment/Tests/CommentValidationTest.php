@@ -44,13 +44,13 @@ class CommentValidationTest extends EntityUnitTestBase {
    * Tests the comment validation constraints.
    */
   public function testValidation() {
-    $node = entity_create('node', array(
+    $node = $this->entityManager->getStorageController('node')->create(array(
       'type' => 'page',
       'title' => 'test',
     ));
     $node->save();
 
-    $comment = entity_create('comment', array(
+    $comment = $this->entityManager->getStorageController('comment')->create(array(
       'entity_id' => $node->id(),
       // Just use some non-existing dummy field ID here, we are not testing
       // that.

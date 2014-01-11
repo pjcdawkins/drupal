@@ -214,6 +214,8 @@ class Term extends ContentEntityBase implements TermInterface {
     $properties['vid'] = array(
       'label' => t('Vocabulary ID'),
       'description' => t('The ID of the vocabulary to which the term is assigned.'),
+      // @todo Convert this to an entity_reference_field once that works with
+      // config entities.
       'type' => 'string_field',
     );
     $properties['langcode'] = array(
@@ -225,6 +227,10 @@ class Term extends ContentEntityBase implements TermInterface {
       'label' => t('Name'),
       'description' => t('The term name.'),
       'type' => 'string_field',
+      'required' => TRUE,
+      'property_constraints' => array(
+        'value' => array('Length' => array('max' => 255)),
+      ),
     );
     $properties['description'] = array(
       'label' => t('Description'),
@@ -246,10 +252,11 @@ class Term extends ContentEntityBase implements TermInterface {
     $properties['parent'] = array(
       'label' => t('Term Parents'),
       'description' => t('The parents of this term.'),
+      // @todo Convert this to an entity_reference_field: [#2048555]
       'type' => 'integer_field',
+      'constraints' => array('TermParent' => array()),
       // Save new terms with no parents by default.
       'settings' => array('default_value' => 0),
-      'computed' => TRUE,
     );
     $properties['changed'] = array(
       'label' => t('Changed'),

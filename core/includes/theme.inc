@@ -91,17 +91,13 @@ function drupal_theme_initialize() {
     return;
   }
 
-  drupal_bootstrap(DRUPAL_BOOTSTRAP_DATABASE);
   $themes = list_themes();
 
-  // Only select the user selected theme if it is available in the
-  // list of themes that can be accessed.
-  $theme = !empty($user->theme) && drupal_theme_access($user->theme) ? $user->theme : \Drupal::config('system.theme')->get('default');
-
-  // Allow modules to override the theme. Validation has already been performed
-  // inside menu_get_custom_theme(), so we do not need to check it again here.
-  $custom_theme = menu_get_custom_theme();
-  $theme = !empty($custom_theme) ? $custom_theme : $theme;
+  // @todo Let the theme.negotiator listen to the kernel request event.
+  // Determine the active theme for the theme negotiator service. This includes
+  // the default theme as well as really specific ones like the ajax base theme.
+  $request = \Drupal::request();
+  $theme = \Drupal::service('theme.negotiator')->determineActiveTheme($request) ?: 'stark';
 
   // Store the identifier for retrieving theme settings with.
   $theme_key = $theme;
@@ -114,9 +110,6 @@ function drupal_theme_initialize() {
     $base_theme[] = $themes[$ancestor];
   }
   _drupal_theme_initialize($themes[$theme], array_reverse($base_theme));
-
-  // Themes can have alter functions, so reset the drupal_alter() cache.
-  drupal_static_reset('drupal_alter');
 }
 
 /**
@@ -243,9 +236,15 @@ function _drupal_theme_initialize($theme, $base_theme = array()) {
   }
 
   // Add scripts used by this theme.
+  $js = array();
   foreach ($final_scripts as $script) {
-    drupal_add_js($script, array('group' => JS_THEME, 'every_page' => TRUE));
+    $js['#attached']['js'][] = array(
+      'data' => $script,
+      'group' => JS_THEME,
+      'every_page' => TRUE,
+    );
   }
+  drupal_render($js);
 
   $theme_engine = NULL;
 
@@ -628,8 +627,14 @@ function theme($hook, $variables = array()) {
   if (isset($info['base hook'])) {
     $suggestions[] = $hook;
   }
-  // Allow suggestions to be altered via hook_theme_suggestions_HOOK_alter().
-  Drupal::moduleHandler()->alter('theme_suggestions_' . $base_theme_hook, $suggestions, $variables);
+
+  // Invoke hook_theme_suggestions_alter() and
+  // hook_theme_suggestions_HOOK_alter().
+  $hooks = array(
+    'theme_suggestions',
+    'theme_suggestions_' . $base_theme_hook,
+  );
+  \Drupal::moduleHandler()->alter($hooks, $suggestions, $variables, $base_theme_hook);
 
   // Check if each suggestion exists in the theme registry, and if so,
   // use it instead of the hook that theme() was called with. For example, a
@@ -1235,31 +1240,20 @@ function theme_links($variables) {
 
     $output .= '<ul' . new Attribute($attributes) . '>';
 
-    $num_links = count($links);
-    $i = 0;
     $active = \Drupal::linkGenerator()->getActive();
-    $language_url = \Drupal::languageManager()->getLanguage(Language::TYPE_URL);
+    $language_url = \Drupal::languageManager()->getCurrentLanguage(Language::TYPE_URL);
 
     foreach ($links as $key => $link) {
-      $i++;
-
       $link += array(
         'href' => NULL,
         'route_name' => NULL,
         'route_parameters' => NULL,
+        'ajax' => NULL,
       );
 
       $class = array();
       // Use the array key as class name.
       $class[] = drupal_html_class($key);
-      // Add odd/even, first, and last classes.
-      $class[] = ($i % 2 ? 'odd' : 'even');
-      if ($i == 1) {
-        $class[] = 'first';
-      }
-      if ($i == $num_links) {
-        $class[] = 'last';
-      }
 
       $link_element = array(
         '#type' => 'link',
@@ -1268,13 +1262,8 @@ function theme_links($variables) {
         '#href' => $link['href'],
         '#route_name' => $link['route_name'],
         '#route_parameters' => $link['route_parameters'],
+        '#ajax' => $link['ajax'],
       );
-
-      // @todo Reconcile Views usage of 'ajax' as a boolean with the rest of
-      //   core's usage of it as an array.
-      if (isset($link['ajax']) && is_array($link['ajax'])) {
-        $link_element['#ajax'] = $link['ajax'];
-      }
 
       // Handle links and ensure that the active class is added on the LIs.
       if (isset($link['route_name'])) {
@@ -1378,7 +1367,11 @@ function theme_image($variables) {
  *   '#header' => array(t('Title'), array('data' => t('Operations'), 'colspan' => '1')),
  *   // Optionally, to add tableDrag support:
  *   '#tabledrag' => array(
- *     array('order', 'sibling', 'thing-weight'),
+ *     array(
+ *       'action' => 'order',
+ *       'relationship' => 'sibling',
+ *       'group' => 'thing-weight',
+ *     ),
  *   ),
  * );
  * foreach ($things as $row => $thing) {
@@ -1412,14 +1405,14 @@ function theme_image($variables) {
  *
  * @param array $element
  *   A structured array containing two sub-levels of elements. Properties used:
- *   - #tabledrag: The value is a list of arrays that are passed to
- *     drupal_add_tabledrag(). The HTML ID of the table is prepended to each set
- *     of arguments.
+ *   - #tabledrag: The value is a list of $options arrays that are passed to
+ *     drupal_attach_tabledrag(). The HTML ID of the table is added to each
+ *     $options array.
  *
  * @see system_element_info()
  * @see theme_table()
  * @see drupal_process_attached()
- * @see drupal_add_tabledrag()
+ * @see drupal_attach_tabledrag()
  */
 function drupal_pre_render_table(array $element) {
   foreach (element_children($element) as $first) {
@@ -1450,13 +1443,13 @@ function drupal_pre_render_table(array $element) {
   // Take over $element['#id'] as HTML ID attribute, if not already set.
   element_set_attributes($element, array('id'));
 
-  // If the custom #tabledrag is set and there is a HTML ID, inject the table's
-  // HTML ID as first callback argument and attach the behavior.
+  // If the custom #tabledrag is set and there is a HTML ID, add the table's
+  // HTML ID to the options and attach the behavior.
   if (!empty($element['#tabledrag']) && isset($element['#attributes']['id'])) {
-    foreach ($element['#tabledrag'] as &$args) {
-      array_unshift($args, $element['#attributes']['id']);
+    foreach ($element['#tabledrag'] as $options) {
+      $options['table_id'] = $element['#attributes']['id'];
+      drupal_attach_tabledrag($element, $options);
     }
-    $element['#attached']['drupal_add_tabledrag'] = $element['#tabledrag'];
   }
 
   return $element;
@@ -1809,23 +1802,13 @@ function theme_item_list($variables) {
   if ($items) {
     $output .= '<' . $list_type . new Attribute($list_attributes) . '>';
 
-    $num_items = count($items);
-    $i = 0;
     foreach ($items as &$item) {
-      $i++;
       $attributes = array();
       if (is_array($item)) {
         if (isset($item['#wrapper_attributes'])) {
           $attributes = $item['#wrapper_attributes'];
         }
         $item = drupal_render($item);
-      }
-      $attributes['class'][] = ($i % 2 ? 'odd' : 'even');
-      if ($i == 1) {
-        $attributes['class'][] = 'first';
-      }
-      if ($i == $num_items) {
-        $attributes['class'][] = 'last';
       }
       $output .= '<li' . new Attribute($attributes) . '>' . $item . '</li>';
     }
@@ -2060,15 +2043,22 @@ function _template_preprocess_default_variables() {
  * @see system_elements()
  */
 function template_preprocess_html(&$variables) {
-  $language_interface = language(Language::TYPE_INTERFACE);
+  /** @var $page \Drupal\Core\Page\HtmlPage */
+  $page = $variables['page_object'];
+
+  $variables['html_attributes'] = $page->getHtmlAttributes();
+  $variables['attributes'] = $page->getBodyAttributes();
+  $variables['page'] = $page->getContent();
 
   // Compile a list of classes that are going to be applied to the body element.
   // This allows advanced theming based on context (home page, node of certain type, etc.).
-  $variables['attributes']['class'][] = 'html';
+  $body_classes = $variables['attributes']['class'];
+  $body_classes[] = 'html';
   // Add a class that tells us whether we're on the front page or not.
-  $variables['attributes']['class'][] = $variables['is_front'] ? 'front' : 'not-front';
+  $body_classes[] = $variables['is_front'] ? 'front' : 'not-front';
   // Add a class that tells us whether the page is viewed by an authenticated user or not.
-  $variables['attributes']['class'][] = $variables['logged_in'] ? 'logged-in' : 'not-logged-in';
+  $body_classes[] = $variables['logged_in'] ? 'logged-in' : 'not-logged-in';
+  $variables['attributes']['class'] = $body_classes;
 
   // Populate the body classes.
   if ($suggestions = theme_get_suggestions(arg(), 'page', '-')) {
@@ -2086,6 +2076,7 @@ function template_preprocess_html(&$variables) {
   $variables['html_attributes'] = new Attribute;
 
   // HTML element attributes.
+  $language_interface = \Drupal::service('language_manager')->getCurrentLanguage();
   $variables['html_attributes']['lang'] = $language_interface->id;
   $variables['html_attributes']['dir'] = $language_interface->direction ? 'rtl' : 'ltr';
 
@@ -2103,9 +2094,9 @@ function template_preprocess_html(&$variables) {
 
   $site_config = \Drupal::config('system.site');
   // Construct page title.
-  if (!empty($variables['page']['#title'])) {
+  if ($page->hasTitle()) {
     $head_title = array(
-      'title' => strip_tags($variables['page']['#title']),
+      'title' => strip_tags($page->getTitle()),
       'name' => String::checkPlain($site_config->get('name')),
     );
   }
@@ -2155,15 +2146,8 @@ function template_preprocess_html(&$variables) {
 
   drupal_add_library('system', 'html5shiv', TRUE);
 
-  // Render page_top and page_bottom into top level variables.
-  $variables['page_top'] = array();
-  if (isset($variables['page']['page_top'])) {
-    $variables['page_top'] = drupal_render($variables['page']['page_top']);
-  }
-  $variables['page_bottom'] = array();
-  if (isset($variables['page']['page_bottom'])) {
-    $variables['page_bottom'][]['#markup'] = drupal_render($variables['page']['page_bottom']);
-  }
+  $variables['page_top'][] = array('#markup' => $page->getBodyTop());
+  $variables['page_bottom'][] = array('#markup' => $page->getBodyBottom());
 
   // Add footer scripts as '#markup' so they can be rendered with other
   // elements in page_bottom.
@@ -2362,6 +2346,8 @@ function theme_get_suggestions($args, $base, $delimiter = '__') {
  * @param array $variables
  *   An associative array containing:
  *   - content - An array of page content.
+ *
+ * @see system_page_build()
  */
 function template_preprocess_maintenance_page(&$variables) {
   global $theme;
@@ -2428,21 +2414,31 @@ function template_preprocess_maintenance_page(&$variables) {
       $head_title['slogan'] = strip_tags(filter_xss_admin($site_slogan));
     }
   }
-  $path = drupal_get_path('module', 'system');
 
   // These are usually added from system_page_build() except maintenance.css.
   // When the database is inactive it's not called so we add it here.
-  $default_css = array(
-    '#attached' => array(
-      'css' => array(
-        $path . '/css/system.module.css',
-        $path . '/css/system.theme.css',
-        $path . '/css/system.admin.css',
-        $path . '/css/system.maintenance.css',
-      ),
-    ),
+  $default_css['library'][] = array('system', 'normalize');
+  $path = drupal_get_path('module', 'system');
+  // Adjust the weights to load these early.
+  $default_css['css'][$path . '/css/system.module.css'] = array(
+    'weight' => CSS_COMPONENT - 10,
+    'every_page' => TRUE,
   );
-  drupal_render($default_css);
+  $default_css['css'][$path . '/css/system.theme.css'] = array(
+    'weight' => CSS_SKIN - 10,
+    'every_page' => TRUE,
+  );
+  // Unlike regular pages, the admin.css is added for every maintenance page.
+  $default_css['css'][$path . '/css/system.admin.css'] = array(
+    'weight' => CSS_COMPONENT - 10,
+    'every_page' => TRUE,
+  );
+  $default_css['css'][$path . '/css/system.maintenance.css'] = array(
+    'weight' => CSS_COMPONENT - 10,
+    'every_page' => TRUE,
+  );
+  $attached = array('#attached' => $default_css);
+  drupal_render($attached);
 
   $variables['head_title_array']  = $head_title;
   $variables['head_title']        = implode(' | ', $head_title);
@@ -2483,7 +2479,7 @@ function template_preprocess_maintenance_page(&$variables) {
   // While this code is used in the installer, the language module may not be
   // enabled yet (even maybe no database set up yet), but an RTL language
   // selected should result in RTL stylesheets loaded properly already.
-  $css = drupal_add_css();
+  $css = _drupal_add_css();
   include_once DRUPAL_ROOT . '/core/modules/language/language.module';
   // Wrapping drupal_get_css() and drupal_get_js() in an object so they can
   // be called when printed.
@@ -2551,7 +2547,7 @@ function drupal_common_theme() {
   return array(
     // From theme.inc.
     'html' => array(
-      'render element' => 'page',
+      'variables' => array('page_object' => NULL),
       'template' => 'html',
     ),
     'page' => array(
@@ -2625,7 +2621,7 @@ function drupal_common_theme() {
     ),
     // From theme.maintenance.inc.
     'maintenance_page' => array(
-      'variables' => array('content' => NULL, 'show_messages' => TRUE),
+      'variables' => array('content' => NULL, 'show_messages' => TRUE, 'page' => array()),
       'template' => 'maintenance-page',
     ),
     'install_page' => array(

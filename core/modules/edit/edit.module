@@ -15,26 +15,6 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 
 /**
- * Implements hook_menu().
- */
-function edit_menu() {
-  // @todo Remove these menu items in http://drupal.org/node/1954892 when theme
-  //   callbacks are replaced with something else.
-  $items['edit/metadata'] = array(
-    'route_name' => 'edit.metadata',
-    'theme callback' => 'ajax_base_page_theme',
-    'type' => MENU_CALLBACK,
-  );
-  $items['edit/form/%/%/%/%/%'] = array(
-    'route_name' => 'edit.field_form',
-    'theme callback' => 'ajax_base_page_theme',
-    'type' => MENU_CALLBACK,
-  );
-
-  return $items;
-}
-
-/**
  * Implements hook_permission().
  */
 function edit_permission() {
@@ -53,6 +33,12 @@ function edit_permission() {
  */
 function edit_page_build(&$page) {
   if (!\Drupal::currentUser()->hasPermission('access in-place editing')) {
+    return;
+  }
+
+  // In-place editing is only supported on the front-end.
+  $path = \Drupal::request()->attributes->get('_system_path');
+  if (path_is_admin($path)) {
     return;
   }
 
@@ -75,6 +61,7 @@ function edit_library_info() {
       $path . '/js/edit.js' => $options,
       $path . '/js/util.js' => $options,
       // Models.
+      $path . '/js/models/BaseModel.js' => $options,
       $path . '/js/models/AppModel.js' => $options,
       $path . '/js/models/EntityModel.js' => $options,
       $path . '/js/models/FieldModel.js' => $options,

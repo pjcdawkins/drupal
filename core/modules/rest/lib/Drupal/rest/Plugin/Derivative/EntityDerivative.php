@@ -71,8 +71,8 @@ class EntityDerivative implements ContainerDerivativeInterface {
         $this->derivatives[$entity_type] = array(
           'id' => 'entity:' . $entity_type,
           'entity_type' => $entity_type,
-          'serialization_class' => $entity_info['class'],
-          'label' => $entity_info['label'],
+          'serialization_class' => $entity_info->getClass(),
+          'label' => $entity_info->getLabel(),
         );
         // Use the entity links as REST URL patterns if available.
         $this->derivatives[$entity_type]['links']['http://drupal.org/link-relations/create'] = isset($entity_info['links']['http://drupal.org/link-relations/create']) ? $entity_info['links']['http://drupal.org/link-relations/create'] : "/entity/$entity_type";

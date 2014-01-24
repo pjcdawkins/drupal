@@ -14,7 +14,7 @@ use Drupal\Component\Utility\Url;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\HttpKernel;
-use Drupal\Core\KeyValueStore\KeyValueExpirableFactory;
+use Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Routing\UrlGeneratorInterface;
 use Drupal\Core\StringTranslation\TranslationInterface;
@@ -41,7 +41,7 @@ class FormBuilder implements FormBuilderInterface {
   /**
    * The factory for expirable key value stores used by form cache.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueExpirableFactory
+   * @var \Drupal\Core\KeyValueStore\KeyValueFactoryInterface
    */
   protected $keyValueExpirableFactory;
 
@@ -123,7 +123,7 @@ class FormBuilder implements FormBuilderInterface {
    *
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
-   * @param \Drupal\Core\KeyValueStore\KeyValueExpirableFactory $key_value_expirable_factory
+   * @param \Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface $key_value_expirable_factory
    *   The keyvalue expirable factory.
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
    *   The event dispatcher.
@@ -136,7 +136,7 @@ class FormBuilder implements FormBuilderInterface {
    * @param \Drupal\Core\HttpKernel $http_kernel
    *   The HTTP kernel.
    */
-  public function __construct(ModuleHandlerInterface $module_handler, KeyValueExpirableFactory $key_value_expirable_factory, EventDispatcherInterface $event_dispatcher, UrlGeneratorInterface $url_generator, TranslationInterface $translation_manager, CsrfTokenGenerator $csrf_token = NULL, HttpKernel $http_kernel = NULL) {
+  public function __construct(ModuleHandlerInterface $module_handler, KeyValueExpirableFactoryInterface $key_value_expirable_factory, EventDispatcherInterface $event_dispatcher, UrlGeneratorInterface $url_generator, TranslationInterface $translation_manager, CsrfTokenGenerator $csrf_token = NULL, HttpKernel $http_kernel = NULL) {
     $this->moduleHandler = $module_handler;
     $this->keyValueExpirableFactory = $key_value_expirable_factory;
     $this->eventDispatcher = $event_dispatcher;
@@ -191,9 +191,12 @@ class FormBuilder implements FormBuilderInterface {
   /**
    * {@inheritdoc}
    */
-  public function buildForm($form_id, &$form_state) {
+  public function buildForm($form_id, array &$form_state) {
     // Ensure some defaults; if already set they will not be overridden.
     $form_state += $this->getFormStateDefaults();
+
+    // Ensure the form ID is prepared.
+    $form_id = $this->getFormId($form_id, $form_state);
 
     if (!isset($form_state['input'])) {
       $form_state['input'] = $form_state['method'] == 'get' ? $_GET : $_POST;
@@ -617,7 +620,7 @@ class FormBuilder implements FormBuilderInterface {
         // possibly ending execution. We make sure we do not react to the batch
         // that is already being processed (if a batch operation performs a
         // self::submitForm).
-        if ($batch =& batch_get() && !isset($batch['current_set'])) {
+        if ($batch = &$this->batchGet() && !isset($batch['current_set'])) {
           // Store $form_state information in the batch definition.
           // We need the full $form_state when either:
           // - Some submit handlers were saved to be called during batch
@@ -1192,7 +1195,7 @@ class FormBuilder implements FormBuilderInterface {
       // Check if a previous _submit handler has set a batch, but make sure we
       // do not react to a batch that is already being processed (for instance
       // if a batch operation performs a self::submitForm()).
-      if ($type == 'submit' && ($batch =& batch_get()) && !isset($batch['id'])) {
+      if ($type == 'submit' && ($batch = &$this->batchGet()) && !isset($batch['id'])) {
         // Some previous submit handler has set a batch. To ensure correct
         // execution order, store the call in a special 'control' batch set.
         // See _batch_next_set().
@@ -1832,6 +1835,13 @@ class FormBuilder implements FormBuilderInterface {
    */
   public function setRequest(Request $request) {
     $this->request = $request;
+  }
+
+  /**
+   * Wraps batch_get().
+   */
+  protected function &batchGet() {
+    return batch_get();
   }
 
 }

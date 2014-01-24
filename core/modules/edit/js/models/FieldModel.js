@@ -10,7 +10,7 @@
 /**
  * State of an in-place editable field in the DOM.
  */
-Drupal.edit.FieldModel = Backbone.Model.extend({
+Drupal.edit.FieldModel = Drupal.edit.BaseModel.extend({
 
   defaults: {
     // The DOM element that represents this field. It may seem bizarre to have
@@ -33,6 +33,11 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
     // Callback function for validating changes between states. Receives the
     // previous state, new state, context, and a callback
     acceptStateChange: null,
+    // A logical field ID, of the form
+    // "<entity type>/<id>/<field name>/<language>", i.e. the fieldID without
+    // the view mode, to be able to identify other instances of the same field
+    // on the page but rendered in a different view mode. e.g. "node/1/field_tags/und".
+    logicalFieldID: null,
 
     // The attributes below are stateful. The ones above will never change
     // during the life of a FieldModel instance.
@@ -49,7 +54,11 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
     // The full HTML representation of this field (with the element that has
     // the data-edit-field-id as the outer element). Used to propagate changes
     // from this field instance to other instances of the same field.
-    html: null
+    html: null,
+    // An object containing the full HTML representations (values) of other view
+    // modes (keys) of this field, for other instances of this field displayed
+    // in a different view mode.
+    htmlForOtherViewModes: null
   },
 
   /**
@@ -61,6 +70,12 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
 
     // Enlist field automatically in the associated entity's field collection.
     this.get('entity').get('fields').add(this);
+
+    // Automatically generate the logical field ID.
+    this.set('logicalFieldID', this.get('fieldID').split('/').slice(0, 4).join('/'));
+
+    // Call Drupal.edit.BaseModel's initialize() method.
+    Drupal.edit.BaseModel.prototype.initialize.call(this, options);
   },
 
   /**
@@ -70,7 +85,7 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
     if (this.get('state') !== 'inactive') {
       throw new Error("FieldModel cannot be destroyed if it is not inactive state.");
     }
-    Backbone.Model.prototype.destroy.apply(this, options);
+    Drupal.edit.BaseModel.prototype.destroy.call(this, options);
   },
 
   /**
@@ -85,11 +100,6 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
    * {@inheritdoc}
    */
   validate: function (attrs, options) {
-    // We only care about validating the 'state' attribute.
-    if (!_.has(attrs, 'state')) {
-      return;
-    }
-
     var current = this.get('state');
     var next = attrs.state;
     if (current !== next) {
@@ -112,6 +122,46 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
    */
   getEntityID: function () {
     return this.get('fieldID').split('/').slice(0, 2).join('/');
+  },
+
+  /**
+   * Extracts the view mode ID from this field's ID.
+   *
+   * @return String
+   *   A view mode ID.
+   */
+  getViewMode: function () {
+    return this.get('fieldID').split('/').pop();
+  },
+
+  /**
+   * Find other instances of this field with different view modes.
+   *
+   * @return Array
+   *   An array containing view mode IDs.
+   */
+  findOtherViewModes: function () {
+    var currentField = this;
+    var otherViewModes = [];
+    Drupal.edit.collections.fields
+      // Find all instances of fields that display the same logical field (same
+      // entity, same field, just a different instance and maybe a different
+      // view mode).
+      .where({ logicalFieldID: currentField.get('logicalFieldID') })
+      .forEach(function (field) {
+        // Ignore the current field.
+        if (field === currentField) {
+          return;
+        }
+        // Also ignore other fields with the same view mode.
+        else if (field.get('fieldID') === currentField.get('fieldID')) {
+          return;
+        }
+        else {
+          otherViewModes.push(field.getViewMode());
+        }
+      });
+    return otherViewModes;
   }
 
 }, {
